@@ -8,6 +8,7 @@ import AdminHome from "./pages/AdminHome";
 import AdminDashboard from "./pages/AdminDashboard";
 import Inventory from "./pages/Inventory";
 import AdminRegistration from "./pages/AdminRegistration";
+import AdminHelp from "./pages/AdminHelp";
 import AdminSearch from "./pages/AdminSearch";
 
 // Staff Pages
@@ -15,10 +16,10 @@ import StaffHome from "./pages/StaffHome";
 import StaffDashboard from "./pages/StaffDashboard";
 import StaffInventory from "./pages/StaffInventory";
 import StaffSearch from "./pages/StaffSearch";
+import StaffHelp from "./pages/StaffHelp";
 
 // Placeholder Pages
 import Maintenance from "./pages/Maintenance";
-import Help from "./pages/Help";
 import About from "./pages/About";
 import Settings from "./pages/Settings";
 
@@ -43,7 +44,7 @@ function App() {
             
             {/* Admin Dedicated Placeholders */}
             <Route path="/admin-maintenance" element={<Maintenance role="admin" />} />
-            <Route path="/admin-help" element={<Help role="admin" />} />
+            <Route path="/admin-help" element={<AdminHelp />} />
             <Route path="/admin-about" element={<About role="admin" />} />
             <Route path="/admin-settings" element={<Settings role="admin" />} />
             
@@ -53,7 +54,7 @@ function App() {
             <Route path="/staff-inventory" element={<StaffInventory />} />
             <Route path="/staff-search" element={<StaffSearch />} />
             
-            <Route path="/staff-help" element={<Help role="staff" />} />
+            <Route path="/staff-help" element={<StaffHelp />} />
             <Route path="/staff-about" element={<About role="staff" />} />
             <Route path="/staff-settings" element={<Settings role="staff" />} />
             <Route path="*" element={<Navigate to="/login" replace />} />
