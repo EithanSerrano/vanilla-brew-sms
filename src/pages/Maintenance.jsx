@@ -653,7 +653,7 @@ export default function Maintenance({ role }) {
   // --- SUB-VIEW: EDIT MENU ITEM  ---
   if (currentView === 'edit-menu-item') {
     return (
-      <div className="flex w-full h-full gap-6 relative bg-[#1a1a1a]">
+      <div className="flex w-full h-full gap-6 relative bg-[#1e1e1e]">
         <AdminSidebar activePage="maintenance" />
         <main className="flex-1 bg-[#2a2a2a] rounded-xl p-8 flex flex-col text-white relative overflow-y-auto">
           
@@ -849,7 +849,7 @@ export default function Maintenance({ role }) {
   // --- SUB-VIEW: EDIT ITEM  ---
   if (currentView === 'edit-item') {
     return (
-      <div className="flex w-full h-full gap-6 relative bg-[#1a1a1a]">
+      <div className="flex w-full h-full gap-6 relative bg-[#1e1e1e]">
         <AdminSidebar activePage="maintenance" />
         <main className="flex-1 bg-[#2a2a2a] rounded-xl p-8 flex flex-col text-white relative overflow-y-auto custom-scrollbar-gutter">
           
@@ -1025,7 +1025,7 @@ export default function Maintenance({ role }) {
   // --- SUB-VIEW: EDIT INGREDIENT ---
   if (currentView === 'edit-ingredient') {
     return (
-      <div className="flex w-full h-full gap-6 relative bg-[#1a1a1a]">
+      <div className="flex w-full h-full gap-6 relative bg-[#1e1e1e]">
         <AdminSidebar activePage="maintenance" />
         {/* Removed items-center to allow full width list */}
         <main className="flex-1 bg-[#2a2a2a] rounded-xl p-8 flex flex-col text-white relative overflow-hidden">
