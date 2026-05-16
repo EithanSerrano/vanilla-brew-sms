@@ -20,6 +20,7 @@ import {
   RotateCw,
   UserRoundPlus,
   UserRoundMinus,
+  Trash2,
   } from 'lucide-react';
 import AdminSidebar from '../layouts/AdminSidebar';
 
@@ -42,11 +43,6 @@ export default function Maintenance({ role }) {
     Large: { locked: true, price: '' },
   });
   const [addOns, setAddOns] = useState([{ id: 1, name: '', price: '' }]);
-  const [connections, setConnections] = useState([
-    { id: 1, type: '', code: '', units: '' },
-    { id: 2, type: '', code: '', units: '' },
-    { id: 3, type: '', code: '', units: '' },
-  ]);
 
   const [itemSizes, setItemSizes] = useState({
   Small: { enabled: true, qty: '50' },
@@ -62,6 +58,32 @@ export default function Maintenance({ role }) {
   };
 
   const [selectedEditItem, setSelectedEditItem] = useState(null);
+
+  const handleAddRow = () => {
+    setAddOns([...addOns, { name: '', price: '' }]);
+  };
+
+  const handleRemoveRow = (index) => {
+    if (addOns.length > 0) {
+      setAddOns(addOns.filter((_, i) => i !== index));
+    } else {
+      setAddOns([{ name: '', price: '' }]);
+    }
+  };
+
+  const [connections, setConnections] = useState([]);
+
+  const addConnection = (type) => {
+    setConnections([...connections, { type, code: '', units: '' }]);
+  };
+
+  const removeConnection = (index) => {
+    setConnections(connections.filter((_, i) => i !== index));
+  };
+
+  const getSequenceNumber = (index, type) => {
+    return connections.slice(0, index + 1).filter(c => c.type === type).length;
+  };
 
   const mockMenuItems = [
   { id: 'MNTM001', name: 'Classic Mango Shake' },
@@ -236,6 +258,7 @@ export default function Maintenance({ role }) {
           <h1 className="text-4xl font-semibold mb-8">Create Menu Item</h1>
 
           <div className="flex flex-col gap-4 w-full pb-24">
+
             {/* General Info Accordion */}
             <div className="bg-[#3d3d3d] rounded-2xl overflow-hidden border border-[#444]">
               <button 
@@ -264,57 +287,120 @@ export default function Maintenance({ role }) {
               )}
             </div>
 
-            {/* Sizes & Pricing Accordion */}
+            {/* Sizes Accordion */}
             <div className="bg-[#3d3d3d] rounded-2xl overflow-hidden border border-[#444]">
-              <button onClick={() => setActiveAccordion(activeAccordion === 'sizes' ? null : 'sizes')} className="w-full p-6 flex justify-between items-center hover:bg-[#444]">
-                <h3 className="text-2xl font-medium">Sizes and Pricing</h3>
+              <button 
+                onClick={() => setActiveAccordion(activeAccordion === 'sizes' ? null : 'sizes')}
+                className="w-full p-6 flex justify-between items-center hover:bg-[#444]"
+              >
+                <h3 className="text-2xl font-medium">Sizes</h3>
                 {activeAccordion === 'sizes' ? <ChevronUp size={28} /> : <ChevronDown size={28} />}
               </button>
               {activeAccordion === 'sizes' && (
-                <div className="p-10 border-t border-[#444] space-y-8">
-                  {Object.entries(sizes).map(([size, data]) => (
-                    <div key={size} className="grid grid-cols-[0.5fr_1fr_0.5fr_1fr] items-center gap-x-8">
-                      <button onClick={() => toggleSizeLock(size)} className="justify-self-end text-white hover:text-[#56a2d1]">
-                        {data.locked ? <Lock size={32} /> : <Unlock size={32} />}
-                      </button>
-                      <span className="text-2xl font-medium">{size}</span>
-                      <span className="text-2xl font-medium text-right">Php</span>
-                      <div className="relative">
+                <div className="p-10 border-t border-[#444]">
+                  {/* Header for the grid columns */}
+                  <div className="grid grid-cols-[1.2fr_1fr_0.8fr_1.2fr] mb-6 px-4 text-center text-lg text-gray-300">
+                    <span></span>
+                    <span>Sizes</span>
+                    <span></span>
+                    <span>Price</span>
+                  </div>
+
+                  <div className="space-y-6">
+                    {Object.entries(itemSizes).map(([size, data]) => (
+                      <div key={size} className="grid grid-cols-[1.2fr_1fr_0.8fr_1.2fr] items-center gap-x-8">
+                        <span className={`text-2xl font-medium text-right ${!data.enabled ? 'opacity-40' : ''}`}>
+                          {size}
+                        </span>
+                        
+                        {/* Checkbox Button */}
+                        <div className="flex justify-center">
+                          <button 
+                            onClick={() => toggleItemSize(size)}
+                            className="bg-white text-black w-16 h-11 rounded-lg flex items-center justify-center transition-all active:scale-90"
+                          >
+                            {data.enabled && <Check size={28} strokeWidth={4} className="text-black" />}
+                          </button>
+                        </div>
+
+                        <span className={`text-2xl font-medium text-right ${!data.enabled ? 'opacity-40' : ''}`}>
+                          Php
+                        </span>
+                        
                         <input 
-                          disabled={data.locked} value={data.locked ? '' : data.price}
-                          className={`w-full rounded-lg h-12 px-4 text-center text-xl font-semibold ${data.locked ? 'bg-transparent border-2 border-gray-500 opacity-50' : 'bg-white text-black'}`}
+                          type="text" 
+                          disabled={!data.enabled}
+                          value={data.enabled ? data.qty : ''}
+                          onChange={(e) => setItemSizes(prev => ({
+                            ...prev,
+                            [size]: { ...prev[size], qty: e.target.value }
+                          }))}
+                          className={`rounded-lg h-11 w-full text-center text-xl font-semibold focus:outline-none transition-colors ${
+                            data.enabled 
+                              ? 'bg-white text-black' 
+                              : 'bg-transparent border-2 border-gray-500 opacity-50 cursor-not-allowed'
+                          }`} 
                         />
-                        {data.locked && <Lock size={20} className="absolute right-4 top-3 text-white" />}
                       </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
 
             {/* Add-Ons Accordion */}
             <div className="bg-[#3d3d3d] rounded-2xl overflow-hidden border border-[#444]">
-              <button onClick={() => setActiveAccordion(activeAccordion === 'addons' ? null : 'addons')} className="w-full p-6 flex justify-between items-center hover:bg-[#444]">
+              <button 
+                onClick={() => setActiveAccordion(activeAccordion === 'addons' ? null : 'addons')} 
+                className="w-full p-6 flex justify-between items-center hover:bg-[#444]"
+              >
                 <h3 className="text-2xl font-medium">Add-Ons</h3>
                 {activeAccordion === 'addons' ? <ChevronUp size={28} /> : <ChevronDown size={28} />}
               </button>
+
               {activeAccordion === 'addons' && (
                 <div className="p-10 border-t border-[#444] space-y-6">
                   {addOns.map((addon, idx) => (
-                    <div key={idx} className="grid grid-cols-[1fr_2fr_0.5fr_1fr] items-center gap-x-8">
-                      <span className="text-2xl font-medium text-right">No. {idx + 1}</span>
+                    /* Grid changed to accommodate the trash icon at the end */
+                    <div key={idx} className="grid grid-cols-[1fr_2fr_0.5fr_1fr_auto] items-center gap-x-8">
+                      <span className="text-2xl font-medium text-right whitespace-nowrap">No. {idx + 1}</span>
+                      
                       <div className="relative">
                         <select className="w-full bg-white text-black rounded-lg h-12 px-4 text-xl font-semibold appearance-none">
-                          <option>{addon.name}</option>
+                          <option value="">{addon.name || "Select Add-On"}</option>
+                          {/* Add your options here */}
                         </select>
                         <ChevronDown size={24} className="absolute right-3 top-3 text-black pointer-events-none" />
                       </div>
+
                       <span className="text-2xl font-medium text-right">Php</span>
-                      <input type="text" value={addon.price} className="bg-white text-black rounded-lg h-12 text-center text-xl font-semibold" />
+                      
+                      <input 
+                        type="text" 
+                        value={addon.price} 
+                        onChange={(e) => {
+                          const updated = [...addOns];
+                          updated[idx].price = e.target.value;
+                          setAddOns(updated);
+                        }}
+                        className="bg-white text-black rounded-lg h-12 text-center text-xl font-semibold" 
+                      />
+
+                      {/* TRASH CAN BUTTON */}
+                      <button 
+                        onClick={() => handleRemoveRow(idx)}
+                        className="text-red-400 hover:text-red-600 transition-colors p-2"
+                      >
+                        <Trash2 size={24} />
+                      </button>
                     </div>
                   ))}
+
                   <div className="flex justify-center pt-4">
-                    <button className="border-2 border-white rounded-xl px-12 py-3 flex items-center gap-3 text-xl font-medium hover:bg-white hover:text-black transition-colors">
+                    <button 
+                      onClick={handleAddRow}
+                      className="border-2 border-white rounded-xl px-12 py-3 flex items-center gap-3 text-xl font-medium hover:bg-white hover:text-black transition-colors"
+                    >
                       <Plus size={24} /> Add another Add-On
                     </button>
                   </div>
@@ -324,32 +410,72 @@ export default function Maintenance({ role }) {
 
             {/* Connections Accordion */}
             <div className="bg-[#3d3d3d] rounded-2xl overflow-hidden border border-[#444]">
-              <button onClick={() => setActiveAccordion(activeAccordion === 'connections' ? null : 'connections')} className="w-full p-6 flex justify-between items-center hover:bg-[#444]">
+              <button 
+                onClick={() => setActiveAccordion(activeAccordion === 'connections' ? null : 'connections')} 
+                className="w-full p-6 flex justify-between items-center hover:bg-[#444] transition-colors"
+              >
                 <h3 className="text-2xl font-medium">Assign Connections</h3>
                 {activeAccordion === 'connections' ? <ChevronUp size={28} /> : <ChevronDown size={28} />}
               </button>
+
               {activeAccordion === 'connections' && (
                 <div className="p-10 border-t border-[#444] space-y-6">
                   {connections.map((conn, idx) => (
-                    <div key={idx} className="grid grid-cols-[1.5fr_2fr_0.8fr_1fr] items-center gap-x-8">
+                    <div key={idx} className="grid grid-cols-[1.5fr_2fr_0.5fr_1fr_auto] items-center gap-x-8">
+                      {/* Dynamic Label based on Type and Sequence */}
                       <span className="text-2xl font-medium text-right">
-                        {conn.type === 'ingredient' ? 'Ingredient' : 'Item'} No. {idx + 1}
+                        {conn.type === 'ingredient' ? 'Ingredient' : 'Item'} No. {getSequenceNumber(idx, conn.type)}
                       </span>
+
+                      {/* Selection Dropdown */}
                       <div className="relative">
                         <select className="w-full bg-white text-black rounded-lg h-12 px-4 text-xl font-semibold appearance-none">
+                          <option value="" disabled selected>
+                            {conn.type === 'ingredient' ? 'Select Ingredient' : 'Select Item'}
+                          </option>
+                          {/* Options would go here */}
                           <option>{conn.code}</option>
                         </select>
                         <ChevronDown size={24} className="absolute right-3 top-3 text-black pointer-events-none" />
                       </div>
+
                       <span className="text-2xl font-medium text-right">Units</span>
-                      <input type="text" value={conn.units} className="bg-white text-black rounded-lg h-12 text-center text-xl font-semibold" />
+
+                      {/* Units Input */}
+                      <input 
+                        type="text" 
+                        value={conn.units} 
+                        onChange={(e) => {
+                          const newConns = [...connections];
+                          newConns[idx].units = e.target.value;
+                          setConnections(newConns);
+                        }}
+                        placeholder={conn.type === 'ingredient' ? '' : '1'}
+                        className="bg-white text-black rounded-lg h-12 text-center text-xl font-semibold" 
+                      />
+
+                      {/* Remove Row Button */}
+                      <button 
+                        onClick={() => removeConnection(idx)}
+                        className="text-red-400 hover:text-red-600 transition-colors p-2"
+                      >
+                        <Trash2 size={24} />
+                      </button>
                     </div>
                   ))}
+
+                  {/* Action Buttons */}
                   <div className="flex justify-center gap-8 pt-4">
-                    <button className="border-2 border-white rounded-xl px-8 py-3 flex items-center gap-2 text-xl font-medium hover:bg-white hover:text-black transition-colors">
+                    <button 
+                      onClick={() => addConnection('ingredient')}
+                      className="border-2 border-white rounded-xl px-8 py-3 flex items-center gap-2 text-xl font-medium hover:bg-white hover:text-black transition-colors"
+                    >
                       <Plus size={24} /> Assign Ingredient
                     </button>
-                    <button className="border-2 border-white rounded-xl px-8 py-3 flex items-center gap-2 text-xl font-medium hover:bg-white hover:text-black transition-colors">
+                    <button 
+                      onClick={() => addConnection('item')}
+                      className="border-2 border-white rounded-xl px-8 py-3 flex items-center gap-2 text-xl font-medium hover:bg-white hover:text-black transition-colors"
+                    >
                       <Plus size={24} /> Assign Item
                     </button>
                   </div>
@@ -650,7 +776,7 @@ export default function Maintenance({ role }) {
     );
   }
 
-  // --- SUB-VIEW: EDIT MENU ITEM  ---
+  // --- SUB-VIEW: EDIT MENU ITEM ---
   if (currentView === 'edit-menu-item') {
     return (
       <div className="flex w-full h-full gap-6 relative bg-[#1e1e1e]">
@@ -659,41 +785,45 @@ export default function Maintenance({ role }) {
           
           {/* Breadcrumb Header */}
           <div className="flex gap-4 mb-10">
-          <button 
-            onClick={() => selectedEditItem ? setSelectedEditItem(null) : handleBack()} 
-            className="bg-[#5a5a5a] p-3 rounded-lg hover:bg-[#6a6a6a]"
-          >
-            <CornerUpLeft size={20} />
-          </button>
-          <div className="flex-1 bg-[#5a5a5a] rounded-lg flex items-center px-4 gap-3 text-base font-medium tracking-wide">
-            <WrenchIcon size={20} />
-            <span> 
-              Maintenance &gt; Edit &gt; Menu Item 
-              {selectedEditItem && (
-                <span className="text-base font-medium tracking-wide"> &gt; {selectedEditItem.id}</span>
-              )}
-            </span>
+            <button 
+              onClick={() => selectedEditItem ? setSelectedEditItem(null) : handleBack()} 
+              className="bg-[#5a5a5a] p-3 rounded-lg hover:bg-[#6a6a6a] transition-colors"
+            >
+              <CornerUpLeft size={20} />
+            </button>
+            <div className="flex-1 bg-[#5a5a5a] rounded-lg flex items-center px-4 gap-3 text-base font-medium tracking-wide">
+              <WrenchIcon size={20} />
+              <span> 
+                Maintenance &gt; Edit &gt; Menu Item 
+                {selectedEditItem && (
+                  <span className="text-base font-medium tracking-wide"> &gt; {selectedEditItem.id}</span>
+                )}
+              </span>
+            </div>
           </div>
-        </div>
 
           <h1 className="text-4xl font-semibold mb-8">
             Edit Menu Item {selectedEditItem ? `(${selectedEditItem.id})` : ''}
           </h1>
 
           {!selectedEditItem ? (
+
+            /* Selection Table */
             <div className="flex-1 w-full bg-[#333] rounded-xl overflow-y-auto border border-[#444] mb-4">
               <div className="grid grid-cols-[1.5fr_3fr_1fr] bg-[#4a4a4a] p-4 text-xl font-medium px-12 border-b border-[#555]">
                 <span className="text-center">No.</span>
                 <span className="text-center">Name</span>
                 <span className="text-center">Action</span>
-                <span></span>
               </div>
               {mockMenuItems.map((item) => (
                 <div key={item.id} className="grid grid-cols-[1.5fr_3fr_1fr] p-6 border-b border-[#444] items-center px-12 hover:bg-[#3d3d3d] transition-colors">
                   <span className="text-center text-xl">{item.id}</span>
                   <span className="text-center text-xl font-medium">{item.name}</span>
                   <button 
-                    onClick={() => { setSelectedEditItem(item); setMenuItemName(item.name); }}
+                    onClick={() => { 
+                      setSelectedEditItem(item); 
+                      setMenuItemName(item.name);
+                    }}
                     className="flex justify-center text-gray-300 hover:text-white"
                   >
                     <Edit3 size={28} />
@@ -703,9 +833,10 @@ export default function Maintenance({ role }) {
             </div>
           ) : (
             <div className="flex flex-col gap-4 w-full pb-24">
+              
               {/* General Information */}
               <div className="bg-[#3d3d3d] rounded-2xl overflow-hidden border border-[#444]">
-                <button onClick={() => setActiveAccordion(activeAccordion === 'general' ? null : 'general')} className="w-full p-6 flex justify-between items-center hover:bg-[#444]">
+                <button onClick={() => setActiveAccordion(activeAccordion === 'general' ? null : 'general')} className="w-full p-6 flex justify-between items-center hover:bg-[#444] transition-colors">
                   <h3 className="text-2xl font-medium">General Information</h3>
                   {activeAccordion === 'general' ? <ChevronUp size={28} /> : <ChevronDown size={28} />}
                 </button>
@@ -715,130 +846,222 @@ export default function Maintenance({ role }) {
                     <input type="text" value={menuItemName} onChange={(e) => setMenuItemName(e.target.value)} className="bg-white text-black rounded-lg h-12 px-4 text-xl font-semibold" />
                     <label className="text-2xl font-medium text-right">Category</label>
                     <div className="relative">
-                      <select className="w-full bg-white text-black rounded-lg h-12 px-4 text-xl font-semibold appearance-none cursor-pointer"><option>Beverage</option><option>Food</option></select>
+                      <select className="w-full bg-white text-black rounded-lg h-12 px-4 text-xl font-semibold appearance-none cursor-pointer">
+                        <option>Beverage</option>
+                        <option>Food</option>
+                      </select>
                       <ChevronDown size={24} className="absolute right-4 top-3 text-black pointer-events-none" />
                     </div>
                   </div>
                 )}
               </div>
 
-              <div className="bg-[#3d3d3d] rounded-2xl overflow-hidden border border-[#444]">
-                <button onClick={() => setActiveAccordion(activeAccordion === 'sizes' ? null : 'sizes')} className="w-full p-6 flex justify-between items-center hover:bg-[#444]">
-                  <h3 className="text-2xl font-medium">Sizes and Pricing</h3>
-                  {activeAccordion === 'sizes' ? <ChevronUp size={28} /> : <ChevronDown size={28} />}
-                </button>
-                {activeAccordion === 'sizes' && (
-                  <div className="p-10 border-t border-[#444] space-y-8 animate-in slide-in-from-top-2">
-                    {Object.entries(sizes).map(([size, data]) => (
-                      <div key={size} className="grid grid-cols-[0.5fr_1fr_0.5fr_1.5fr] items-center gap-x-8">
-                        <button onClick={() => toggleSizeLock(size)} className="justify-self-end text-white hover:text-[#56a2d1]">{data.locked ? <Lock size={32} /> : <Unlock size={32} />}</button>
-                        <span className="text-2xl font-medium">{size}</span>
-                        <span className="text-2xl font-medium text-right">Php</span>
-                        <div className="relative">
-                          <input disabled={data.locked} value={data.locked ? '' : data.price} className={`w-full rounded-lg h-12 px-4 text-center text-xl font-semibold ${data.locked ? 'bg-transparent border-2 border-gray-500 opacity-50' : 'bg-white text-black'}`} />
-                          {data.locked && <Lock size={20} className="absolute right-4 top-3 text-white" />}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div className="bg-[#3d3d3d] rounded-2xl overflow-hidden border border-[#444]">
-                <button onClick={() => setActiveAccordion(activeAccordion === 'addons' ? null : 'addons')} className="w-full p-6 flex justify-between items-center hover:bg-[#444]">
-                  <h3 className="text-2xl font-medium">Add-Ons</h3>
-                  {activeAccordion === 'addons' ? <ChevronUp size={28} /> : <ChevronDown size={28} />}
-                </button>
-                {activeAccordion === 'addons' && (
-                  <div className="p-10 border-t border-[#444] space-y-6 animate-in slide-in-from-top-2">
-                    {addOns.map((addon, idx) => (
-                      <div key={idx} className="grid grid-cols-[1fr_2fr_0.5fr_1fr] items-center gap-x-8">
-                        <span className="text-2xl font-medium text-right">No. {idx + 1}</span>
-                        <div className="relative">
-                          <select className="w-full bg-white text-black rounded-lg h-12 px-4 text-xl font-semibold appearance-none"><option>{addon.name}</option></select>
-                          <ChevronDown size={24} className="absolute right-3 top-3 text-black pointer-events-none" />
-                        </div>
-                        <span className="text-2xl font-medium text-right">Php</span>
-                        <input type="text" value={addon.price} className="bg-white text-black rounded-lg h-12 text-center text-xl font-semibold" />
-                      </div>
-                    ))}
-                    <div className="flex justify-center pt-4">
-                      <button className="border-2 border-white rounded-xl px-12 py-3 flex items-center gap-3 text-xl font-medium hover:bg-white hover:text-black transition-colors"><Plus size={24} /> Add another Add-On</button>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div className="bg-[#3d3d3d] rounded-2xl overflow-hidden border border-[#444]">
-              <button onClick={() => setActiveAccordion(activeAccordion === 'connections' ? null : 'connections')} className="w-full p-6 flex justify-between items-center hover:bg-[#444]">
-                <h3 className="text-2xl font-medium">Assign Connections</h3>
-                {activeAccordion === 'connections' ? <ChevronUp size={28} /> : <ChevronDown size={28} />}
+              {/* Sizes Accordion */}
+            <div className="bg-[#3d3d3d] rounded-2xl overflow-hidden border border-[#444]">
+              <button 
+                onClick={() => setActiveAccordion(activeAccordion === 'sizes' ? null : 'sizes')}
+                className="w-full p-6 flex justify-between items-center hover:bg-[#444]"
+              >
+                <h3 className="text-2xl font-medium">Sizes</h3>
+                {activeAccordion === 'sizes' ? <ChevronUp size={28} /> : <ChevronDown size={28} />}
               </button>
-              {activeAccordion === 'connections' && (
+              {activeAccordion === 'sizes' && (
+                <div className="p-10 border-t border-[#444]">
+                  {/* Header for the grid columns */}
+                  <div className="grid grid-cols-[1.2fr_1fr_0.8fr_1.2fr] mb-6 px-4 text-center text-lg text-gray-300">
+                    <span></span>
+                    <span>Sizes</span>
+                    <span></span>
+                    <span>Price</span>
+                  </div>
+
+                  <div className="space-y-6">
+                    {Object.entries(itemSizes).map(([size, data]) => (
+                      <div key={size} className="grid grid-cols-[1.2fr_1fr_0.8fr_1.2fr] items-center gap-x-8">
+                        <span className={`text-2xl font-medium text-right ${!data.enabled ? 'opacity-40' : ''}`}>
+                          {size}
+                        </span>
+                        
+                        {/* Checkbox Button */}
+                        <div className="flex justify-center">
+                          <button 
+                            onClick={() => toggleItemSize(size)}
+                            className="bg-white text-black w-16 h-11 rounded-lg flex items-center justify-center transition-all active:scale-90"
+                          >
+                            {data.enabled && <Check size={28} strokeWidth={4} className="text-black" />}
+                          </button>
+                        </div>
+
+                        <span className={`text-2xl font-medium text-right ${!data.enabled ? 'opacity-40' : ''}`}>
+                          Php
+                        </span>
+                        
+                        <input 
+                          type="text" 
+                          disabled={!data.enabled}
+                          value={data.enabled ? data.qty : ''}
+                          onChange={(e) => setItemSizes(prev => ({
+                            ...prev,
+                            [size]: { ...prev[size], qty: e.target.value }
+                          }))}
+                          className={`rounded-lg h-11 w-full text-center text-xl font-semibold focus:outline-none transition-colors ${
+                            data.enabled 
+                              ? 'bg-white text-black' 
+                              : 'bg-transparent border-2 border-gray-500 opacity-50 cursor-not-allowed'
+                          }`} 
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+              {/* Add-Ons Accordion */}
+            <div className="bg-[#3d3d3d] rounded-2xl overflow-hidden border border-[#444]">
+              <button 
+                onClick={() => setActiveAccordion(activeAccordion === 'addons' ? null : 'addons')} 
+                className="w-full p-6 flex justify-between items-center hover:bg-[#444]"
+              >
+                <h3 className="text-2xl font-medium">Add-Ons</h3>
+                {activeAccordion === 'addons' ? <ChevronUp size={28} /> : <ChevronDown size={28} />}
+              </button>
+
+              {activeAccordion === 'addons' && (
                 <div className="p-10 border-t border-[#444] space-y-6">
-                  {connections.map((conn, idx) => (
-                    <div key={idx} className="grid grid-cols-[1.5fr_2fr_0.8fr_1fr] items-center gap-x-8">
-                      <span className="text-2xl font-medium text-right">
-                        {conn.type === 'ingredient' ? 'Ingredient' : 'Item'} No. {idx + 1}
-                      </span>
+                  {addOns.map((addon, idx) => (
+                    /* Grid changed to accommodate the trash icon at the end */
+                    <div key={idx} className="grid grid-cols-[1fr_2fr_0.5fr_1fr_auto] items-center gap-x-8">
+                      <span className="text-2xl font-medium text-right whitespace-nowrap">No. {idx + 1}</span>
+                      
                       <div className="relative">
                         <select className="w-full bg-white text-black rounded-lg h-12 px-4 text-xl font-semibold appearance-none">
-                          <option>{conn.code}</option>
+                          <option value="">{addon.name || "Select Add-On"}</option>
+                          {/* Add your options here */}
                         </select>
                         <ChevronDown size={24} className="absolute right-3 top-3 text-black pointer-events-none" />
                       </div>
-                      <span className="text-2xl font-medium text-right">Units</span>
-                      <input type="text" value={conn.units} className="bg-white text-black rounded-lg h-12 text-center text-xl font-semibold" />
+
+                      <span className="text-2xl font-medium text-right">Php</span>
+                      
+                      <input 
+                        type="text" 
+                        value={addon.price} 
+                        onChange={(e) => {
+                          const updated = [...addOns];
+                          updated[idx].price = e.target.value;
+                          setAddOns(updated);
+                        }}
+                        className="bg-white text-black rounded-lg h-12 text-center text-xl font-semibold" 
+                      />
+
+                      {/* TRASH CAN BUTTON */}
+                      <button 
+                        onClick={() => handleRemoveRow(idx)}
+                        className="text-red-400 hover:text-red-600 transition-colors p-2"
+                      >
+                        <Trash2 size={24} />
+                      </button>
                     </div>
                   ))}
-                  <div className="flex justify-center gap-8 pt-4">
-                    <button className="border-2 border-white rounded-xl px-8 py-3 flex items-center gap-2 text-xl font-medium hover:bg-white hover:text-black transition-colors">
-                      <Plus size={24} /> Assign Ingredient
-                    </button>
-                    <button className="border-2 border-white rounded-xl px-8 py-3 flex items-center gap-2 text-xl font-medium hover:bg-white hover:text-black transition-colors">
-                      <Plus size={24} /> Assign Item
+
+                  <div className="flex justify-center pt-4">
+                    <button 
+                      onClick={handleAddRow}
+                      className="border-2 border-white rounded-xl px-12 py-3 flex items-center gap-3 text-xl font-medium hover:bg-white hover:text-black transition-colors"
+                    >
+                      <Plus size={24} /> Add another Add-On
                     </button>
                   </div>
                 </div>
               )}
             </div>
 
+              {/* Connections Section */}
+              <div className="bg-[#3d3d3d] rounded-2xl overflow-hidden border border-[#444]">
+                <button onClick={() => setActiveAccordion(activeAccordion === 'connections' ? null : 'connections')} className="w-full p-6 flex justify-between items-center hover:bg-[#444] transition-colors">
+                  <h3 className="text-2xl font-medium">Assign Connections</h3>
+                  {activeAccordion === 'connections' ? <ChevronUp size={28} /> : <ChevronDown size={28} />}
+                </button>
+                {activeAccordion === 'connections' && (
+                  <div className="p-10 border-t border-[#444] space-y-6 animate-in slide-in-from-top-2">
+                    {connections.map((conn, idx) => (
+                      <div key={idx} className="grid grid-cols-[1.5fr_2fr_0.8fr_1fr_auto] items-center gap-x-8">
+                        <span className="text-2xl font-medium text-right">
+                          {conn.type === 'ingredient' ? 'Ingredient' : 'Item'} No. {getSequenceNumber(idx, conn.type)}
+                        </span>
+                        <div className="relative">
+                          <select className="w-full bg-white text-black rounded-lg h-12 px-4 text-xl font-semibold appearance-none">
+                            <option>{conn.code || `Select ${conn.type}`}</option>
+                          </select>
+                          <ChevronDown size={24} className="absolute right-3 top-3 text-black pointer-events-none" />
+                        </div>
+                        <span className="text-2xl font-medium text-right">Units</span>
+                        <input 
+                          type="text" 
+                          value={conn.units} 
+                          onChange={(e) => {
+                            const updated = [...connections];
+                            updated[idx].units = e.target.value;
+                            setConnections(updated);
+                          }}
+                          className="bg-white text-black rounded-lg h-12 text-center text-xl font-semibold" 
+                        />
+                        <button onClick={() => removeConnection(idx)} className="text-red-400 hover:text-red-600 transition-colors p-1">
+                          <Trash2 size={24} />
+                        </button>
+                      </div>
+                    ))}
+                    <div className="flex justify-center gap-8 pt-4">
+                      <button onClick={() => addConnection('ingredient')} className="border-2 border-white rounded-xl px-8 py-3 flex items-center gap-2 text-xl font-medium hover:bg-white hover:text-black transition-colors">
+                        <Plus size={24} /> Assign Ingredient
+                      </button>
+                      <button onClick={() => addConnection('item')} className="border-2 border-white rounded-xl px-8 py-3 flex items-center gap-2 text-xl font-medium hover:bg-white hover:text-black transition-colors">
+                        <Plus size={24} /> Assign Item
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Final Action Button */}
               <div className="mt-8 flex justify-center">
                 <button onClick={() => setShowSavePrompt(true)} className="bg-[#56a2d1] hover:bg-[#66b2e1] text-white text-2xl font-semibold py-4 px-24 rounded-xl shadow-lg transition-transform active:scale-95">
                   Save Changes
                 </button>
               </div>
 
+              {/* Prompt Overlays (Keep as originally provided) */}
               {(showSavePrompt || showItemSavedSuccess || showDiscardPrompt) && (
-              <div className="fixed inset-0 bg-black/65 z-50 flex items-center justify-center animate-in fade-in duration-300">
-                {showSavePrompt && (
-                  <div className="bg-[#2a2a2a] rounded-3xl p-10 shadow-2xl w-full max-w-xl flex flex-col items-center relative border border-[#444]">
-                    <button onClick={() => setShowSavePrompt(false)} className="absolute top-8 left-8 bg-[#5a5a5a] p-3 rounded-xl hover:bg-[#6a6a6a]"><CornerUpLeft size={22} /></button>
-                    <h2 className="text-5xl font-semibold mb-12 text-white mt-4 text-center">Save Creation?</h2>
-                    <div className="flex flex-col gap-5 w-full max-w-md">
-                      <button onClick={() => { setShowSavePrompt(false); setShowDiscardPrompt(true); }} className="w-full bg-[#4a4a4a] py-5 rounded-2xl text-2xl font-semibold transition-colors">Discard</button>
-                      <button onClick={() => { setShowSavePrompt(false); setShowItemSavedSuccess(true); }} className="w-full bg-[#56a2d1] py-5 rounded-2xl text-2xl font-semibold text-white transition-colors">Save</button>
+                <div className="fixed inset-0 bg-black/65 z-50 flex items-center justify-center animate-in fade-in duration-300">
+                  {showSavePrompt && (
+                    <div className="bg-[#2a2a2a] rounded-3xl p-10 shadow-2xl w-full max-w-xl flex flex-col items-center relative border border-[#444]">
+                      <button onClick={() => setShowSavePrompt(false)} className="absolute top-8 left-8 bg-[#5a5a5a] p-3 rounded-xl hover:bg-[#6a6a6a]"><CornerUpLeft size={22} /></button>
+                      <h2 className="text-5xl font-semibold mb-12 text-white mt-4 text-center">Save Changes?</h2>
+                      <div className="flex flex-col gap-5 w-full max-w-md">
+                        <button onClick={() => { setShowSavePrompt(false); setShowDiscardPrompt(true); }} className="w-full bg-[#4a4a4a] py-5 rounded-2xl text-2xl font-semibold transition-colors">Discard</button>
+                        <button onClick={() => { setShowSavePrompt(false); setShowItemSavedSuccess(true); }} className="w-full bg-[#56a2d1] py-5 rounded-2xl text-2xl font-semibold text-white transition-colors">Save</button>
+                      </div>
                     </div>
-                  </div>
-                )}
-                {showItemSavedSuccess && (
-                  <div className="bg-[#2a2a2a] rounded-3xl p-12 shadow-2xl w-full max-w-xl flex flex-col items-center border border-[#444] text-center">
-                    <h2 className="text-5xl font-semibold mb-8 text-white"> Menu Item Saved!</h2>
-                    <p className="text-2xl text-gray-300 mb-10">{menuItemName || "Graham"} has been saved and assigned as ____</p>
-                    <button onClick={() => { setShowItemSavedSuccess(false); setCurrentView('main'); setMenuItemName(''); }} className="w-full max-w-xs bg-[#4a4a4a] py-4 rounded-2xl text-2xl font-semibold transition-colors">Return</button>
-                  </div>
-                )}
-                {showDiscardPrompt && (
-                  <div className="bg-[#2a2a2a] rounded-3xl p-10 shadow-2xl w-full max-w-xl flex flex-col items-center border border-[#444]">
-                    <h2 className="text-5xl font-semibold mb-12 text-white text-center">Discard Creation?</h2>
-                    <div className="flex flex-col gap-5 w-full max-w-md">
-                      <button onClick={() => setShowDiscardPrompt(false)} className="w-full bg-[#4a4a4a] py-5 rounded-2xl text-2xl font-semibold transition-colors">Return</button>
-                      <button onClick={() => { setShowDiscardPrompt(false); setCurrentView('main'); setMenuItemName(''); }} className="w-full bg-[#ca4646] py-5 rounded-2xl text-2xl font-semibold text-white transition-colors">Discard</button>
+                  )}
+                  {showItemSavedSuccess && (
+                    <div className="bg-[#2a2a2a] rounded-3xl p-12 shadow-2xl w-full max-w-xl flex flex-col items-center border border-[#444] text-center">
+                      <h2 className="text-5xl font-semibold mb-8 text-white"> Menu Item Updated!</h2>
+                      <p className="text-2xl text-gray-300 mb-10">{menuItemName} has been successfully updated.</p>
+                      <button onClick={() => { setShowItemSavedSuccess(false); setSelectedEditItem(null); setMenuItemName(''); }} className="w-full max-w-xs bg-[#4a4a4a] py-4 rounded-2xl text-2xl font-semibold transition-colors">Return</button>
                     </div>
-                  </div>
-                )}
-              </div>
-            )}
+                  )}
+                  {showDiscardPrompt && (
+                    <div className="bg-[#2a2a2a] rounded-3xl p-10 shadow-2xl w-full max-w-xl flex flex-col items-center border border-[#444]">
+                      <h2 className="text-5xl font-semibold mb-12 text-white text-center">Discard Changes?</h2>
+                      <div className="flex flex-col gap-5 w-full max-w-md">
+                        <button onClick={() => setShowDiscardPrompt(false)} className="w-full bg-[#4a4a4a] py-5 rounded-2xl text-2xl font-semibold transition-colors">Return</button>
+                        <button onClick={() => { setShowDiscardPrompt(false); setSelectedEditItem(null); setMenuItemName(''); }} className="w-full bg-[#ca4646] py-5 rounded-2xl text-2xl font-semibold text-white transition-colors">Discard</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </main>
@@ -1741,6 +1964,7 @@ export default function Maintenance({ role }) {
       </div>
     );
   }
+
   // --- SAVE/DISCARD PROMPTS (OVERLAY) ---
   {showSavePrompt && (
       <div className="fixed inset-0 z-50 flex items-center justify-center">
