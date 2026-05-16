@@ -1,12 +1,4 @@
-import { useState } from 'react'; // Added missing import
-import { useNavigate } from 'react-router-dom'; // Added missing import
-import { 
-  HelpCircle, 
-  CornerUpLeft, 
-  ChevronDown, 
-  ChevronUp,
-  Info // Changed icon for About
-} from 'lucide-react';
+import { Book } from 'lucide-react';
 import AdminSidebar from '../layouts/AdminSidebar';
 import StaffSidebar from '../layouts/StaffSidebar';
 
