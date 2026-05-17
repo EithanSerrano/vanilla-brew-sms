@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Package, Filter, Layers, Edit, CornerUpLeft, AlertCircle } from 'lucide-react'; // Added AlertCircle
+import { Package, Filter, Layers, Edit, CornerUpLeft, AlertCircle } from 'lucide-react'; 
 import AdminSidebar from '../layouts/AdminSidebar';
 
 export default function Inventory() {

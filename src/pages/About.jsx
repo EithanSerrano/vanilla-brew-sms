@@ -1,4 +1,6 @@
-import { Book } from 'lucide-react';
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Info, ChevronDown, ChevronUp, CornerUpLeft } from 'lucide-react';
 import AdminSidebar from '../layouts/AdminSidebar';
 import StaffSidebar from '../layouts/StaffSidebar';
 
@@ -45,7 +47,7 @@ export default function About({ role }) {
           <h1 className="text-4xl font-semibold mb-10 shrink-0">System Information</h1>
 
           {/* Accordion List */}
-          <div className="flex-1 overflow-y-auto space-y-4 pr-2 custom-scrollbar">
+          <div className="flex flex-col gap-4 w-full pb-10">
             {aboutTopics.map((topic) => (
               <div 
                 key={topic} 

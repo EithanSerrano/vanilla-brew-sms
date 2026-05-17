@@ -23,12 +23,15 @@ import {
   Trash2,
   } from 'lucide-react';
 import AdminSidebar from '../layouts/AdminSidebar';
+import { collection, addDoc, updateDoc, doc } from "firebase/firestore"; 
+import { db } from "../firebase";
 
 export default function Maintenance({ role }) {
   const navigate = useNavigate();
   const [currentView, setCurrentView] = useState('main'); 
   const [activeDropdown, setActiveDropdown] = useState(null);
   const [activeAccordion, setActiveAccordion] = useState('general');
+  const [currentFormType, setCurrentFormType] = useState(null); // Track which form is being saved
   
   // --- STATE FOR FORMS & FLOWS ---
   const [showSavePrompt, setShowSavePrompt] = useState(false);
@@ -40,15 +43,12 @@ export default function Maintenance({ role }) {
   const [sizes, setSizes] = useState({
     Small: { locked: false, price: '' },
     Medium: { locked: false, price: '' },
-    Large: { locked: true, price: '' },
-  });
+    Large: { locked: true, price: '' },});
   const [addOns, setAddOns] = useState([{ id: 1, name: '', price: '' }]);
-
   const [itemSizes, setItemSizes] = useState({
   Small: { enabled: true, qty: '50' },
   Medium: { enabled: true, qty: '50' },
-  Large: { enabled: true, qty: '50' },
-  });
+  Large: { enabled: true, qty: '50' },});
 
   const toggleItemSize = (size) => {
   setItemSizes(prev => ({
@@ -194,6 +194,10 @@ export default function Maintenance({ role }) {
 
   // --- DUMMY FORM DATA ---
   const [ingredientName, setIngredientName] = useState('');
+  const [ingredientType, setIngredientType] = useState('Dry');
+  const [startingQty, setStartingQty] = useState('');
+  const [itemName, setItemName] = useState('');
+  const [itemCategory, setItemCategory] = useState('Beverage');
   
   // --- HELPERS ---
   const isFormFilled = () => {
@@ -220,9 +224,86 @@ export default function Maintenance({ role }) {
       }
     };
 
-  const finalizeSaveFlow = () => {
-    setShowSavePrompt(false);
-    setShowItemSavedSuccess(true);
+  // --- FIRESTORE SAVE FUNCTIONS ---
+  const saveMenuItemToFirestore = async () => {
+    try {
+      const menuItemData = {
+        name: menuItemName,
+        category: itemCategory,
+        sizes: itemSizes,
+        addOns: addOns.filter(addon => addon.name && addon.price), // Filter out empty addons
+        connections: connections,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      
+      const docRef = await addDoc(collection(db, 'menuItems'), menuItemData);
+      console.log('Menu Item saved with ID:', docRef.id);
+      return true;
+    } catch (error) {
+      console.error('Error saving menu item:', error);
+      alert('Error saving menu item to database');
+      return false;
+    }
+  };
+
+  const saveItemToFirestore = async () => {
+    try {
+      const itemData = {
+        name: itemName || ingredientName,
+        sizes: itemSizes,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      
+      const docRef = await addDoc(collection(db, 'items'), itemData);
+      console.log('Item saved with ID:', docRef.id);
+      return true;
+    } catch (error) {
+      console.error('Error saving item:', error);
+      alert('Error saving item to database');
+      return false;
+    }
+  };
+
+  const saveIngredientToFirestore = async () => {
+    try {
+      const ingredientData = {
+        name: ingredientName,
+        type: ingredientType,
+        startingQty: parseFloat(startingQty) || 0,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      
+      const docRef = await addDoc(collection(db, 'ingredients'), ingredientData);
+      console.log('Ingredient saved with ID:', docRef.id);
+      return true;
+    } catch (error) {
+      console.error('Error saving ingredient:', error);
+      alert('Error saving ingredient to database');
+      return false;
+    }
+  };
+
+  const finalizeSaveFlow = async () => {
+    let saveSuccess = false;
+
+    // Determine which form is being saved based on currentView
+    if (currentView === 'create-menu-item' || currentView === 'edit-menu-item') {
+      saveSuccess = await saveMenuItemToFirestore();
+    } else if (currentView === 'create-item' || currentView === 'edit-item') {
+      saveSuccess = await saveItemToFirestore();
+    } else if (currentView === 'create-ingredient' || currentView === 'edit-ingredient') {
+      saveSuccess = await saveIngredientToFirestore();
+    }
+
+    if (saveSuccess) {
+      setShowSavePrompt(false);
+      setShowItemSavedSuccess(true);
+    } else {
+      alert('Error saving data. Please try again.');
+    }
   };
 
   const finalizeDiscardFlow = () => {
@@ -277,7 +358,11 @@ export default function Maintenance({ role }) {
                   />
                   <label className="text-2xl font-medium text-right">Category</label>
                   <div className="relative">
-                    <select className="w-full bg-white text-black rounded-lg h-12 px-4 text-xl font-semibold appearance-none cursor-pointer">
+                    <select 
+                      value={itemCategory}
+                      onChange={(e) => setItemCategory(e.target.value)}
+                      className="w-full bg-white text-black rounded-lg h-12 px-4 text-xl font-semibold appearance-none cursor-pointer"
+                    >
                       <option>Beverage</option>
                       <option>Food</option>
                     </select>
@@ -498,7 +583,7 @@ export default function Maintenance({ role }) {
                   <h2 className="text-5xl font-semibold mb-12 text-white mt-4 text-center">Save Creation?</h2>
                   <div className="flex flex-col gap-5 w-full max-w-md">
                     <button onClick={() => { setShowSavePrompt(false); setShowDiscardPrompt(true); }} className="w-full bg-[#4a4a4a] py-5 rounded-2xl text-2xl font-semibold transition-colors">Discard</button>
-                    <button onClick={() => { setShowSavePrompt(false); setShowItemSavedSuccess(true); }} className="w-full bg-[#56a2d1] py-5 rounded-2xl text-2xl font-semibold text-white transition-colors">Save</button>
+                    <button onClick={finalizeSaveFlow} className="w-full bg-[#56a2d1] py-5 rounded-2xl text-2xl font-semibold text-white transition-colors">Save</button>
                   </div>
                 </div>
               )}
@@ -560,7 +645,9 @@ export default function Maintenance({ role }) {
                 <div className="p-10 border-t border-[#444] grid grid-cols-[1fr_2.5fr] items-center gap-y-8 gap-x-12">
                   <label className="text-2xl font-medium text-right">Item Name</label>
                   <input 
-                    type="text" 
+                    type="text"
+                    value={itemName}
+                    onChange={(e) => setItemName(e.target.value)}
                     className="bg-white text-black rounded-lg h-12 px-4 text-xl font-semibold focus:outline-none" 
                   />
                 </div>
@@ -651,7 +738,7 @@ export default function Maintenance({ role }) {
                   <h2 className="text-5xl font-semibold mb-12 text-white mt-4 text-center">Save Creation?</h2>
                   <div className="flex flex-col gap-5 w-full max-w-md">
                     <button onClick={() => { setShowSavePrompt(false); setShowDiscardPrompt(true); }} className="w-full bg-[#4a4a4a] py-5 rounded-2xl text-2xl font-semibold transition-colors">Discard</button>
-                    <button onClick={() => { setShowSavePrompt(false); setShowItemSavedSuccess(true); }} className="w-full bg-[#56a2d1] py-5 rounded-2xl text-2xl font-semibold text-white transition-colors">Save</button>
+                    <button onClick={finalizeSaveFlow} className="w-full bg-[#56a2d1] py-5 rounded-2xl text-2xl font-semibold text-white transition-colors">Save</button>
                   </div>
                 </div>
               )}
@@ -714,7 +801,11 @@ export default function Maintenance({ role }) {
               
               <label className="text-2xl font-medium text-right">Ingredient Type</label>
               <div className="relative group">
-                <select className="w-full bg-white text-black rounded-lg h-12 px-4 text-xl font-semibold focus:outline-none appearance-none cursor-pointer pr-14">
+                <select 
+                  value={ingredientType}
+                  onChange={(e) => setIngredientType(e.target.value)}
+                  className="w-full bg-white text-black rounded-lg h-12 px-4 text-xl font-semibold focus:outline-none appearance-none cursor-pointer pr-14"
+                >
                   <option>Dry</option>
                   <option>Liquid</option>
                   <option>Frozen</option>
@@ -724,7 +815,12 @@ export default function Maintenance({ role }) {
 
               <label className="text-2xl font-medium text-right">Starting Qty.</label>
               <div className="flex items-center gap-4">
-                <input type="text" className="flex-1 bg-white text-black rounded-lg h-12 px-4 text-center text-xl font-semibold focus:outline-none" />
+                <input 
+                  type="text" 
+                  value={startingQty}
+                  onChange={(e) => setStartingQty(e.target.value)}
+                  className="flex-1 bg-white text-black rounded-lg h-12 px-4 text-center text-xl font-semibold focus:outline-none" 
+                />
                 <span className="text-2xl font-medium w-10">kg</span>
               </div>
             </div>
@@ -750,7 +846,7 @@ export default function Maintenance({ role }) {
                   <h2 className="text-5xl font-semibold mb-12 text-white mt-4 text-center">Save Creation?</h2>
                   <div className="flex flex-col gap-5 w-full max-w-md">
                     <button onClick={() => { setShowSavePrompt(false); setShowDiscardPrompt(true); }} className="w-full bg-[#4a4a4a] py-5 rounded-2xl text-2xl font-semibold transition-colors">Discard</button>
-                    <button onClick={() => { setShowSavePrompt(false); setShowItemSavedSuccess(true); }} className="w-full bg-[#56a2d1] py-5 rounded-2xl text-2xl font-semibold text-white transition-colors">Save</button>
+                    <button onClick={finalizeSaveFlow} className="w-full bg-[#56a2d1] py-5 rounded-2xl text-2xl font-semibold text-white transition-colors">Save</button>
                   </div>
                 </div>
               )}
@@ -846,7 +942,11 @@ export default function Maintenance({ role }) {
                     <input type="text" value={menuItemName} onChange={(e) => setMenuItemName(e.target.value)} className="bg-white text-black rounded-lg h-12 px-4 text-xl font-semibold" />
                     <label className="text-2xl font-medium text-right">Category</label>
                     <div className="relative">
-                      <select className="w-full bg-white text-black rounded-lg h-12 px-4 text-xl font-semibold appearance-none cursor-pointer">
+                      <select 
+                        value={itemCategory}
+                        onChange={(e) => setItemCategory(e.target.value)}
+                        className="w-full bg-white text-black rounded-lg h-12 px-4 text-xl font-semibold appearance-none cursor-pointer"
+                      >
                         <option>Beverage</option>
                         <option>Food</option>
                       </select>
@@ -1040,7 +1140,7 @@ export default function Maintenance({ role }) {
                       <h2 className="text-5xl font-semibold mb-12 text-white mt-4 text-center">Save Changes?</h2>
                       <div className="flex flex-col gap-5 w-full max-w-md">
                         <button onClick={() => { setShowSavePrompt(false); setShowDiscardPrompt(true); }} className="w-full bg-[#4a4a4a] py-5 rounded-2xl text-2xl font-semibold transition-colors">Discard</button>
-                        <button onClick={() => { setShowSavePrompt(false); setShowItemSavedSuccess(true); }} className="w-full bg-[#56a2d1] py-5 rounded-2xl text-2xl font-semibold text-white transition-colors">Save</button>
+                        <button onClick={finalizeSaveFlow} className="w-full bg-[#56a2d1] py-5 rounded-2xl text-2xl font-semibold text-white transition-colors">Save</button>
                       </div>
                     </div>
                   )}
@@ -1132,8 +1232,8 @@ export default function Maintenance({ role }) {
                     <label className="text-2xl font-medium text-right">Item Name</label>
                     <input 
                       type="text" 
-                      value={ingredientName} 
-                      onChange={(e) => setIngredientName(e.target.value)}
+                      value={itemName} 
+                      onChange={(e) => setItemName(e.target.value)}
                       className="bg-white text-black rounded-lg h-14 px-6 text-2xl font-semibold focus:outline-none text-center" 
                     />
                   </div>
@@ -1216,7 +1316,7 @@ export default function Maintenance({ role }) {
                       <h2 className="text-5xl font-semibold mb-12 text-white mt-4 text-center">Save Creation?</h2>
                       <div className="flex flex-col gap-5 w-full max-w-md">
                         <button onClick={() => { setShowSavePrompt(false); setShowDiscardPrompt(true); }} className="w-full bg-[#4a4a4a] py-5 rounded-2xl text-2xl font-semibold transition-colors">Discard</button>
-                        <button onClick={() => { setShowSavePrompt(false); setShowItemSavedSuccess(true); }} className="w-full bg-[#56a2d1] py-5 rounded-2xl text-2xl font-semibold text-white transition-colors">Save</button>
+                        <button onClick={finalizeSaveFlow} className="w-full bg-[#56a2d1] py-5 rounded-2xl text-2xl font-semibold text-white transition-colors">Save</button>
                       </div>
                     </div>
                   )}
@@ -1317,7 +1417,11 @@ export default function Maintenance({ role }) {
                   
                   <label className="text-2xl font-medium text-right">Ingredient Type</label>
                   <div className="relative">
-                    <select className="w-full bg-white text-black rounded-lg h-14 px-6 text-2xl font-semibold focus:outline-none appearance-none cursor-pointer text-center">
+                    <select 
+                      value={ingredientType}
+                      onChange={(e) => setIngredientType(e.target.value)}
+                      className="w-full bg-white text-black rounded-lg h-14 px-6 text-2xl font-semibold focus:outline-none appearance-none cursor-pointer text-center"
+                    >
                       <option>Dry</option>
                       <option>Liquid</option>
                       <option>Frozen</option>
@@ -1347,7 +1451,7 @@ export default function Maintenance({ role }) {
                       <h2 className="text-5xl font-semibold mb-12 text-white mt-4 text-center uppercase tracking-tight">Save Changes?</h2>
                       <div className="flex flex-col gap-5 w-full max-w-md">
                         <button onClick={() => { setShowSavePrompt(false); setShowDiscardPrompt(true); }} className="w-full bg-[#4a4a4a] py-5 rounded-2xl text-2xl font-semibold">Discard</button>
-                        <button onClick={() => { setShowSavePrompt(false); setShowItemSavedSuccess(true); }} className="w-full bg-[#56a2d1] py-5 rounded-2xl text-2xl font-semibold text-white">Save</button>
+                        <button onClick={finalizeSaveFlow} className="w-full bg-[#56a2d1] py-5 rounded-2xl text-2xl font-semibold text-white">Save</button>
                       </div>
                     </div>
                   )}
@@ -2050,7 +2154,6 @@ export default function Maintenance({ role }) {
 
         <div className="flex flex-col flex-1 animate-in fade-in duration-300">
           <h1 className="text-4xl font-semibold mb-8">Maintenance</h1>
-          <h2 className="text-2xl font-medium mb-6">Select Action</h2>
 
           <div className="flex flex-col gap-4 w-full"> 
             {menuItems.map((item) => (
