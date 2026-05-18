@@ -1,60 +1,55 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { signInWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
-import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs, updateDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase';
-
 
 export default function Login() {
   const navigate = useNavigate();
   const [currentView, setCurrentView] = useState('login');
 
-
   const [loginError, setLoginError] = useState(false);
   const [passkeyError, setPasskeyError] = useState(false);
   const [resetError, setResetError] = useState(false);
- 
+  
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successMessage, setSuccessMessage] = useState(false);
-
 
   const [credentials, setCredentials] = useState({
     username: '',
     password: ''
   });
 
-
   const [passkeyInput, setPasskeyInput] = useState('');
   const [resetEmail, setResetEmail] = useState('');
-
 
   const handleLoginChange = (e) => {
     setCredentials({ ...credentials, [e.target.name]: e.target.value });
     if (loginError) setLoginError(false);
   };
 
-
   const handlePasskeyChange = (e) => {
     setPasskeyInput(e.target.value);
     if (passkeyError) setPasskeyError(false);
   };
 
-
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoginError(false);
-   
+    
     try {
       const userCredential = await signInWithEmailAndPassword(auth, credentials.username, credentials.password);
       const user = userCredential.user;
 
-
       const userDocRef = doc(db, 'users', user.uid);
       const userDocSnap = await getDoc(userDocRef);
 
-
       if (userDocSnap.exists()) {
         const userData = userDocSnap.data();
+        
+        // --- UPDATED: Set status to Active ---
+        await updateDoc(userDocRef, { status: 'Active' });
+
         if (userData.role === 'admin') {
           navigate('/admin');
         } else if (userData.role === 'staff') {
@@ -66,10 +61,10 @@ export default function Login() {
         setLoginError(true);
       }
     } catch (error) {
+      console.error("Login error:", error);
       setLoginError(true);
     }
   };
-
 
   const handlePasskeySubmit = (e) => {
     e.preventDefault();
@@ -82,7 +77,6 @@ export default function Login() {
     }
   };
 
-
   const handleResetPassword = async (e) => {
     e.preventDefault();
     if (resetEmail.trim() === '') {
@@ -90,31 +84,27 @@ export default function Login() {
       return;
     }
     setIsSubmitting(true);
-   
+    
     try {
       const usersRef = collection(db, 'users');
       const q = query(usersRef, where("email", "==", resetEmail.trim()));
       const querySnapshot = await getDocs(q);
 
-
       if (querySnapshot.empty) {
         alert("Account Not Found: There is no registered staff member with this email address.");
         setResetError(true);
         setIsSubmitting(false);
-        return;
+        return; 
       }
 
-
-      const currentDomain = window.location.origin;
+      const currentDomain = window.location.origin; 
       const actionCodeSettings = {
-        url: `${currentDomain}/reset-password`,
+        url: `${currentDomain}/reset-password`, 
         handleCodeInApp: true,
       };
 
-
       await sendPasswordResetEmail(auth, resetEmail.trim(), actionCodeSettings);
       setSuccessMessage(true);
-
 
     } catch (error) {
       console.error("Firebase Reset Error:", error);
@@ -131,11 +121,10 @@ export default function Login() {
     }
   };
 
-
   return (
     <div className="h-full w-full flex items-center justify-center font-sans">
       <div className="bg-[#333333] p-10 rounded-2xl shadow-2xl flex flex-col items-center w-[480px] z-10">
-       
+        
         <div className="flex items-center justify-center gap-8 mb-8 w-full">
           <img src="/logo.png" alt="Vanilla Brew Logo" className="w-[180px] object-contain" />
           <div className="flex flex-col items-center">
@@ -150,7 +139,6 @@ export default function Login() {
           </div>
         </div>
 
-
         {currentView === 'login' && (
           <div className="w-full flex flex-col items-center animate-in fade-in duration-300">
             <p className="text-gray-200 text-sm mb-6 tracking-wide">Please enter your credentials</p>
@@ -159,7 +147,7 @@ export default function Login() {
                 <label className="text-white text-sm font-medium tracking-wide">
                   {loginError ? 'Username (No Match)' : 'Username'}
                 </label>
-                <input
+                <input 
                   type="text" name="username" value={credentials.username} onChange={handleLoginChange}
                   className={`w-full h-12 px-4 rounded-lg text-lg font-medium text-black focus:outline-none focus:ring-4 focus:ring-[#3ca4c7]/50 transition-colors ${loginError ? 'bg-[#ffadad]' : 'bg-[#f0f0f0]'}`}
                   required
@@ -167,7 +155,7 @@ export default function Login() {
               </div>
               <div className="flex flex-col gap-1.5">
                 <label className="text-white text-sm font-medium tracking-wide">Password</label>
-                <input
+                <input 
                   type="password" name="password" value={credentials.password} onChange={handleLoginChange}
                   className={`w-full h-12 px-4 rounded-lg text-lg font-medium text-black focus:outline-none focus:ring-4 focus:ring-[#3ca4c7]/50 transition-colors ${loginError ? 'bg-[#ffadad]' : 'bg-[#f0f0f0]'}`}
                   required
@@ -185,7 +173,6 @@ export default function Login() {
           </div>
         )}
 
-
         {currentView === 'passkey' && (
           <div className="w-full flex flex-col items-center animate-in fade-in duration-300">
             <p className="text-white text-sm mb-1 tracking-wide font-medium">Enter a valid Admin Passkey</p>
@@ -197,7 +184,7 @@ export default function Login() {
                 <label className="text-white text-sm font-medium tracking-wide">
                   {passkeyError ? 'Admin Passkey (Invalid)' : 'Admin Passkey'}
                 </label>
-                <input
+                <input 
                   type="password" value={passkeyInput} onChange={handlePasskeyChange}
                   className={`w-full h-12 px-4 rounded-lg text-lg font-medium text-black focus:outline-none focus:ring-4 focus:ring-[#3ca4c7]/50 transition-colors text-center ${passkeyError ? 'bg-[#ffadad]' : 'bg-[#f0f0f0]'}`}
                   required
@@ -214,7 +201,6 @@ export default function Login() {
             </button>
           </div>
         )}
-
 
         {currentView === 'forgot' && (
           <div className="w-full flex flex-col items-center animate-in fade-in duration-300">
@@ -238,7 +224,7 @@ export default function Login() {
                     <label className="text-white text-sm font-medium tracking-wide">
                       {resetError ? 'Email Address (Not Found)' : 'Email Address'}
                     </label>
-                    <input
+                    <input 
                       type="email" value={resetEmail} onChange={(e) => { setResetEmail(e.target.value); setResetError(false); }}
                       className={`w-full h-12 px-4 rounded-lg text-lg font-medium text-black focus:outline-none focus:ring-4 focus:ring-[#3ca4c7]/50 transition-colors ${resetError ? 'bg-[#ffadad]' : 'bg-[#f0f0f0]'}`}
                       required disabled={isSubmitting}
@@ -258,11 +244,7 @@ export default function Login() {
           </div>
         )}
 
-
       </div>
     </div>
   );
 }
-
-
-
