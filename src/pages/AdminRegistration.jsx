@@ -3,42 +3,83 @@ import { useNavigate } from 'react-router-dom';
 import { UserPlus, CornerUpLeft } from 'lucide-react';
 import AdminSidebar from '../layouts/AdminSidebar';
 
+// --- FIXED: Imported onSnapshot ---
+import { collection, query, orderBy, limit, getDocs, doc, setDoc, onSnapshot } from 'firebase/firestore';
+import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { auth, db } from '../firebase'; 
+
 export default function AdminRegistration() {
   const navigate = useNavigate();
 
-  // State to manage the active view ('list' or 'create')
   const [currentView, setCurrentView] = useState('list');
-  
-  // Initialize accounts from localStorage if they exist, otherwise start empty
-  const [accounts, setAccounts] = useState(() => {
-    const savedAccounts = localStorage.getItem('vnl_brew_accounts');
-    if (savedAccounts) {
-      return JSON.parse(savedAccounts);
-    }
-    return [];
-  });
+  const [accounts, setAccounts] = useState([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
 
-  // Form states
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     password: '',
     retypePassword: ''
   });
-  
-  // Modal state
-  const [showSuccessModal, setShowSuccessModal] = useState(false);
 
-  // Handle input changes
+  // --- UPDATED: Real-Time Listener for the Accounts List ---
+  useEffect(() => {
+    if (currentView === 'list') {
+      const usersRef = collection(db, 'users');
+      // Sort by empId so they display in order (EMP001, EMP002, etc.)
+      const q = query(usersRef, orderBy('empId', 'asc'));
+      
+      // onSnapshot keeps a live connection open to your database
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+        const usersList = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        setAccounts(usersList);
+      }, (error) => {
+        console.error("Error listening to accounts:", error);
+      });
+
+      // Cleanup the listener when you leave the 'list' view or page
+      return () => unsubscribe();
+    }
+  }, [currentView]);
+
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  // Handle form submission
-  const handleCreateAccount = (e) => {
+  const generateNextEmpId = async () => {
+    try {
+      const usersRef = collection(db, 'users');
+      const q = query(usersRef, orderBy('empId', 'desc'), limit(1));
+      const querySnapshot = await getDocs(q);
+
+      if (querySnapshot.empty) {
+        return 'EMP001';
+      }
+
+      const lastDoc = querySnapshot.docs[0];
+      const lastEmpId = lastDoc.data().empId;
+
+      if (!lastEmpId) {
+        return 'EMP001';
+      }
+
+      const lastNumber = parseInt(lastEmpId.replace('EMP', ''), 10);
+      const nextNumber = lastNumber + 1;
+      return `EMP${String(nextNumber).padStart(3, '0')}`;
+
+    } catch (error) {
+      console.error("Error generating Employee ID:", error);
+      return `EMP${String(Math.floor(Math.random() * 1000)).padStart(3, '0')}`; 
+    }
+  };
+
+  const handleCreateAccount = async (e) => {
     e.preventDefault();
 
-    // Basic validation
     if (!formData.name || !formData.email || !formData.password) {
       alert("Please fill out all fields.");
       return;
@@ -48,30 +89,45 @@ export default function AdminRegistration() {
       return;
     }
 
-    // Show success modal first
-    setShowSuccessModal(true);
+    setIsSubmitting(true);
+
+    try {
+      const newEmpId = await generateNextEmpId();
+
+      const userCredential = await createUserWithEmailAndPassword(
+        auth, 
+        formData.email, 
+        formData.password
+      );
+      const user = userCredential.user;
+
+      // Notice this correctly sets them as 'Inactive' until they log in!
+      await setDoc(doc(db, 'users', user.uid), {
+        empId: newEmpId,
+        name: formData.name,
+        email: formData.email,
+        role: 'staff',
+        status: 'Inactive', 
+        createdAt: new Date().toISOString()
+      });
+
+      setShowSuccessModal(true);
+
+    } catch (error) {
+      console.error("Error creating account:", error);
+      if (error.code === 'auth/email-already-in-use') {
+        alert("This email is already registered!");
+      } else if (error.code === 'auth/weak-password') {
+        alert("Password should be at least 6 characters.");
+      } else {
+        alert("Failed to create account: " + error.message);
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  // Handle closing the modal and saving the data
   const handleModalDone = () => {
-    // Generate new ID (e.g., E001, E002) based on total accounts ever made
-    const newIdNumber = accounts.length + 1;
-    const newId = `E${String(newIdNumber).padStart(3, '0')}`;
-
-    // Add to accounts array
-    const newAccount = {
-      id: newId,
-      name: formData.name,
-      status: 'Active'
-    };
-    
-    const updatedAccounts = [...accounts, newAccount];
-    
-    // Save to React State AND Browser Local Storage
-    setAccounts(updatedAccounts);
-    localStorage.setItem('vnl_brew_accounts', JSON.stringify(updatedAccounts));
-
-    // Reset form and go back to list
     setFormData({ name: '', email: '', password: '', retypePassword: '' });
     setShowSuccessModal(false);
     setCurrentView('list');
@@ -79,14 +135,13 @@ export default function AdminRegistration() {
 
   return (
     <div className="flex w-full h-full gap-6">
-      <AdminSidebar />
+      <AdminSidebar activePage="registration" />
       
       <main className="flex-1 bg-[#2a2a2a] rounded-xl p-8 flex flex-col text-white relative overflow-hidden">
         
         {/* VIEW 1: ACCOUNTS LIST */}
         {currentView === 'list' && (
           <div className="flex flex-col h-full animate-in fade-in duration-300">
-            {/* Top Header Row */}
             <div className="flex gap-4 mb-8">
               <button 
                 onClick={() => navigate('/admin')}
@@ -100,7 +155,6 @@ export default function AdminRegistration() {
               </div>
             </div>
 
-            {/* Create New Account Button */}
             <button 
               onClick={() => setCurrentView('create')}
               className="w-full bg-[#5a5a5a] hover:bg-[#6a6a6a] text-2xl font-medium py-6 rounded-xl mb-8 transition-colors tracking-wide"
@@ -108,11 +162,10 @@ export default function AdminRegistration() {
               Create new Account
             </button>
 
-            {/* Accounts List Container */}
             <div className="flex-1 overflow-auto flex flex-col gap-4 pr-2">
               {accounts.length === 0 ? (
                 <div className="text-center text-gray-400 mt-10 text-lg italic">
-                  No accounts registered yet. Click above to create one.
+                  Loading accounts or database is empty. Click above to create one.
                 </div>
               ) : (
                 accounts.map((account) => (
@@ -121,10 +174,14 @@ export default function AdminRegistration() {
                     className="w-full bg-[#4a4a4a] rounded-xl p-6 flex items-center justify-between"
                   >
                     <div className="flex gap-8 items-center">
-                      <span className="text-2xl font-bold tracking-wider">{account.id}</span>
+                      <span className="text-2xl font-bold tracking-wider text-[#3ca4c7]">
+                        {account.empId || 'N/A'}
+                      </span>
                       <span className="text-2xl font-medium">{account.name}</span>
                     </div>
-                    <span className="text-lg text-gray-200 tracking-wide">{account.status}</span>
+                    <span className={`text-lg tracking-wide font-bold ${account.status === 'Active' ? 'text-green-400' : 'text-red-400'}`}>
+                      {account.status || 'Inactive'}
+                    </span>
                   </div>
                 ))
               )}
@@ -135,11 +192,11 @@ export default function AdminRegistration() {
         {/* VIEW 2: CREATE ACCOUNT FORM */}
         {currentView === 'create' && (
           <div className="flex flex-col h-full animate-in fade-in duration-300">
-            {/* Top Header Row (Breadcrumbs) */}
             <div className="flex gap-4 mb-10">
               <button 
                 onClick={() => setCurrentView('list')}
-                className="bg-[#5a5a5a] hover:bg-[#6a6a6a] p-3 rounded-lg transition-colors"
+                disabled={isSubmitting}
+                className="bg-[#5a5a5a] hover:bg-[#6a6a6a] p-3 rounded-lg transition-colors disabled:opacity-50"
               >
                 <CornerUpLeft size={20} />
               </button>
@@ -160,7 +217,8 @@ export default function AdminRegistration() {
                   name="name"
                   value={formData.name}
                   onChange={handleChange}
-                  className="flex-1 h-14 bg-[#f0f0f0] rounded-xl px-6 text-black text-xl font-medium focus:outline-none focus:ring-4 focus:ring-[#3ca4c7]/50"
+                  disabled={isSubmitting}
+                  className="flex-1 h-14 bg-[#f0f0f0] rounded-xl px-6 text-black text-xl font-medium focus:outline-none focus:ring-4 focus:ring-[#3ca4c7]/50 disabled:opacity-70"
                   required
                 />
               </div>
@@ -172,7 +230,8 @@ export default function AdminRegistration() {
                   name="email"
                   value={formData.email}
                   onChange={handleChange}
-                  className="flex-1 h-14 bg-[#f0f0f0] rounded-xl px-6 text-black text-xl font-medium focus:outline-none focus:ring-4 focus:ring-[#3ca4c7]/50"
+                  disabled={isSubmitting}
+                  className="flex-1 h-14 bg-[#f0f0f0] rounded-xl px-6 text-black text-xl font-medium focus:outline-none focus:ring-4 focus:ring-[#3ca4c7]/50 disabled:opacity-70"
                   required
                 />
               </div>
@@ -184,7 +243,8 @@ export default function AdminRegistration() {
                   name="password"
                   value={formData.password}
                   onChange={handleChange}
-                  className="flex-1 h-14 bg-[#f0f0f0] rounded-xl px-6 text-black text-xl font-medium focus:outline-none focus:ring-4 focus:ring-[#3ca4c7]/50"
+                  disabled={isSubmitting}
+                  className="flex-1 h-14 bg-[#f0f0f0] rounded-xl px-6 text-black text-xl font-medium focus:outline-none focus:ring-4 focus:ring-[#3ca4c7]/50 disabled:opacity-70"
                   required
                 />
               </div>
@@ -196,7 +256,8 @@ export default function AdminRegistration() {
                   name="retypePassword"
                   value={formData.retypePassword}
                   onChange={handleChange}
-                  className="flex-1 h-14 bg-[#f0f0f0] rounded-xl px-6 text-black text-xl font-medium focus:outline-none focus:ring-4 focus:ring-[#3ca4c7]/50"
+                  disabled={isSubmitting}
+                  className="flex-1 h-14 bg-[#f0f0f0] rounded-xl px-6 text-black text-xl font-medium focus:outline-none focus:ring-4 focus:ring-[#3ca4c7]/50 disabled:opacity-70"
                   required
                 />
               </div>
@@ -204,9 +265,10 @@ export default function AdminRegistration() {
               <div className="flex justify-center mt-6">
                 <button 
                   type="submit"
-                  className="bg-[#5a5a5a] hover:bg-[#6a6a6a] px-16 py-3 rounded-xl text-xl font-medium transition-colors tracking-wide"
+                  disabled={isSubmitting}
+                  className="bg-[#5a5a5a] hover:bg-[#6a6a6a] px-16 py-3 rounded-xl text-xl font-medium transition-colors tracking-wide disabled:opacity-50 flex items-center gap-3"
                 >
-                  Create
+                  {isSubmitting ? 'Creating...' : 'Create'}
                 </button>
               </div>
             </form>
@@ -218,14 +280,14 @@ export default function AdminRegistration() {
           <div className="absolute inset-0 bg-black/60 rounded-xl flex items-center justify-center z-50 animate-in fade-in duration-200">
             <div className="bg-[#333333] p-10 rounded-2xl w-[500px] shadow-2xl flex flex-col items-center text-center">
               
-              <h3 className="text-3xl font-semibold tracking-wide mb-8">Account Created</h3>
+              <h3 className="text-3xl font-semibold tracking-wide mb-8 text-[#3ca4c7]">Account Created!</h3>
               
               <p className="text-lg text-gray-200 mb-6 leading-relaxed">
                 The Account for <span className="font-bold text-white">{formData.name}</span> has been created and saved into the Database.
               </p>
               
               <p className="text-lg text-gray-200 mb-10 leading-relaxed">
-                The LogIn Credentials for {formData.name} has been sent to their personal email address.
+                They can now log in using the email and password you just provided.
               </p>
 
               <button 
