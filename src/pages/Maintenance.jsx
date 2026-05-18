@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   WrenchIcon, 
@@ -28,7 +28,7 @@ import MaintenanceEdit from './maintenance/MaintenanceEdit';
 import MaintenanceArchive from './maintenance/MaintenanceArchive';
 import MaintenanceRetrieve from './maintenance/MaintenanceRetrieve';
 import MaintenanceAccounts from './maintenance/MaintenanceAccounts';
-import { collection, addDoc, updateDoc, doc } from "firebase/firestore"; 
+import { collection, addDoc, updateDoc, doc, getDocs } from "firebase/firestore"; 
 import { db } from "../firebase";
 
 export default function Maintenance({ role }) {
@@ -51,7 +51,7 @@ export default function Maintenance({ role }) {
     Large: { enabled: false, price: '' },
   });
   const [selectedMenuItemSize, setSelectedMenuItemSize] = useState('Small');
-  const [addOns, setAddOns] = useState([{ ingredientId: '', name: '', price: '' }]);
+  const [addOns, setAddOns] = useState([{ ingredientId: '', name: '', price: '', unit: '' }]);
   const [itemSizes, setItemSizes] = useState({
     Small: { enabled: true, qty: '50' },
     Medium: { enabled: true, qty: '50' },
@@ -70,14 +70,14 @@ export default function Maintenance({ role }) {
   const [selectedEditItem, setSelectedEditItem] = useState(null);
 
   const handleAddRow = () => {
-    setAddOns([...addOns, { ingredientId: '', name: '', price: '' }]);
+    setAddOns([...addOns, { ingredientId: '', name: '', price: '', unit: '' }]);
   };
 
   const handleRemoveRow = (index) => {
     if (addOns.length > 0) {
       setAddOns(addOns.filter((_, i) => i !== index));
     } else {
-      setAddOns([{ ingredientId: '', name: '', price: '' }]);
+      setAddOns([{ ingredientId: '', name: '', price: '', unit: '' }]);
     }
   };
 
@@ -110,6 +110,31 @@ export default function Maintenance({ role }) {
   const [activeItems, setActiveItems] = useState([
     
   ]);
+
+  useEffect(() => {
+    const loadActiveData = async () => {
+      try {
+        const ingredientSnapshot = await getDocs(collection(db, 'ingredients'));
+        const itemSnapshot = await getDocs(collection(db, 'items'));
+        const menuItemSnapshot = await getDocs(collection(db, 'menuItems'));
+
+        const ingredients = ingredientSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+        const items = itemSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+        const menuItems = menuItemSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+
+        setActiveIngredients(ingredients.filter((item) => !item.archived));
+        setArchivedIngredients(ingredients.filter((item) => item.archived));
+        setActiveItems(items.filter((item) => !item.archived));
+        setArchivedItems(items.filter((item) => item.archived));
+        setActiveMenuItems(menuItems.filter((item) => !item.archived));
+        setArchivedMenuItems(menuItems.filter((item) => item.archived));
+      } catch (error) {
+        console.error('Failed to load active maintenance data:', error);
+      }
+    };
+
+    loadActiveData();
+  }, []);
 
   const [selectedArchiveIngredient, setSelectedArchiveIngredient] = useState(null);
   const [showIngConfirm, setShowIngConfirm] = useState(false);
@@ -254,6 +279,7 @@ export default function Maintenance({ role }) {
         sizes,
         addOns: filteredAddOns,
         connections: validConnections,
+        archived: false,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -275,6 +301,7 @@ export default function Maintenance({ role }) {
           sizes,
           addOns: filteredAddOns,
           connections: validConnections,
+          archived: false,
         },
       ]));
 
@@ -296,6 +323,7 @@ export default function Maintenance({ role }) {
         name: savedItemName,
         size: itemSize,
         startingQty: parseFloat(itemStartingQty) || 0,
+        archived: false,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -313,6 +341,7 @@ export default function Maintenance({ role }) {
           name: savedItemName,
           size: itemSize,
           startingQty: parseFloat(itemStartingQty) || 0,
+          archived: false,
         },
       ]));
 
@@ -333,6 +362,7 @@ export default function Maintenance({ role }) {
         type: ingredientType,
         startingQty: parseFloat(startingQty) || 0,
         isAddOn: ingredientIsAddOn,
+        archived: false,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -351,6 +381,7 @@ export default function Maintenance({ role }) {
           type: ingredientType,
           startingQty: parseFloat(startingQty) || 0,
           isAddOn: ingredientIsAddOn,
+          archived: false,
         },
       ]));
 
@@ -391,7 +422,7 @@ export default function Maintenance({ role }) {
       Medium: { enabled: true, price: '' },
       Large: { enabled: false, price: '' },
     });
-    setAddOns([{ ingredientId: '', name: '', price: '' }]);
+    setAddOns([{ ingredientId: '', name: '', price: '', unit: '' }]);
     setConnections([]);
     setItemName('');
     setIngredientName('');
@@ -564,6 +595,9 @@ export default function Maintenance({ role }) {
         setActiveMenuItems={setActiveMenuItems}
         setActiveItems={setActiveItems}
         setActiveIngredients={setActiveIngredients}
+        setArchivedMenuItems={setArchivedMenuItems}
+        setArchivedItems={setArchivedItems}
+        setArchivedIngredients={setArchivedIngredients}
       />
     );
   }

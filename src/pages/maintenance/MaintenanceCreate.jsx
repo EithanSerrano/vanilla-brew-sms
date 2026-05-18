@@ -171,7 +171,7 @@ export default function MaintenanceCreate({
               {activeAccordion === 'addons' && (
                 <div className="p-10 border-t border-[#444] space-y-6">
                   {addOns.map((addon, idx) => (
-                    <div key={idx} className="grid grid-cols-[1fr_2fr_0.5fr_1fr_auto] items-center gap-x-8">
+                    <div key={idx} className="grid grid-cols-[1fr_2fr_1.2fr_0.5fr_1fr_auto] items-center gap-x-8">
                       <span className="text-2xl font-medium text-right whitespace-nowrap">No. {idx + 1}</span>
                       
                       <div className="relative">
@@ -196,6 +196,18 @@ export default function MaintenanceCreate({
                         </select>
                         <ChevronDown size={24} className="absolute right-3 top-3 text-black pointer-events-none" />
                       </div>
+
+                      <input
+                        type="text"
+                        placeholder="Unit"
+                        value={addon.unit}
+                        onChange={(e) => {
+                          const updated = [...addOns];
+                          updated[idx].unit = e.target.value;
+                          setAddOns(updated);
+                        }}
+                        className="bg-white text-black rounded-lg h-12 px-4 text-xl font-semibold"
+                      />
 
                       <span className="text-2xl font-medium text-right">Php</span>
                       

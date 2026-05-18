@@ -33,6 +33,9 @@ export default function MaintenanceArchive({
   setActiveMenuItems,
   setActiveItems,
   setActiveIngredients,
+  setArchivedMenuItems,
+  setArchivedItems,
+  setArchivedIngredients,
 }) {
   if (currentView === 'archive-menu-item') {
     return (
@@ -76,6 +79,10 @@ export default function MaintenanceArchive({
                 <button 
                   onClick={() => { 
                     setActiveMenuItems(prev => prev.filter(i => i.id !== selectedArchiveMenuItem.id));
+                    setArchivedMenuItems(prev => ([
+                      ...prev,
+                      { ...selectedArchiveMenuItem, archived: true }
+                    ]));
                     setShowMenuConfirm(false); 
                     setShowMenuSuccess(true); 
                   }} 
@@ -140,6 +147,10 @@ export default function MaintenanceArchive({
                 <button 
                   onClick={() => { 
                     setActiveItems(prev => prev.filter(i => i.id !== selectedArchiveItem.id));
+                    setArchivedItems(prev => ([
+                      ...prev,
+                      { ...selectedArchiveItem, archived: true }
+                    ]));
                     setShowItemConfirm(false); 
                     setShowItemSuccess(true); 
                   }} 
@@ -225,6 +236,10 @@ export default function MaintenanceArchive({
                 <button 
                   onClick={() => { 
                     setActiveIngredients(prev => prev.filter(i => i.id !== selectedArchiveIngredient.id));
+                    setArchivedIngredients(prev => ([
+                      ...prev,
+                      { ...selectedArchiveIngredient, archived: true }
+                    ]));
                     setShowIngConfirm(false); 
                     setShowIngSuccess(true); 
                   }} 

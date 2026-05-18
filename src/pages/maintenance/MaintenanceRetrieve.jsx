@@ -81,7 +81,7 @@ export default function MaintenanceRetrieve({
                 <button 
                   onClick={() => {
                     setArchivedMenuItems(prev => prev.filter(i => i.id !== selectedRetrieveMenu.id));
-                    setActiveMenuItems(prev => [...prev, selectedRetrieveMenu]);
+                    setActiveMenuItems(prev => [...prev, { ...selectedRetrieveMenu, archived: false }]);
                     setShowRetrieveMenuConfirm(false);
                     setShowRetrieveMenuSuccess(true);
                   }}
@@ -150,7 +150,7 @@ export default function MaintenanceRetrieve({
                 <button 
                   onClick={() => {
                     setArchivedItems(prev => prev.filter(i => i.id !== selectedRetrieveItem.id));
-                    setActiveItems(prev => [...prev, selectedRetrieveItem]);
+                    setActiveItems(prev => [...prev, { ...selectedRetrieveItem, archived: false }]);
                     setShowRetrieveItemConfirm(false);
                     setShowRetrieveItemSuccess(true);
                   }}
@@ -225,7 +225,7 @@ export default function MaintenanceRetrieve({
                 <button 
                   onClick={() => {
                     setArchivedIngredients(prev => prev.filter(i => i.id !== selectedRetrieveIng.id));
-                    setActiveIngredients(prev => [...prev, selectedRetrieveIng]);
+                    setActiveIngredients(prev => [...prev, { ...selectedRetrieveIng, archived: false }]);
                     setShowRetrieveIngConfirm(false);
                     setShowRetrieveIngSuccess(true);
                   }}
