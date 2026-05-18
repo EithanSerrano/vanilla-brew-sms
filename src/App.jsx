@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
 // Pages
 import Login from "./pages/Login";
+import ResetPassword from "./pages/ResetPassword"; // <-- Added this import
 
 // Admin Pages
 import AdminHome from "./pages/AdminHome"; 
@@ -35,6 +36,9 @@ function App() {
             {/* Authentication */}
             <Route path="/login" element={<Login />} />
             
+            {/* --- ADDED RESET PASSWORD ROUTE HERE --- */}
+            <Route path="/reset-password" element={<ResetPassword />} />
+            
             {/* --- ADMIN ROUTES --- */}
             <Route path="/admin" element={<AdminHome />} /> 
             <Route path="/admin-dashboard" element={<AdminDashboard />} />
@@ -57,6 +61,8 @@ function App() {
             <Route path="/staff-help" element={<StaffHelp />} />
             <Route path="/staff-about" element={<About role="staff" />} />
             <Route path="/staff-settings" element={<Settings role="staff" />} />
+            
+            {/* Catch-all: Must be at the bottom */}
             <Route path="*" element={<Navigate to="/login" replace />} />
           </Routes>
         </div>
