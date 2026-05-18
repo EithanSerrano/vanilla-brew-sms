@@ -23,6 +23,11 @@ import {
   Trash2,
   } from 'lucide-react';
 import AdminSidebar from '../layouts/AdminSidebar';
+import MaintenanceCreate from './maintenance/MaintenanceCreate';
+import MaintenanceEdit from './maintenance/MaintenanceEdit';
+import MaintenanceArchive from './maintenance/MaintenanceArchive';
+import MaintenanceRetrieve from './maintenance/MaintenanceRetrieve';
+import MaintenanceAccounts from './maintenance/MaintenanceAccounts';
 import { collection, addDoc, updateDoc, doc } from "firebase/firestore"; 
 import { db } from "../firebase";
 
@@ -41,14 +46,19 @@ export default function Maintenance({ role }) {
   //MOCK VALUES
   const [menuItemName, setMenuItemName] = useState('');
   const [sizes, setSizes] = useState({
-    Small: { locked: false, price: '' },
-    Medium: { locked: false, price: '' },
-    Large: { locked: true, price: '' },});
-  const [addOns, setAddOns] = useState([{ id: 1, name: '', price: '' }]);
+    Small: { enabled: true, price: '' },
+    Medium: { enabled: true, price: '' },
+    Large: { enabled: false, price: '' },
+  });
+  const [selectedMenuItemSize, setSelectedMenuItemSize] = useState('Small');
+  const [addOns, setAddOns] = useState([{ ingredientId: '', name: '', price: '' }]);
   const [itemSizes, setItemSizes] = useState({
-  Small: { enabled: true, qty: '50' },
-  Medium: { enabled: true, qty: '50' },
-  Large: { enabled: true, qty: '50' },});
+    Small: { enabled: true, qty: '50' },
+    Medium: { enabled: true, qty: '50' },
+    Large: { enabled: true, qty: '50' },
+  });
+  const [selectedItemSize, setSelectedItemSize] = useState('Small');
+  const [itemStartingQty, setItemStartingQty] = useState('');
 
   const toggleItemSize = (size) => {
   setItemSizes(prev => ({
@@ -60,14 +70,14 @@ export default function Maintenance({ role }) {
   const [selectedEditItem, setSelectedEditItem] = useState(null);
 
   const handleAddRow = () => {
-    setAddOns([...addOns, { name: '', price: '' }]);
+    setAddOns([...addOns, { ingredientId: '', name: '', price: '' }]);
   };
 
   const handleRemoveRow = (index) => {
     if (addOns.length > 0) {
       setAddOns(addOns.filter((_, i) => i !== index));
     } else {
-      setAddOns([{ name: '', price: '' }]);
+      setAddOns([{ ingredientId: '', name: '', price: '' }]);
     }
   };
 
@@ -85,42 +95,20 @@ export default function Maintenance({ role }) {
     return connections.slice(0, index + 1).filter(c => c.type === type).length;
   };
 
-  const mockMenuItems = [
-  { id: 'MNTM001', name: 'Classic Mango Shake' },
-  { id: 'MNTM002', name: 'Mango Cheesecake' },
-  { id: 'MNTM003', name: 'Mango Oreo Shake' },
-  { id: 'MNTM004', name: 'Mango Overload Pop' },
-  { id: 'MNTM005', name: 'Mango Graham Shake' },
-  ];
 
-  const mockIngredientsList = [
-    { id: 'INGR001', name: 'Egg', type: 'Dry' },
-    { id: 'INGR002', name: 'Meat', type: 'Frozen' },
-    { id: 'INGR003', name: 'Graham', type: 'Dry' },
-  ];
-
-  const mockItemsList = [
-    { id: 'ITEM001', name: 'Plastic Utensil Set' },
-    { id: 'ITEM002', name: 'Paper Box' },
-    { id: 'ITEM003', name: 'Plastic Cup' },
-  ];
 
   // --- ACTIVE & ARCHIVED DATA STATES --- 
 
   const [activeIngredients, setActiveIngredients] = useState([
-    { id: 'INGR001', name: 'Egg', type: 'Dry' },
-    { id: 'INGR002', name: 'Meat', type: 'Frozen' },
+    
   ]);
 
   const [activeMenuItems, setActiveMenuItems] = useState([
-    { id: 'MNTM001', name: 'Classic Mango Shake' },
-    { id: 'MNTM002', name: 'Mango Cheesecake' },
+    
   ]);
 
   const [activeItems, setActiveItems] = useState([
-    { id: 'ITEM001', name: 'Plastic Utensil Set' },
-    { id: 'ITEM002', name: 'Paper Box' },
-    { id: 'ITEM003', name: 'Plastic Cup' },
+    
   ]);
 
   const [selectedArchiveIngredient, setSelectedArchiveIngredient] = useState(null);
@@ -136,13 +124,13 @@ export default function Maintenance({ role }) {
   const [showItemSuccess, setShowItemSuccess] = useState(false);
 
   const [archivedIngredients, setArchivedIngredients] = useState([
-    { id: 'INGR003', name: 'Graham', type: 'Dry' },
+    
   ]);
   const [archivedMenuItems, setArchivedMenuItems] = useState([
-    { id: 'MNTM003', name: 'Mango Graham' },
+    
   ]);
   const [archivedItems, setArchivedItems] = useState([
-    { id: 'ITEM004', name: 'Straws' },
+    
   ]);
 
   const [selectedRetrieveIng, setSelectedRetrieveIng] = useState(null);
@@ -171,33 +159,40 @@ export default function Maintenance({ role }) {
   const toggleSizeLock = (size) => {
     setSizes(prev => ({
       ...prev,
-      [size]: { ...prev[size], locked: !prev[size].locked }
+      [size]: { ...prev[size], enabled: !prev[size].enabled }
     }));
   };
 
   const handleArchiveConfirm = () => {
-  if (!selectedArchiveItem) return;
+    if (!selectedArchiveItem) return;
 
-  // Logic to remove from current active state
-  if (currentView === 'archive-ingredient') {
-    setActiveIngredients(prev => prev.filter(i => i.id !== selectedArchiveItem.id));
-  } else if (currentView === 'archive-menu-item') {
-    setActiveMenuItems(prev => prev.filter(i => i.id !== selectedArchiveItem.id));
-  } else if (currentView === 'archive-item') {
-    setActiveItems(prev => prev.filter(i => i.id !== selectedArchiveItem.id));
-  }
+    // Logic to remove from current active state
+    if (currentView === 'archive-ingredient') {
+      setActiveIngredients(prev => prev.filter(i => i.id !== selectedArchiveItem.id));
+    } else if (currentView === 'archive-menu-item') {
+      setActiveMenuItems(prev => prev.filter(i => i.id !== selectedArchiveItem.id));
+    } else if (currentView === 'archive-item') {
+      setActiveItems(prev => prev.filter(i => i.id !== selectedArchiveItem.id));
+    }
 
-  // Clear state and close modal
-  setShowArchiveConfirm(false);
-  setSelectedArchiveItem(null);
+    // Clear state and close modal
+    setShowArchiveConfirm(false);
+    setSelectedArchiveItem(null);
   };
 
-  // --- DUMMY FORM DATA ---
+  // --- FORM DATA STATE ---
   const [ingredientName, setIngredientName] = useState('');
   const [ingredientType, setIngredientType] = useState('Dry');
   const [startingQty, setStartingQty] = useState('');
+  const [ingredientIsAddOn, setIngredientIsAddOn] = useState(false);
   const [itemName, setItemName] = useState('');
-  const [itemCategory, setItemCategory] = useState('Beverage');
+  
+  // Updated initial category alignment state to default to Coffee
+  const [itemCategory, setItemCategory] = useState('Coffee');
+
+  // --- SAVED UNIQUE KEY STATE (for modal display) ---
+  const [lastSavedKey, setLastSavedKey] = useState('');
+  const [lastSavedName, setLastSavedName] = useState('');
   
   // --- HELPERS ---
   const isFormFilled = () => {
@@ -211,34 +206,78 @@ export default function Maintenance({ role }) {
   };
 
   const handleBack = () => {
-      if (showSavePrompt || showItemSavedSuccess || showDiscardPrompt) {
-        setShowSavePrompt(false);
-        setShowItemSavedSuccess(false);
-        setShowDiscardPrompt(false);
-        return;
-      }
-      if (currentView !== 'main') {
-        setCurrentView('main');
-      } else {
-        navigate(-1);
-      }
-    };
+    if (showSavePrompt || showItemSavedSuccess || showDiscardPrompt) {
+      setShowSavePrompt(false);
+      setShowItemSavedSuccess(false);
+      setShowDiscardPrompt(false);
+      return;
+    }
+    if (currentView !== 'main') {
+      setCurrentView('main');
+    } else {
+      navigate(-1);
+    }
+  };
 
   // --- FIRESTORE SAVE FUNCTIONS ---
+  const generateNextId = (prefix, itemsArray) => {
+    const existingIds = itemsArray.map(item => {
+      const match = item.id.match(new RegExp(`^${prefix}(\\d+)$`));
+      return match ? parseInt(match[1], 10) : 0;
+    });
+    const maxId = existingIds.length > 0 ? Math.max(...existingIds) : 0;
+    return `${prefix}${String(maxId + 1).padStart(3, '0')}`;
+  };
+
   const saveMenuItemToFirestore = async () => {
     try {
+      const filteredAddOns = addOns
+        .filter(addon => addon.ingredientId && addon.price)
+        .map(addon => ({
+          ingredientId: addon.ingredientId,
+          name: addon.name,
+          price: addon.price,
+        }));
+
+      const validConnections = connections.filter(conn => conn.code && conn.units);
+      const selectedSize = selectedMenuItemSize || 'Small';
+      const selectedPrice = sizes[selectedSize]?.price || '';
+      const savedMenuItemName = menuItemName ? `${menuItemName} (${selectedSize})` : '';
+      const newMenuItemId = generateNextId('MNTM', activeMenuItems);
+
       const menuItemData = {
-        name: menuItemName,
+        id: newMenuItemId,
+        name: savedMenuItemName,
         category: itemCategory,
-        sizes: itemSizes,
-        addOns: addOns.filter(addon => addon.name && addon.price), // Filter out empty addons
-        connections: connections,
+        selectedSize,
+        price: selectedPrice,
+        sizes,
+        addOns: filteredAddOns,
+        connections: validConnections,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
       
       const docRef = await addDoc(collection(db, 'menuItems'), menuItemData);
-      console.log('Menu Item saved with ID:', docRef.id);
+      console.log('Menu Item saved with ID:', newMenuItemId);
+
+      setLastSavedKey(newMenuItemId);
+      setLastSavedName(savedMenuItemName);
+
+      setActiveMenuItems(prev => ([
+        ...prev,
+        {
+          id: newMenuItemId,
+          name: savedMenuItemName,
+          category: itemCategory,
+          selectedSize,
+          price: selectedPrice,
+          sizes,
+          addOns: filteredAddOns,
+          connections: validConnections,
+        },
+      ]));
+
       return true;
     } catch (error) {
       console.error('Error saving menu item:', error);
@@ -249,15 +288,34 @@ export default function Maintenance({ role }) {
 
   const saveItemToFirestore = async () => {
     try {
+      const itemSize = selectedItemSize || 'Small';
+      const savedItemName = itemName ? `${itemName} (${itemSize})` : '';
+      const newItemId = generateNextId('ITEM', activeItems);
       const itemData = {
-        name: itemName || ingredientName,
-        sizes: itemSizes,
+        id: newItemId,
+        name: savedItemName,
+        size: itemSize,
+        startingQty: parseFloat(itemStartingQty) || 0,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
       
       const docRef = await addDoc(collection(db, 'items'), itemData);
-      console.log('Item saved with ID:', docRef.id);
+      console.log('Item saved with ID:', newItemId);
+
+      setLastSavedKey(newItemId);
+      setLastSavedName(savedItemName);
+
+      setActiveItems(prev => ([
+        ...prev,
+        {
+          id: newItemId,
+          name: savedItemName,
+          size: itemSize,
+          startingQty: parseFloat(itemStartingQty) || 0,
+        },
+      ]));
+
       return true;
     } catch (error) {
       console.error('Error saving item:', error);
@@ -268,16 +326,34 @@ export default function Maintenance({ role }) {
 
   const saveIngredientToFirestore = async () => {
     try {
+      const newIngredientId = generateNextId('INGR', activeIngredients);
       const ingredientData = {
+        id: newIngredientId,
         name: ingredientName,
         type: ingredientType,
         startingQty: parseFloat(startingQty) || 0,
+        isAddOn: ingredientIsAddOn,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
       
       const docRef = await addDoc(collection(db, 'ingredients'), ingredientData);
-      console.log('Ingredient saved with ID:', docRef.id);
+      console.log('Ingredient saved with ID:', newIngredientId);
+
+      setLastSavedKey(newIngredientId);
+      setLastSavedName(ingredientName);
+
+      setActiveIngredients(prev => ([
+        ...prev,
+        {
+          id: newIngredientId,
+          name: ingredientName,
+          type: ingredientType,
+          startingQty: parseFloat(startingQty) || 0,
+          isAddOn: ingredientIsAddOn,
+        },
+      ]));
+
       return true;
     } catch (error) {
       console.error('Error saving ingredient:', error);
@@ -306,8 +382,36 @@ export default function Maintenance({ role }) {
     }
   };
 
-  const finalizeDiscardFlow = () => {
+  const resetCreateStates = () => {
+    setActiveAccordion('general');
+    setMenuItemName('');
+    setItemCategory('Coffee');
+    setSizes({
+      Small: { enabled: true, price: '' },
+      Medium: { enabled: true, price: '' },
+      Large: { enabled: false, price: '' },
+    });
+    setAddOns([{ ingredientId: '', name: '', price: '' }]);
+    setConnections([]);
+    setItemName('');
     setIngredientName('');
+    setIngredientType('Dry');
+    setStartingQty('');
+    setIngredientIsAddOn(false);
+    setSelectedMenuItemSize('Small');
+    setSelectedItemSize('Small');
+    setItemStartingQty('');
+    setItemSizes({
+      Small: { enabled: true, qty: '50' },
+      Medium: { enabled: true, qty: '50' },
+      Large: { enabled: true, qty: '50' },
+    });
+    setLastSavedKey('');
+    setLastSavedName('');
+  };
+
+  const finalizeDiscardFlow = () => {
+    resetCreateStates();
     closeAllModals();
     setCurrentView('main');
   };
@@ -319,1827 +423,205 @@ export default function Maintenance({ role }) {
     { id: 'retrieve', label: 'Retrieve', icon: <FilePlus size={24} />, subOptions: ['Menu Item', 'Item', 'Ingredient'] },
   ];
 
-  // --- SUB-VIEW: CREATE MENU ITEM ---
-  if (currentView === 'create-menu-item') {
+  if (currentView.startsWith('create-')) {
     return (
-      <div className="flex w-full h-full gap-6 relative"> 
-        <AdminSidebar activePage="maintenance" />
-        <main className="flex-1 bg-[#2a2a2a] rounded-xl p-8 flex flex-col text-white relative overflow-y-auto">
-          
-          <div className="flex gap-4 mb-10">
-            <button onClick={handleBack} className="bg-[#5a5a5a] p-3 rounded-lg hover:bg-[#6a6a6a]">
-              <CornerUpLeft size={20} />
-            </button>
-            <div className="flex-1 bg-[#5a5a5a] rounded-lg flex items-center px-4 gap-3 text-base font-medium tracking-wide">
-              <WrenchIcon size={20} />
-              <span>Maintenance &gt; Create &gt; Menu Item</span>
-            </div>
-          </div>
-
-          <h1 className="text-4xl font-semibold mb-8">Create Menu Item</h1>
-
-          <div className="flex flex-col gap-4 w-full pb-24">
-
-            {/* General Info Accordion */}
-            <div className="bg-[#3d3d3d] rounded-2xl overflow-hidden border border-[#444]">
-              <button 
-                onClick={() => setActiveAccordion(activeAccordion === 'general' ? null : 'general')}
-                className="w-full p-6 flex justify-between items-center hover:bg-[#444]"
-              >
-                <h3 className="text-2xl font-medium">General Information</h3>
-                {activeAccordion === 'general' ? <ChevronUp size={28} /> : <ChevronDown size={28} />}
-              </button>
-              {activeAccordion === 'general' && (
-                <div className="p-10 border-t border-[#444] grid grid-cols-[1fr_2.5fr] items-center gap-y-8 gap-x-12">
-                  <label className="text-2xl font-medium text-right">Menu Item Name</label>
-                  <input 
-                    type="text" value={menuItemName} onChange={(e) => setMenuItemName(e.target.value)}
-                    className="bg-white text-black rounded-lg h-12 px-4 text-xl font-semibold focus:outline-none" 
-                  />
-                  <label className="text-2xl font-medium text-right">Category</label>
-                  <div className="relative">
-                    <select 
-                      value={itemCategory}
-                      onChange={(e) => setItemCategory(e.target.value)}
-                      className="w-full bg-white text-black rounded-lg h-12 px-4 text-xl font-semibold appearance-none cursor-pointer"
-                    >
-                      <option>Beverage</option>
-                      <option>Food</option>
-                    </select>
-                    <ChevronDown size={24} className="absolute right-4 top-3 text-black pointer-events-none" />
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Sizes Accordion */}
-            <div className="bg-[#3d3d3d] rounded-2xl overflow-hidden border border-[#444]">
-              <button 
-                onClick={() => setActiveAccordion(activeAccordion === 'sizes' ? null : 'sizes')}
-                className="w-full p-6 flex justify-between items-center hover:bg-[#444]"
-              >
-                <h3 className="text-2xl font-medium">Sizes</h3>
-                {activeAccordion === 'sizes' ? <ChevronUp size={28} /> : <ChevronDown size={28} />}
-              </button>
-              {activeAccordion === 'sizes' && (
-                <div className="p-10 border-t border-[#444]">
-                  {/* Header for the grid columns */}
-                  <div className="grid grid-cols-[1.2fr_1fr_0.8fr_1.2fr] mb-6 px-4 text-center text-lg text-gray-300">
-                    <span></span>
-                    <span>Sizes</span>
-                    <span></span>
-                    <span>Price</span>
-                  </div>
-
-                  <div className="space-y-6">
-                    {Object.entries(itemSizes).map(([size, data]) => (
-                      <div key={size} className="grid grid-cols-[1.2fr_1fr_0.8fr_1.2fr] items-center gap-x-8">
-                        <span className={`text-2xl font-medium text-right ${!data.enabled ? 'opacity-40' : ''}`}>
-                          {size}
-                        </span>
-                        
-                        {/* Checkbox Button */}
-                        <div className="flex justify-center">
-                          <button 
-                            onClick={() => toggleItemSize(size)}
-                            className="bg-white text-black w-16 h-11 rounded-lg flex items-center justify-center transition-all active:scale-90"
-                          >
-                            {data.enabled && <Check size={28} strokeWidth={4} className="text-black" />}
-                          </button>
-                        </div>
-
-                        <span className={`text-2xl font-medium text-right ${!data.enabled ? 'opacity-40' : ''}`}>
-                          Php
-                        </span>
-                        
-                        <input 
-                          type="text" 
-                          disabled={!data.enabled}
-                          value={data.enabled ? data.qty : ''}
-                          onChange={(e) => setItemSizes(prev => ({
-                            ...prev,
-                            [size]: { ...prev[size], qty: e.target.value }
-                          }))}
-                          className={`rounded-lg h-11 w-full text-center text-xl font-semibold focus:outline-none transition-colors ${
-                            data.enabled 
-                              ? 'bg-white text-black' 
-                              : 'bg-transparent border-2 border-gray-500 opacity-50 cursor-not-allowed'
-                          }`} 
-                        />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Add-Ons Accordion */}
-            <div className="bg-[#3d3d3d] rounded-2xl overflow-hidden border border-[#444]">
-              <button 
-                onClick={() => setActiveAccordion(activeAccordion === 'addons' ? null : 'addons')} 
-                className="w-full p-6 flex justify-between items-center hover:bg-[#444]"
-              >
-                <h3 className="text-2xl font-medium">Add-Ons</h3>
-                {activeAccordion === 'addons' ? <ChevronUp size={28} /> : <ChevronDown size={28} />}
-              </button>
-
-              {activeAccordion === 'addons' && (
-                <div className="p-10 border-t border-[#444] space-y-6">
-                  {addOns.map((addon, idx) => (
-                    /* Grid changed to accommodate the trash icon at the end */
-                    <div key={idx} className="grid grid-cols-[1fr_2fr_0.5fr_1fr_auto] items-center gap-x-8">
-                      <span className="text-2xl font-medium text-right whitespace-nowrap">No. {idx + 1}</span>
-                      
-                      <div className="relative">
-                        <select className="w-full bg-white text-black rounded-lg h-12 px-4 text-xl font-semibold appearance-none">
-                          <option value="">{addon.name || "Select Add-On"}</option>
-                          {/* Add your options here */}
-                        </select>
-                        <ChevronDown size={24} className="absolute right-3 top-3 text-black pointer-events-none" />
-                      </div>
-
-                      <span className="text-2xl font-medium text-right">Php</span>
-                      
-                      <input 
-                        type="text" 
-                        value={addon.price} 
-                        onChange={(e) => {
-                          const updated = [...addOns];
-                          updated[idx].price = e.target.value;
-                          setAddOns(updated);
-                        }}
-                        className="bg-white text-black rounded-lg h-12 text-center text-xl font-semibold" 
-                      />
-
-                      {/* TRASH CAN BUTTON */}
-                      <button 
-                        onClick={() => handleRemoveRow(idx)}
-                        className="text-red-400 hover:text-red-600 transition-colors p-2"
-                      >
-                        <Trash2 size={24} />
-                      </button>
-                    </div>
-                  ))}
-
-                  <div className="flex justify-center pt-4">
-                    <button 
-                      onClick={handleAddRow}
-                      className="border-2 border-white rounded-xl px-12 py-3 flex items-center gap-3 text-xl font-medium hover:bg-white hover:text-black transition-colors"
-                    >
-                      <Plus size={24} /> Add another Add-On
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Connections Accordion */}
-            <div className="bg-[#3d3d3d] rounded-2xl overflow-hidden border border-[#444]">
-              <button 
-                onClick={() => setActiveAccordion(activeAccordion === 'connections' ? null : 'connections')} 
-                className="w-full p-6 flex justify-between items-center hover:bg-[#444] transition-colors"
-              >
-                <h3 className="text-2xl font-medium">Assign Connections</h3>
-                {activeAccordion === 'connections' ? <ChevronUp size={28} /> : <ChevronDown size={28} />}
-              </button>
-
-              {activeAccordion === 'connections' && (
-                <div className="p-10 border-t border-[#444] space-y-6">
-                  {connections.map((conn, idx) => (
-                    <div key={idx} className="grid grid-cols-[1.5fr_2fr_0.5fr_1fr_auto] items-center gap-x-8">
-                      {/* Dynamic Label based on Type and Sequence */}
-                      <span className="text-2xl font-medium text-right">
-                        {conn.type === 'ingredient' ? 'Ingredient' : 'Item'} No. {getSequenceNumber(idx, conn.type)}
-                      </span>
-
-                      {/* Selection Dropdown */}
-                      <div className="relative">
-                        <select className="w-full bg-white text-black rounded-lg h-12 px-4 text-xl font-semibold appearance-none">
-                          <option value="" disabled selected>
-                            {conn.type === 'ingredient' ? 'Select Ingredient' : 'Select Item'}
-                          </option>
-                          {/* Options would go here */}
-                          <option>{conn.code}</option>
-                        </select>
-                        <ChevronDown size={24} className="absolute right-3 top-3 text-black pointer-events-none" />
-                      </div>
-
-                      <span className="text-2xl font-medium text-right">Units</span>
-
-                      {/* Units Input */}
-                      <input 
-                        type="text" 
-                        value={conn.units} 
-                        onChange={(e) => {
-                          const newConns = [...connections];
-                          newConns[idx].units = e.target.value;
-                          setConnections(newConns);
-                        }}
-                        placeholder={conn.type === 'ingredient' ? '' : '1'}
-                        className="bg-white text-black rounded-lg h-12 text-center text-xl font-semibold" 
-                      />
-
-                      {/* Remove Row Button */}
-                      <button 
-                        onClick={() => removeConnection(idx)}
-                        className="text-red-400 hover:text-red-600 transition-colors p-2"
-                      >
-                        <Trash2 size={24} />
-                      </button>
-                    </div>
-                  ))}
-
-                  {/* Action Buttons */}
-                  <div className="flex justify-center gap-8 pt-4">
-                    <button 
-                      onClick={() => addConnection('ingredient')}
-                      className="border-2 border-white rounded-xl px-8 py-3 flex items-center gap-2 text-xl font-medium hover:bg-white hover:text-black transition-colors"
-                    >
-                      <Plus size={24} /> Assign Ingredient
-                    </button>
-                    <button 
-                      onClick={() => addConnection('item')}
-                      className="border-2 border-white rounded-xl px-8 py-3 flex items-center gap-2 text-xl font-medium hover:bg-white hover:text-black transition-colors"
-                    >
-                      <Plus size={24} /> Assign Item
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="mt-auto flex justify-center pb-4">
-            <button onClick={() => setShowSavePrompt(true)} className="bg-[#56a2d1] hover:bg-[#66b2e1] text-white text-2xl font-semibold py-4 px-32 rounded-xl shadow-lg transition-transform active:scale-95">
-              Save
-            </button>
-          </div>
-
-          {(showSavePrompt || showItemSavedSuccess || showDiscardPrompt) && (
-            <div className="fixed inset-0 bg-black/65 z-50 flex items-center justify-center animate-in fade-in duration-300">
-              {showSavePrompt && (
-                <div className="bg-[#2a2a2a] rounded-3xl p-10 shadow-2xl w-full max-w-xl flex flex-col items-center relative border border-[#444]">
-                  <button onClick={() => setShowSavePrompt(false)} className="absolute top-8 left-8 bg-[#5a5a5a] p-3 rounded-xl hover:bg-[#6a6a6a]"><CornerUpLeft size={22} /></button>
-                  <h2 className="text-5xl font-semibold mb-12 text-white mt-4 text-center">Save Creation?</h2>
-                  <div className="flex flex-col gap-5 w-full max-w-md">
-                    <button onClick={() => { setShowSavePrompt(false); setShowDiscardPrompt(true); }} className="w-full bg-[#4a4a4a] py-5 rounded-2xl text-2xl font-semibold transition-colors">Discard</button>
-                    <button onClick={finalizeSaveFlow} className="w-full bg-[#56a2d1] py-5 rounded-2xl text-2xl font-semibold text-white transition-colors">Save</button>
-                  </div>
-                </div>
-              )}
-              {showItemSavedSuccess && (
-                <div className="bg-[#2a2a2a] rounded-3xl p-12 shadow-2xl w-full max-w-xl flex flex-col items-center border border-[#444] text-center">
-                  <h2 className="text-5xl font-semibold mb-8 text-white"> Menu Item Saved!</h2>
-                  <p className="text-2xl text-gray-300 mb-10">{menuItemName || "Graham"} has been saved and assigned as ____</p>
-                  <button onClick={() => { setShowItemSavedSuccess(false); setCurrentView('main'); setMenuItemName(''); }} className="w-full max-w-xs bg-[#4a4a4a] py-4 rounded-2xl text-2xl font-semibold transition-colors">Return</button>
-                </div>
-              )}
-              {showDiscardPrompt && (
-                <div className="bg-[#2a2a2a] rounded-3xl p-10 shadow-2xl w-full max-w-xl flex flex-col items-center border border-[#444]">
-                  <h2 className="text-5xl font-semibold mb-12 text-white text-center">Discard Creation?</h2>
-                  <div className="flex flex-col gap-5 w-full max-w-md">
-                    <button onClick={() => setShowDiscardPrompt(false)} className="w-full bg-[#4a4a4a] py-5 rounded-2xl text-2xl font-semibold transition-colors">Return</button>
-                    <button onClick={() => { setShowDiscardPrompt(false); setCurrentView('main'); setMenuItemName(''); }} className="w-full bg-[#ca4646] py-5 rounded-2xl text-2xl font-semibold text-white transition-colors">Discard</button>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </main>
-      </div>
+      <MaintenanceCreate
+        currentView={currentView}
+        handleBack={handleBack}
+        activeAccordion={activeAccordion}
+        setActiveAccordion={setActiveAccordion}
+        menuItemName={menuItemName}
+        setMenuItemName={setMenuItemName}
+        itemCategory={itemCategory}
+        setItemCategory={setItemCategory}
+        sizes={sizes}
+        setSizes={setSizes}
+        selectedMenuItemSize={selectedMenuItemSize}
+        setSelectedMenuItemSize={setSelectedMenuItemSize}
+        itemSizes={itemSizes}
+        setItemSizes={setItemSizes}
+        selectedItemSize={selectedItemSize}
+        setSelectedItemSize={setSelectedItemSize}
+        itemStartingQty={itemStartingQty}
+        setItemStartingQty={setItemStartingQty}
+        addOns={addOns}
+        setAddOns={setAddOns}
+        handleAddRow={handleAddRow}
+        handleRemoveRow={handleRemoveRow}
+        connections={connections}
+        setConnections={setConnections}
+        addConnection={addConnection}
+        removeConnection={removeConnection}
+        getSequenceNumber={getSequenceNumber}
+        showSavePrompt={showSavePrompt}
+        setShowSavePrompt={setShowSavePrompt}
+        showItemSavedSuccess={showItemSavedSuccess}
+        setShowItemSavedSuccess={setShowItemSavedSuccess}
+        showDiscardPrompt={showDiscardPrompt}
+        setShowDiscardPrompt={setShowDiscardPrompt}
+        finalizeSaveFlow={finalizeSaveFlow}
+        setCurrentView={setCurrentView}
+        resetCreateStates={resetCreateStates}
+        activeItems={activeItems}
+        activeIngredients={activeIngredients}
+        itemName={itemName}
+        setItemName={setItemName}
+        ingredientName={ingredientName}
+        setIngredientName={setIngredientName}
+        ingredientType={ingredientType}
+        setIngredientType={setIngredientType}
+        ingredientIsAddOn={ingredientIsAddOn}
+        setIngredientIsAddOn={setIngredientIsAddOn}
+        startingQty={startingQty}
+        setStartingQty={setStartingQty}
+        lastSavedKey={lastSavedKey}
+        lastSavedName={lastSavedName}
+      />
     );
   }
 
-  // --- SUB-VIEW: CREATE ITEM ---
-  if (currentView === 'create-item') {
+  if (currentView.startsWith('edit-')) {
     return (
-      <div className="flex w-full h-full gap-6 relative">
-        <AdminSidebar activePage="maintenance" />
-        <main className="flex-1 bg-[#2a2a2a] rounded-xl p-8 flex flex-col text-white relative overflow-y-auto custom-scrollbar-gutter">
-          
-          {/* Breadcrumb Header */}
-          <div className="flex gap-4 mb-10">
-            <button onClick={handleBack} className="bg-[#5a5a5a] p-3 rounded-lg hover:bg-[#6a6a6a]">
-              <CornerUpLeft size={20} />
-            </button>
-            <div className="flex-1 bg-[#5a5a5a] rounded-lg flex items-center px-4 gap-3 text-base font-medium tracking-wide">
-              <WrenchIcon size={20} />
-              <span>Maintenance &gt; Create &gt; Item</span>
-            </div>
-          </div>
-
-          <h1 className="text-4xl font-semibold mb-8">Create Item</h1>
-
-          <div className="flex flex-col gap-4 w-full pb-24">
-            
-            {/* General Info Accordion */}
-            <div className="bg-[#3d3d3d] rounded-2xl overflow-hidden border border-[#444]">
-              <button 
-                onClick={() => setActiveAccordion(activeAccordion === 'general' ? null : 'general')}
-                className="w-full p-6 flex justify-between items-center hover:bg-[#444]"
-              >
-                <h3 className="text-2xl font-medium">General Information</h3>
-                {activeAccordion === 'general' ? <ChevronUp size={28} /> : <ChevronDown size={28} />}
-              </button>
-              {activeAccordion === 'general' && (
-                <div className="p-10 border-t border-[#444] grid grid-cols-[1fr_2.5fr] items-center gap-y-8 gap-x-12">
-                  <label className="text-2xl font-medium text-right">Item Name</label>
-                  <input 
-                    type="text"
-                    value={itemName}
-                    onChange={(e) => setItemName(e.target.value)}
-                    className="bg-white text-black rounded-lg h-12 px-4 text-xl font-semibold focus:outline-none" 
-                  />
-                </div>
-              )}
-            </div>
-
-            {/* Sizes Accordion */}
-            <div className="bg-[#3d3d3d] rounded-2xl overflow-hidden border border-[#444]">
-              <button 
-                onClick={() => setActiveAccordion(activeAccordion === 'sizes' ? null : 'sizes')}
-                className="w-full p-6 flex justify-between items-center hover:bg-[#444]"
-              >
-                <h3 className="text-2xl font-medium">Sizes</h3>
-                {activeAccordion === 'sizes' ? <ChevronUp size={28} /> : <ChevronDown size={28} />}
-              </button>
-              {activeAccordion === 'sizes' && (
-                <div className="p-10 border-t border-[#444]">
-                  {/* Header for the grid columns */}
-                  <div className="grid grid-cols-[1.2fr_1fr_0.8fr_1.2fr] mb-6 px-4 text-center text-lg text-gray-300">
-                    <span></span>
-                    <span>Sizes</span>
-                    <span></span>
-                    <span>Starting Qty.</span>
-                  </div>
-
-                  <div className="space-y-6">
-                    {Object.entries(itemSizes).map(([size, data]) => (
-                      <div key={size} className="grid grid-cols-[1.2fr_1fr_0.8fr_1.2fr] items-center gap-x-8">
-                        <span className={`text-2xl font-medium text-right ${!data.enabled ? 'opacity-40' : ''}`}>
-                          {size}
-                        </span>
-                        
-                        {/* Checkbox Button */}
-                        <div className="flex justify-center">
-                          <button 
-                            onClick={() => toggleItemSize(size)}
-                            className="bg-white text-black w-16 h-11 rounded-lg flex items-center justify-center transition-all active:scale-90"
-                          >
-                            {data.enabled && <Check size={28} strokeWidth={4} className="text-black" />}
-                          </button>
-                        </div>
-
-                        <span className={`text-2xl font-medium text-right ${!data.enabled ? 'opacity-40' : ''}`}>
-                          Units
-                        </span>
-                        
-                        <input 
-                          type="text" 
-                          disabled={!data.enabled}
-                          value={data.enabled ? data.qty : ''}
-                          onChange={(e) => setItemSizes(prev => ({
-                            ...prev,
-                            [size]: { ...prev[size], qty: e.target.value }
-                          }))}
-                          className={`rounded-lg h-11 w-full text-center text-xl font-semibold focus:outline-none transition-colors ${
-                            data.enabled 
-                              ? 'bg-white text-black' 
-                              : 'bg-transparent border-2 border-gray-500 opacity-50 cursor-not-allowed'
-                          }`} 
-                        />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-        {/* Save Button */}
-        <div className="mt-auto flex justify-center pb-4">
-          <button 
-            onClick={() => setShowSavePrompt(true)} 
-            className="bg-[#56a2d1] hover:bg-[#66b2e1] text-white text-2xl font-semibold py-4 px-32 rounded-xl shadow-lg transition-transform active:scale-95"
-          >
-            Save
-          </button>
-        </div>
-
-        {/* Backdrop for all Modals */}
-        {(showSavePrompt || showItemSavedSuccess || showDiscardPrompt) && (
-          <div className="fixed inset-0 bg-black/65 z-50 animate-in fade-in duration-300" />)}
-
-        {(showSavePrompt || showItemSavedSuccess || showDiscardPrompt) && (
-            <div className="fixed inset-0 bg-black/65 z-50 flex items-center justify-center animate-in fade-in duration-300">
-              {showSavePrompt && (
-                <div className="bg-[#2a2a2a] rounded-3xl p-10 shadow-2xl w-full max-w-xl flex flex-col items-center relative border border-[#444]">
-                  <button onClick={() => setShowSavePrompt(false)} className="absolute top-8 left-8 bg-[#5a5a5a] p-3 rounded-xl hover:bg-[#6a6a6a]"><CornerUpLeft size={22} /></button>
-                  <h2 className="text-5xl font-semibold mb-12 text-white mt-4 text-center">Save Creation?</h2>
-                  <div className="flex flex-col gap-5 w-full max-w-md">
-                    <button onClick={() => { setShowSavePrompt(false); setShowDiscardPrompt(true); }} className="w-full bg-[#4a4a4a] py-5 rounded-2xl text-2xl font-semibold transition-colors">Discard</button>
-                    <button onClick={finalizeSaveFlow} className="w-full bg-[#56a2d1] py-5 rounded-2xl text-2xl font-semibold text-white transition-colors">Save</button>
-                  </div>
-                </div>
-              )}
-              {showItemSavedSuccess && (
-                <div className="bg-[#2a2a2a] rounded-3xl p-12 shadow-2xl w-full max-w-xl flex flex-col items-center border border-[#444] text-center">
-                  <h2 className="text-5xl font-semibold mb-8 text-white"> Item Saved!</h2>
-                  <p className="text-2xl text-gray-300 mb-10">_____ has been saved and assigned as ____</p>
-                  <button onClick={() => { setShowItemSavedSuccess(false); setCurrentView('main'); setMenuItemName(''); }} className="w-full max-w-xs bg-[#4a4a4a] py-4 rounded-2xl text-2xl font-semibold transition-colors">Return</button>
-                </div>
-              )}
-              {showDiscardPrompt && (
-                <div className="bg-[#2a2a2a] rounded-3xl p-10 shadow-2xl w-full max-w-xl flex flex-col items-center border border-[#444]">
-                  <h2 className="text-5xl font-semibold mb-12 text-white text-center">Discard Creation?</h2>
-                  <div className="flex flex-col gap-5 w-full max-w-md">
-                    <button onClick={() => setShowDiscardPrompt(false)} className="w-full bg-[#4a4a4a] py-5 rounded-2xl text-2xl font-semibold transition-colors">Return</button>
-                    <button onClick={() => { setShowDiscardPrompt(false); setCurrentView('main'); setMenuItemName(''); }} className="w-full bg-[#ca4646] py-5 rounded-2xl text-2xl font-semibold text-white transition-colors">Discard</button>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </main>
-      </div>
+      <MaintenanceEdit
+        currentView={currentView}
+        handleBack={handleBack}
+        activeAccordion={activeAccordion}
+        setActiveAccordion={setActiveAccordion}
+        selectedEditItem={selectedEditItem}
+        setSelectedEditItem={setSelectedEditItem}
+        menuItemName={menuItemName}
+        setMenuItemName={setMenuItemName}
+        itemCategory={itemCategory}
+        setItemCategory={setItemCategory}
+        itemSizes={itemSizes}
+        setItemSizes={setItemSizes}
+        addOns={addOns}
+        setAddOns={setAddOns}
+        handleAddRow={handleAddRow}
+        handleRemoveRow={handleRemoveRow}
+        connections={connections}
+        setConnections={setConnections}
+        getSequenceNumber={getSequenceNumber}
+        showSavePrompt={showSavePrompt}
+        setShowSavePrompt={setShowSavePrompt}
+        showItemSavedSuccess={showItemSavedSuccess}
+        setShowItemSavedSuccess={setShowItemSavedSuccess}
+        showDiscardPrompt={showDiscardPrompt}
+        setShowDiscardPrompt={setShowDiscardPrompt}
+        finalizeSaveFlow={finalizeSaveFlow}
+        setCurrentView={setCurrentView}
+        activeMenuItems={activeMenuItems}
+        activeItems={activeItems}
+        activeIngredients={activeIngredients}
+        itemName={itemName}
+        setItemName={setItemName}
+        ingredientName={ingredientName}
+        setIngredientName={setIngredientName}
+        ingredientType={ingredientType}
+        setIngredientType={setIngredientType}
+        ingredientIsAddOn={ingredientIsAddOn}
+        setIngredientIsAddOn={setIngredientIsAddOn}
+        startingQty={startingQty}
+        setStartingQty={setStartingQty}
+        selectedMenuItemSize={selectedMenuItemSize}
+        setSelectedMenuItemSize={setSelectedMenuItemSize}
+        selectedItemSize={selectedItemSize}
+        setSelectedItemSize={setSelectedItemSize}
+        itemStartingQty={itemStartingQty}
+        setItemStartingQty={setItemStartingQty}
+        sizes={sizes}
+        setSizes={setSizes}
+      />
     );
   }
 
-  // --- SUB-VIEW: CREATE INGREDIENT ---
-  if (currentView === 'create-ingredient') {
+  if (currentView.startsWith('archive-')) {
     return (
-      <div className="flex w-full h-full gap-6 relative"> 
-        <AdminSidebar activePage="maintenance" />
-        <main className="flex-1 bg-[#2a2a2a] rounded-xl p-8 flex flex-col text-white relative">
-          
-          {/* Breadcrumb Header */}
-          <div className="flex gap-4 mb-10">
-            <button onClick={handleBack} className="bg-[#5a5a5a] p-3 rounded-lg hover:bg-[#6a6a6a]">
-              <CornerUpLeft size={20} />
-            </button>
-            <div className="flex-1 bg-[#5a5a5a] rounded-lg flex items-center px-4 gap-3 text-base font-medium tracking-wide">
-              <WrenchIcon size={20} />
-              <span>Maintenance &gt; Create &gt; Ingredient</span>
-            </div>
-          </div>
-
-          <h1 className="text-4xl font-semibold mb-8">Create Ingredient</h1>
-
-          {/* Form Card */}
-          <div className="bg-[#3d3d3d] rounded-2xl p-10 w-full shadow-inner border border-[#444]">
-            <h3 className="text-2xl font-medium mb-10 text-gray-200">General Information</h3>
-            
-            {/* Grid Container */}
-            <div className="grid grid-cols-[1.2fr_2fr] items-center gap-y-8 gap-x-12 w-full max-w-5xl px-4">
-              <label className="text-2xl font-medium text-right">Ingredient Name</label>
-              <input 
-                type="text" 
-                value={ingredientName}
-                onChange={(e) => setIngredientName(e.target.value)}
-                className="w-full bg-white text-black rounded-lg h-12 px-4 text-xl font-semibold focus:outline-none" 
-              />
-              
-              <label className="text-2xl font-medium text-right">Ingredient Type</label>
-              <div className="relative group">
-                <select 
-                  value={ingredientType}
-                  onChange={(e) => setIngredientType(e.target.value)}
-                  className="w-full bg-white text-black rounded-lg h-12 px-4 text-xl font-semibold focus:outline-none appearance-none cursor-pointer pr-14"
-                >
-                  <option>Dry</option>
-                  <option>Liquid</option>
-                  <option>Frozen</option>
-                </select>
-                <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-black"><ChevronDown size={28} strokeWidth={3} /></div>
-              </div>
-
-              <label className="text-2xl font-medium text-right">Starting Qty.</label>
-              <div className="flex items-center gap-4">
-                <input 
-                  type="text" 
-                  value={startingQty}
-                  onChange={(e) => setStartingQty(e.target.value)}
-                  className="flex-1 bg-white text-black rounded-lg h-12 px-4 text-center text-xl font-semibold focus:outline-none" 
-                />
-                <span className="text-2xl font-medium w-10">kg</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Save Button Container */}
-          <div className="mt-auto flex justify-center pb-4">
-            <button onClick={() => setShowSavePrompt(true)} className="bg-[#56a2d1] hover:bg-[#66b2e1] text-white text-2xl font-semibold py-4 px-32 rounded-xl shadow-lg transition-transform active:scale-95">
-              Save
-            </button>
-          </div>
-        </main>
-
-        {/* Backdrop for all Modals */}
-        {(showSavePrompt || showItemSavedSuccess || showDiscardPrompt) && (
-          <div className="fixed inset-0 bg-black/65 z-50 animate-in fade-in duration-300" />)}
-
-        {(showSavePrompt || showItemSavedSuccess || showDiscardPrompt) && (
-            <div className="fixed inset-0 bg-black/65 z-50 flex items-center justify-center animate-in fade-in duration-300">
-              {showSavePrompt && (
-                <div className="bg-[#2a2a2a] rounded-3xl p-10 shadow-2xl w-full max-w-xl flex flex-col items-center relative border border-[#444]">
-                  <button onClick={() => setShowSavePrompt(false)} className="absolute top-8 left-8 bg-[#5a5a5a] p-3 rounded-xl hover:bg-[#6a6a6a]"><CornerUpLeft size={22} /></button>
-                  <h2 className="text-5xl font-semibold mb-12 text-white mt-4 text-center">Save Creation?</h2>
-                  <div className="flex flex-col gap-5 w-full max-w-md">
-                    <button onClick={() => { setShowSavePrompt(false); setShowDiscardPrompt(true); }} className="w-full bg-[#4a4a4a] py-5 rounded-2xl text-2xl font-semibold transition-colors">Discard</button>
-                    <button onClick={finalizeSaveFlow} className="w-full bg-[#56a2d1] py-5 rounded-2xl text-2xl font-semibold text-white transition-colors">Save</button>
-                  </div>
-                </div>
-              )}
-              {showItemSavedSuccess && (
-                <div className="bg-[#2a2a2a] rounded-3xl p-12 shadow-2xl w-full max-w-xl flex flex-col items-center border border-[#444] text-center">
-                  <h2 className="text-5xl font-semibold mb-8 text-white"> Menu Item Saved!</h2>
-                  <p className="text-2xl text-gray-300 mb-10">_____ has been saved and assigned as ____</p>
-                  <button onClick={() => { setShowItemSavedSuccess(false); setCurrentView('main'); setMenuItemName(''); }} className="w-full max-w-xs bg-[#4a4a4a] py-4 rounded-2xl text-2xl font-semibold transition-colors">Return</button>
-                </div>
-              )}
-              {showDiscardPrompt && (
-                <div className="bg-[#2a2a2a] rounded-3xl p-10 shadow-2xl w-full max-w-xl flex flex-col items-center border border-[#444]">
-                  <h2 className="text-5xl font-semibold mb-12 text-white text-center">Discard Creation?</h2>
-                  <div className="flex flex-col gap-5 w-full max-w-md">
-                    <button onClick={() => setShowDiscardPrompt(false)} className="w-full bg-[#4a4a4a] py-5 rounded-2xl text-2xl font-semibold transition-colors">Return</button>
-                    <button onClick={() => { setShowDiscardPrompt(false); setCurrentView('main'); setMenuItemName(''); }} className="w-full bg-[#ca4646] py-5 rounded-2xl text-2xl font-semibold text-white transition-colors">Discard</button>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-      </div>
+      <MaintenanceArchive
+        currentView={currentView}
+        handleBack={handleBack}
+        activeMenuItems={activeMenuItems}
+        activeItems={activeItems}
+        activeIngredients={activeIngredients}
+        selectedArchiveMenuItem={selectedArchiveMenuItem}
+        setSelectedArchiveMenuItem={setSelectedArchiveMenuItem}
+        showMenuConfirm={showMenuConfirm}
+        setShowMenuConfirm={setShowMenuConfirm}
+        showMenuSuccess={showMenuSuccess}
+        setShowMenuSuccess={setShowMenuSuccess}
+        selectedArchiveItem={selectedArchiveItem}
+        setSelectedArchiveItem={setSelectedArchiveItem}
+        showItemConfirm={showItemConfirm}
+        setShowItemConfirm={setShowItemConfirm}
+        showItemSuccess={showItemSuccess}
+        setShowItemSuccess={setShowItemSuccess}
+        selectedArchiveIngredient={selectedArchiveIngredient}
+        setSelectedArchiveIngredient={setSelectedArchiveIngredient}
+        showIngConfirm={showIngConfirm}
+        setShowIngConfirm={setShowIngConfirm}
+        showIngSuccess={showIngSuccess}
+        setShowIngSuccess={setShowIngSuccess}
+        setActiveMenuItems={setActiveMenuItems}
+        setActiveItems={setActiveItems}
+        setActiveIngredients={setActiveIngredients}
+      />
     );
   }
 
-  // --- SUB-VIEW: EDIT MENU ITEM ---
-  if (currentView === 'edit-menu-item') {
+  if (currentView.startsWith('retrieve-')) {
     return (
-      <div className="flex w-full h-full gap-6 relative bg-[#1e1e1e]">
-        <AdminSidebar activePage="maintenance" />
-        <main className="flex-1 bg-[#2a2a2a] rounded-xl p-8 flex flex-col text-white relative overflow-y-auto">
-          
-          {/* Breadcrumb Header */}
-          <div className="flex gap-4 mb-10">
-            <button 
-              onClick={() => selectedEditItem ? setSelectedEditItem(null) : handleBack()} 
-              className="bg-[#5a5a5a] p-3 rounded-lg hover:bg-[#6a6a6a] transition-colors"
-            >
-              <CornerUpLeft size={20} />
-            </button>
-            <div className="flex-1 bg-[#5a5a5a] rounded-lg flex items-center px-4 gap-3 text-base font-medium tracking-wide">
-              <WrenchIcon size={20} />
-              <span> 
-                Maintenance &gt; Edit &gt; Menu Item 
-                {selectedEditItem && (
-                  <span className="text-base font-medium tracking-wide"> &gt; {selectedEditItem.id}</span>
-                )}
-              </span>
-            </div>
-          </div>
-
-          <h1 className="text-4xl font-semibold mb-8">
-            Edit Menu Item {selectedEditItem ? `(${selectedEditItem.id})` : ''}
-          </h1>
-
-          {!selectedEditItem ? (
-
-            /* Selection Table */
-            <div className="flex-1 w-full bg-[#333] rounded-xl overflow-y-auto border border-[#444] mb-4">
-              <div className="grid grid-cols-[1.5fr_3fr_1fr] bg-[#4a4a4a] p-4 text-xl font-medium px-12 border-b border-[#555]">
-                <span className="text-center">No.</span>
-                <span className="text-center">Name</span>
-                <span className="text-center">Action</span>
-              </div>
-              {mockMenuItems.map((item) => (
-                <div key={item.id} className="grid grid-cols-[1.5fr_3fr_1fr] p-6 border-b border-[#444] items-center px-12 hover:bg-[#3d3d3d] transition-colors">
-                  <span className="text-center text-xl">{item.id}</span>
-                  <span className="text-center text-xl font-medium">{item.name}</span>
-                  <button 
-                    onClick={() => { 
-                      setSelectedEditItem(item); 
-                      setMenuItemName(item.name);
-                    }}
-                    className="flex justify-center text-gray-300 hover:text-white"
-                  >
-                    <Edit3 size={28} />
-                  </button>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="flex flex-col gap-4 w-full pb-24">
-              
-              {/* General Information */}
-              <div className="bg-[#3d3d3d] rounded-2xl overflow-hidden border border-[#444]">
-                <button onClick={() => setActiveAccordion(activeAccordion === 'general' ? null : 'general')} className="w-full p-6 flex justify-between items-center hover:bg-[#444] transition-colors">
-                  <h3 className="text-2xl font-medium">General Information</h3>
-                  {activeAccordion === 'general' ? <ChevronUp size={28} /> : <ChevronDown size={28} />}
-                </button>
-                {activeAccordion === 'general' && (
-                  <div className="p-10 border-t border-[#444] grid grid-cols-[1fr_2.5fr] items-center gap-y-8 gap-x-12 animate-in slide-in-from-top-2">
-                    <label className="text-2xl font-medium text-right">Menu Item Name</label>
-                    <input type="text" value={menuItemName} onChange={(e) => setMenuItemName(e.target.value)} className="bg-white text-black rounded-lg h-12 px-4 text-xl font-semibold" />
-                    <label className="text-2xl font-medium text-right">Category</label>
-                    <div className="relative">
-                      <select 
-                        value={itemCategory}
-                        onChange={(e) => setItemCategory(e.target.value)}
-                        className="w-full bg-white text-black rounded-lg h-12 px-4 text-xl font-semibold appearance-none cursor-pointer"
-                      >
-                        <option>Beverage</option>
-                        <option>Food</option>
-                      </select>
-                      <ChevronDown size={24} className="absolute right-4 top-3 text-black pointer-events-none" />
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Sizes Accordion */}
-            <div className="bg-[#3d3d3d] rounded-2xl overflow-hidden border border-[#444]">
-              <button 
-                onClick={() => setActiveAccordion(activeAccordion === 'sizes' ? null : 'sizes')}
-                className="w-full p-6 flex justify-between items-center hover:bg-[#444]"
-              >
-                <h3 className="text-2xl font-medium">Sizes</h3>
-                {activeAccordion === 'sizes' ? <ChevronUp size={28} /> : <ChevronDown size={28} />}
-              </button>
-              {activeAccordion === 'sizes' && (
-                <div className="p-10 border-t border-[#444]">
-                  {/* Header for the grid columns */}
-                  <div className="grid grid-cols-[1.2fr_1fr_0.8fr_1.2fr] mb-6 px-4 text-center text-lg text-gray-300">
-                    <span></span>
-                    <span>Sizes</span>
-                    <span></span>
-                    <span>Price</span>
-                  </div>
-
-                  <div className="space-y-6">
-                    {Object.entries(itemSizes).map(([size, data]) => (
-                      <div key={size} className="grid grid-cols-[1.2fr_1fr_0.8fr_1.2fr] items-center gap-x-8">
-                        <span className={`text-2xl font-medium text-right ${!data.enabled ? 'opacity-40' : ''}`}>
-                          {size}
-                        </span>
-                        
-                        {/* Checkbox Button */}
-                        <div className="flex justify-center">
-                          <button 
-                            onClick={() => toggleItemSize(size)}
-                            className="bg-white text-black w-16 h-11 rounded-lg flex items-center justify-center transition-all active:scale-90"
-                          >
-                            {data.enabled && <Check size={28} strokeWidth={4} className="text-black" />}
-                          </button>
-                        </div>
-
-                        <span className={`text-2xl font-medium text-right ${!data.enabled ? 'opacity-40' : ''}`}>
-                          Php
-                        </span>
-                        
-                        <input 
-                          type="text" 
-                          disabled={!data.enabled}
-                          value={data.enabled ? data.qty : ''}
-                          onChange={(e) => setItemSizes(prev => ({
-                            ...prev,
-                            [size]: { ...prev[size], qty: e.target.value }
-                          }))}
-                          className={`rounded-lg h-11 w-full text-center text-xl font-semibold focus:outline-none transition-colors ${
-                            data.enabled 
-                              ? 'bg-white text-black' 
-                              : 'bg-transparent border-2 border-gray-500 opacity-50 cursor-not-allowed'
-                          }`} 
-                        />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-
-              {/* Add-Ons Accordion */}
-            <div className="bg-[#3d3d3d] rounded-2xl overflow-hidden border border-[#444]">
-              <button 
-                onClick={() => setActiveAccordion(activeAccordion === 'addons' ? null : 'addons')} 
-                className="w-full p-6 flex justify-between items-center hover:bg-[#444]"
-              >
-                <h3 className="text-2xl font-medium">Add-Ons</h3>
-                {activeAccordion === 'addons' ? <ChevronUp size={28} /> : <ChevronDown size={28} />}
-              </button>
-
-              {activeAccordion === 'addons' && (
-                <div className="p-10 border-t border-[#444] space-y-6">
-                  {addOns.map((addon, idx) => (
-                    /* Grid changed to accommodate the trash icon at the end */
-                    <div key={idx} className="grid grid-cols-[1fr_2fr_0.5fr_1fr_auto] items-center gap-x-8">
-                      <span className="text-2xl font-medium text-right whitespace-nowrap">No. {idx + 1}</span>
-                      
-                      <div className="relative">
-                        <select className="w-full bg-white text-black rounded-lg h-12 px-4 text-xl font-semibold appearance-none">
-                          <option value="">{addon.name || "Select Add-On"}</option>
-                          {/* Add your options here */}
-                        </select>
-                        <ChevronDown size={24} className="absolute right-3 top-3 text-black pointer-events-none" />
-                      </div>
-
-                      <span className="text-2xl font-medium text-right">Php</span>
-                      
-                      <input 
-                        type="text" 
-                        value={addon.price} 
-                        onChange={(e) => {
-                          const updated = [...addOns];
-                          updated[idx].price = e.target.value;
-                          setAddOns(updated);
-                        }}
-                        className="bg-white text-black rounded-lg h-12 text-center text-xl font-semibold" 
-                      />
-
-                      {/* TRASH CAN BUTTON */}
-                      <button 
-                        onClick={() => handleRemoveRow(idx)}
-                        className="text-red-400 hover:text-red-600 transition-colors p-2"
-                      >
-                        <Trash2 size={24} />
-                      </button>
-                    </div>
-                  ))}
-
-                  <div className="flex justify-center pt-4">
-                    <button 
-                      onClick={handleAddRow}
-                      className="border-2 border-white rounded-xl px-12 py-3 flex items-center gap-3 text-xl font-medium hover:bg-white hover:text-black transition-colors"
-                    >
-                      <Plus size={24} /> Add another Add-On
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-
-              {/* Connections Section */}
-              <div className="bg-[#3d3d3d] rounded-2xl overflow-hidden border border-[#444]">
-                <button onClick={() => setActiveAccordion(activeAccordion === 'connections' ? null : 'connections')} className="w-full p-6 flex justify-between items-center hover:bg-[#444] transition-colors">
-                  <h3 className="text-2xl font-medium">Assign Connections</h3>
-                  {activeAccordion === 'connections' ? <ChevronUp size={28} /> : <ChevronDown size={28} />}
-                </button>
-                {activeAccordion === 'connections' && (
-                  <div className="p-10 border-t border-[#444] space-y-6 animate-in slide-in-from-top-2">
-                    {connections.map((conn, idx) => (
-                      <div key={idx} className="grid grid-cols-[1.5fr_2fr_0.8fr_1fr_auto] items-center gap-x-8">
-                        <span className="text-2xl font-medium text-right">
-                          {conn.type === 'ingredient' ? 'Ingredient' : 'Item'} No. {getSequenceNumber(idx, conn.type)}
-                        </span>
-                        <div className="relative">
-                          <select className="w-full bg-white text-black rounded-lg h-12 px-4 text-xl font-semibold appearance-none">
-                            <option>{conn.code || `Select ${conn.type}`}</option>
-                          </select>
-                          <ChevronDown size={24} className="absolute right-3 top-3 text-black pointer-events-none" />
-                        </div>
-                        <span className="text-2xl font-medium text-right">Units</span>
-                        <input 
-                          type="text" 
-                          value={conn.units} 
-                          onChange={(e) => {
-                            const updated = [...connections];
-                            updated[idx].units = e.target.value;
-                            setConnections(updated);
-                          }}
-                          className="bg-white text-black rounded-lg h-12 text-center text-xl font-semibold" 
-                        />
-                        <button onClick={() => removeConnection(idx)} className="text-red-400 hover:text-red-600 transition-colors p-1">
-                          <Trash2 size={24} />
-                        </button>
-                      </div>
-                    ))}
-                    <div className="flex justify-center gap-8 pt-4">
-                      <button onClick={() => addConnection('ingredient')} className="border-2 border-white rounded-xl px-8 py-3 flex items-center gap-2 text-xl font-medium hover:bg-white hover:text-black transition-colors">
-                        <Plus size={24} /> Assign Ingredient
-                      </button>
-                      <button onClick={() => addConnection('item')} className="border-2 border-white rounded-xl px-8 py-3 flex items-center gap-2 text-xl font-medium hover:bg-white hover:text-black transition-colors">
-                        <Plus size={24} /> Assign Item
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Final Action Button */}
-              <div className="mt-8 flex justify-center">
-                <button onClick={() => setShowSavePrompt(true)} className="bg-[#56a2d1] hover:bg-[#66b2e1] text-white text-2xl font-semibold py-4 px-24 rounded-xl shadow-lg transition-transform active:scale-95">
-                  Save Changes
-                </button>
-              </div>
-
-              {/* Prompt Overlays (Keep as originally provided) */}
-              {(showSavePrompt || showItemSavedSuccess || showDiscardPrompt) && (
-                <div className="fixed inset-0 bg-black/65 z-50 flex items-center justify-center animate-in fade-in duration-300">
-                  {showSavePrompt && (
-                    <div className="bg-[#2a2a2a] rounded-3xl p-10 shadow-2xl w-full max-w-xl flex flex-col items-center relative border border-[#444]">
-                      <button onClick={() => setShowSavePrompt(false)} className="absolute top-8 left-8 bg-[#5a5a5a] p-3 rounded-xl hover:bg-[#6a6a6a]"><CornerUpLeft size={22} /></button>
-                      <h2 className="text-5xl font-semibold mb-12 text-white mt-4 text-center">Save Changes?</h2>
-                      <div className="flex flex-col gap-5 w-full max-w-md">
-                        <button onClick={() => { setShowSavePrompt(false); setShowDiscardPrompt(true); }} className="w-full bg-[#4a4a4a] py-5 rounded-2xl text-2xl font-semibold transition-colors">Discard</button>
-                        <button onClick={finalizeSaveFlow} className="w-full bg-[#56a2d1] py-5 rounded-2xl text-2xl font-semibold text-white transition-colors">Save</button>
-                      </div>
-                    </div>
-                  )}
-                  {showItemSavedSuccess && (
-                    <div className="bg-[#2a2a2a] rounded-3xl p-12 shadow-2xl w-full max-w-xl flex flex-col items-center border border-[#444] text-center">
-                      <h2 className="text-5xl font-semibold mb-8 text-white"> Menu Item Updated!</h2>
-                      <p className="text-2xl text-gray-300 mb-10">{menuItemName} has been successfully updated.</p>
-                      <button onClick={() => { setShowItemSavedSuccess(false); setSelectedEditItem(null); setMenuItemName(''); }} className="w-full max-w-xs bg-[#4a4a4a] py-4 rounded-2xl text-2xl font-semibold transition-colors">Return</button>
-                    </div>
-                  )}
-                  {showDiscardPrompt && (
-                    <div className="bg-[#2a2a2a] rounded-3xl p-10 shadow-2xl w-full max-w-xl flex flex-col items-center border border-[#444]">
-                      <h2 className="text-5xl font-semibold mb-12 text-white text-center">Discard Changes?</h2>
-                      <div className="flex flex-col gap-5 w-full max-w-md">
-                        <button onClick={() => setShowDiscardPrompt(false)} className="w-full bg-[#4a4a4a] py-5 rounded-2xl text-2xl font-semibold transition-colors">Return</button>
-                        <button onClick={() => { setShowDiscardPrompt(false); setSelectedEditItem(null); setMenuItemName(''); }} className="w-full bg-[#ca4646] py-5 rounded-2xl text-2xl font-semibold text-white transition-colors">Discard</button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-        </main>
-      </div>
+      <MaintenanceRetrieve
+        currentView={currentView}
+        handleBack={handleBack}
+        archivedMenuItems={archivedMenuItems}
+        archivedItems={archivedItems}
+        archivedIngredients={archivedIngredients}
+        selectedRetrieveMenu={selectedRetrieveMenu}
+        setSelectedRetrieveMenu={setSelectedRetrieveMenu}
+        showRetrieveMenuConfirm={showRetrieveMenuConfirm}
+        setShowRetrieveMenuConfirm={setShowRetrieveMenuConfirm}
+        showRetrieveMenuSuccess={showRetrieveMenuSuccess}
+        setShowRetrieveMenuSuccess={setShowRetrieveMenuSuccess}
+        selectedRetrieveItem={selectedRetrieveItem}
+        setSelectedRetrieveItem={setSelectedRetrieveItem}
+        showRetrieveItemConfirm={showRetrieveItemConfirm}
+        setShowRetrieveItemConfirm={setShowRetrieveItemConfirm}
+        showRetrieveItemSuccess={showRetrieveItemSuccess}
+        setShowRetrieveItemSuccess={setShowRetrieveItemSuccess}
+        selectedRetrieveIng={selectedRetrieveIng}
+        setSelectedRetrieveIng={setSelectedRetrieveIng}
+        showRetrieveIngConfirm={showRetrieveIngConfirm}
+        setShowRetrieveIngConfirm={setShowRetrieveIngConfirm}
+        showRetrieveIngSuccess={showRetrieveIngSuccess}
+        setShowRetrieveIngSuccess={setShowRetrieveIngSuccess}
+        setArchivedMenuItems={setArchivedMenuItems}
+        setArchivedItems={setArchivedItems}
+        setArchivedIngredients={setArchivedIngredients}
+        setActiveMenuItems={setActiveMenuItems}
+        setActiveItems={setActiveItems}
+        setActiveIngredients={setActiveIngredients}
+      />
     );
   }
 
-  // --- SUB-VIEW: EDIT ITEM  ---
-  if (currentView === 'edit-item') {
-    return (
-      <div className="flex w-full h-full gap-6 relative bg-[#1e1e1e]">
-        <AdminSidebar activePage="maintenance" />
-        <main className="flex-1 bg-[#2a2a2a] rounded-xl p-8 flex flex-col text-white relative overflow-y-auto custom-scrollbar-gutter">
-          
-          {/* Breadcrumb Header */}
-          <div className="flex gap-4 mb-10">
-            <button 
-              onClick={() => selectedEditItem ? setSelectedEditItem(null) : handleBack()} 
-              className="bg-[#5a5a5a] p-3 rounded-lg hover:bg-[#6a6a6a]"
-            >
-              <CornerUpLeft size={20} />
-            </button>
-            <div className="flex-1 bg-[#5a5a5a] rounded-lg flex items-center px-4 gap-3 text-base font-medium tracking-wide">
-              <WrenchIcon size={20} />
-              <span> Maintenance &gt; Edit &gt; Item {selectedEditItem && (<span className="text-base font-medium tracking-wide"> &gt; {selectedEditItem.id}</span>)}</span>
-            </div>
-          </div>
-
-          <h1 className="text-4xl font-semibold mb-8">
-            Edit Item {selectedEditItem ? `(${selectedEditItem.id})` : ''}
-          </h1>
-
-          {!selectedEditItem ? (
-            <div className="flex-1 w-full bg-[#333] rounded-xl overflow-y-auto border border-[#444] mb-4">
-              <div className="grid grid-cols-[1fr_2fr_0.5fr] bg-[#4a4a4a] p-4 text-xl font-medium px-12 border-b border-[#555]">
-                <span className="text-center">No.</span>
-                <span className="text-center">Name</span>
-                <span className="text-center">Action</span>
-                <span></span>
-              </div>
-              {mockItemsList.map((item) => (
-                <div key={item.id} className="grid grid-cols-[1fr_2fr_0.5fr] p-6 border-b border-[#444] items-center px-12 hover:bg-[#3d3d3d] transition-colors">
-                  <span className="text-center text-xl">{item.id}</span>
-                  <span className="text-center text-xl font-medium">{item.name}</span>
-                  <button 
-                    onClick={() => { setSelectedEditItem(item); setIngredientName(item.name); }}
-                    className="flex justify-center text-gray-300 hover:text-white transition-transform active:scale-90"
-                  >
-                    <Edit3 size={28} />
-                  </button>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="flex flex-col gap-4 w-full pb-24">
-              
-              {/* General Information Accordion */}
-              <div className="bg-[#3d3d3d] rounded-2xl overflow-hidden border border-[#444]">
-                <button 
-                  onClick={() => setActiveAccordion(activeAccordion === 'general' ? null : 'general')}
-                  className="w-full p-6 flex justify-between items-center hover:bg-[#444]"
-                >
-                  <h3 className="text-2xl font-medium">General Information</h3>
-                  {activeAccordion === 'general' ? <ChevronUp size={28} /> : <ChevronDown size={28} />}
-                </button>
-                {activeAccordion === 'general' && (
-                  <div className="p-10 border-t border-[#444] grid grid-cols-[1fr_2fr] items-center gap-x-12 animate-in slide-in-from-top-2">
-                    <label className="text-2xl font-medium text-right">Item Name</label>
-                    <input 
-                      type="text" 
-                      value={itemName} 
-                      onChange={(e) => setItemName(e.target.value)}
-                      className="bg-white text-black rounded-lg h-14 px-6 text-2xl font-semibold focus:outline-none text-center" 
-                    />
-                  </div>
-                )}
-              </div>
-
-              {/* Sizes Accordion */}
-              <div className="bg-[#3d3d3d] rounded-2xl overflow-hidden border border-[#444]">
-                <button 
-                  onClick={() => setActiveAccordion(activeAccordion === 'sizes' ? null : 'sizes')}
-                  className="w-full p-6 flex justify-between items-center hover:bg-[#444]"
-                >
-                  <h3 className="text-2xl font-medium">Sizes</h3>
-                  {activeAccordion === 'sizes' ? <ChevronUp size={28} /> : <ChevronDown size={28} />}
-                </button>
-                {activeAccordion === 'sizes' && (
-                  <div className="p-10 border-t border-[#444] space-y-8 animate-in slide-in-from-top-2">
-                    {/* Column Headers */}
-                    <div className="grid grid-cols-[1.5fr_1fr_0.5fr_1fr] px-4 text-gray-300 text-lg">
-                      <span></span>
-                      <span className="text-center font-medium">Sizes</span>
-                      <span></span>
-                      <span className="text-center font-medium">Starting Qty.</span>
-                    </div>
-
-                    {Object.entries(itemSizes).map(([size, data]) => (
-                      <div key={size} className="grid grid-cols-[1.5fr_1fr_0.5fr_1fr] items-center gap-x-8">
-                        <span className={`text-2xl font-medium text-right ${!data.enabled ? 'opacity-40' : ''}`}>
-                          {size}
-                        </span>
-                        
-                        {/* Checkbox Button */}
-                        <div className="flex justify-center">
-                          <button 
-                            onClick={() => toggleItemSize(size)}
-                            className="bg-white text-black w-16 h-11 rounded-lg flex items-center justify-center transition-all active:scale-90"
-                          >
-                            {data.enabled && <Plus size={28} strokeWidth={4} className="text-black" />}
-                          </button>
-                        </div>
-
-                        <span className={`text-2xl font-medium text-right ${!data.enabled ? 'opacity-40' : ''}`}>
-                          Units
-                        </span>
-                        
-                        <input 
-                          type="text" 
-                          disabled={!data.enabled}
-                          value={data.enabled ? data.qty : ''}
-                          onChange={(e) => setItemSizes(prev => ({
-                            ...prev,
-                            [size]: { ...prev[size], qty: e.target.value }
-                          }))}
-                          className={`rounded-lg h-11 w-full text-center text-xl font-semibold focus:outline-none transition-all ${
-                            data.enabled 
-                              ? 'bg-white text-black' 
-                              : 'bg-transparent border-2 border-gray-500 opacity-50 cursor-not-allowed'
-                          }`} 
-                        />
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Save Changes Button */}
-              <div className="mt-8 flex justify-center">
-                <button 
-                  onClick={() => setShowSavePrompt(true)} 
-                  className="bg-[#56a2d1] hover:bg-[#66b2e1] text-white text-2xl font-semibold py-4 px-24 rounded-xl shadow-lg transition-transform active:scale-95">
-                  Save Changes
-                </button>
-              </div>
-
-              {(showSavePrompt || showItemSavedSuccess || showDiscardPrompt) && (
-                <div className="fixed inset-0 bg-black/65 z-50 flex items-center justify-center animate-in fade-in duration-300">
-                  {showSavePrompt && (
-                    <div className="bg-[#2a2a2a] rounded-3xl p-10 shadow-2xl w-full max-w-xl flex flex-col items-center relative border border-[#444]">
-                      <button onClick={() => setShowSavePrompt(false)} className="absolute top-8 left-8 bg-[#5a5a5a] p-3 rounded-xl hover:bg-[#6a6a6a]"><CornerUpLeft size={22} /></button>
-                      <h2 className="text-5xl font-semibold mb-12 text-white mt-4 text-center">Save Creation?</h2>
-                      <div className="flex flex-col gap-5 w-full max-w-md">
-                        <button onClick={() => { setShowSavePrompt(false); setShowDiscardPrompt(true); }} className="w-full bg-[#4a4a4a] py-5 rounded-2xl text-2xl font-semibold transition-colors">Discard</button>
-                        <button onClick={finalizeSaveFlow} className="w-full bg-[#56a2d1] py-5 rounded-2xl text-2xl font-semibold text-white transition-colors">Save</button>
-                      </div>
-                    </div>
-                  )}
-                  {showItemSavedSuccess && (
-                    <div className="bg-[#2a2a2a] rounded-3xl p-12 shadow-2xl w-full max-w-xl flex flex-col items-center border border-[#444] text-center">
-                      <h2 className="text-5xl font-semibold mb-8 text-white"> Menu Item Saved!</h2>
-                      <p className="text-2xl text-gray-300 mb-10">{menuItemName || "Graham"} has been saved and assigned as ____</p>
-                      <button onClick={() => { setShowItemSavedSuccess(false); setCurrentView('main'); setMenuItemName(''); }} className="w-full max-w-xs bg-[#4a4a4a] py-4 rounded-2xl text-2xl font-semibold transition-colors">Return</button>
-                    </div>
-                  )}
-                  {showDiscardPrompt && (
-                    <div className="bg-[#2a2a2a] rounded-3xl p-10 shadow-2xl w-full max-w-xl flex flex-col items-center border border-[#444]">
-                      <h2 className="text-5xl font-semibold mb-12 text-white text-center">Discard Creation?</h2>
-                      <div className="flex flex-col gap-5 w-full max-w-md">
-                        <button onClick={() => setShowDiscardPrompt(false)} className="w-full bg-[#4a4a4a] py-5 rounded-2xl text-2xl font-semibold transition-colors">Return</button>
-                        <button onClick={() => { setShowDiscardPrompt(false); setCurrentView('main'); setMenuItemName(''); }} className="w-full bg-[#ca4646] py-5 rounded-2xl text-2xl font-semibold text-white transition-colors">Discard</button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-        </main>
-      </div>
-    );
-  }
-
-  // --- SUB-VIEW: EDIT INGREDIENT ---
-  if (currentView === 'edit-ingredient') {
-    return (
-      <div className="flex w-full h-full gap-6 relative bg-[#1e1e1e]">
-        <AdminSidebar activePage="maintenance" />
-        {/* Removed items-center to allow full width list */}
-        <main className="flex-1 bg-[#2a2a2a] rounded-xl p-8 flex flex-col text-white relative overflow-hidden">
-          
-          {/* Breadcrumb Header */}
-          <div className="flex gap-4 mb-10 w-full">
-            <button 
-              onClick={() => selectedEditItem ? setSelectedEditItem(null) : handleBack()} 
-              className="bg-[#5a5a5a] p-3 rounded-lg hover:bg-[#6a6a6a]"
-            >
-              <CornerUpLeft size={20} />
-            </button>
-            <div className="flex-1 bg-[#5a5a5a] rounded-lg flex items-center px-4 gap-3 text-base font-medium tracking-wide">
-              <WrenchIcon size={20} />
-              <span> Maintenance &gt; Edit &gt; Ingredient {selectedEditItem && (<span className="text-base font-medium tracking-wide"> &gt; {selectedEditItem.id}</span>)}</span>
-            </div>
-          </div>
-
-          <h1 className="text-4xl font-semibold mb-8 px-2">
-            Edit Ingredient {selectedEditItem ? `(${selectedEditItem.id})` : ''}
-          </h1>
-
-          {!selectedEditItem ? (
-            /* STRETCHED LIST VIEW */
-            <div className="flex-1 w-full bg-[#333] rounded-xl overflow-hidden border border-[#444] flex flex-col mb-4">
-              {/* Fixed Table Header */}
-              <div className="grid grid-cols-[1fr_2fr_0.5fr] bg-[#4a4a4a] p-5 text-xl font-medium px-12 border-b border-[#555]">
-                <span className="text-center">No.</span>
-                <span className="text-center">Name</span>
-                <span className="text-center">Action</span>
-              </div>
-              
-              {/* Scrollable Table Body */}
-              <div className="flex-1 overflow-y-auto">
-                {activeIngredients.map((ing) => (
-                  <div key={ing.id} className="grid grid-cols-[1fr_2fr_0.5fr] p-6 border-b border-[#444] items-center px-12 hover:bg-[#3d3d3d] transition-colors">
-                    <span className="text-center text-xl">{ing.id}</span>
-                    <span className="text-center text-xl font-medium">{ing.name}</span>
-                    <button 
-                      onClick={() => { 
-                        setSelectedEditItem(ing); 
-                        setIngredientName(ing.name); 
-                      }}
-                      className="flex justify-center text-gray-300 hover:text-white transition-transform active:scale-90"
-                    >
-                      <Edit3 size={28} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : (
-            /* CENTERED EDIT FORM */
-            <div className="flex-1 flex flex-col gap-8 w-full items-center overflow-y-auto pt-4">
-              <div className="bg-[#3d3d3d] rounded-2xl p-12 w-full max-w-5xl shadow-inner border border-[#444]">
-                <h3 className="text-2xl font-medium mb-12 text-gray-200">General Information</h3>
-                
-                <div className="grid grid-cols-[1.2fr_2fr] items-center gap-y-10 gap-x-12 px-4">
-                  <label className="text-2xl font-medium text-right">Ingredient Name</label>
-                  <input 
-                    type="text" 
-                    value={ingredientName}
-                    onChange={(e) => setIngredientName(e.target.value)}
-                    className="w-full bg-white text-black rounded-lg h-14 px-6 text-2xl font-semibold focus:outline-none text-center" 
-                  />
-                  
-                  <label className="text-2xl font-medium text-right">Ingredient Type</label>
-                  <div className="relative">
-                    <select 
-                      value={ingredientType}
-                      onChange={(e) => setIngredientType(e.target.value)}
-                      className="w-full bg-white text-black rounded-lg h-14 px-6 text-2xl font-semibold focus:outline-none appearance-none cursor-pointer text-center"
-                    >
-                      <option>Dry</option>
-                      <option>Liquid</option>
-                      <option>Frozen</option>
-                    </select>
-                    <div className="absolute right-6 top-1/2 -translate-y-1/2 pointer-events-none text-black">
-                      <ChevronDown size={32} strokeWidth={3} />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Save Changes Button */}
-              <div className="mt-4 mb-10">
-                <button 
-                  onClick={() => setShowSavePrompt(true)} 
-                  className="bg-[#56a2d1] hover:bg-[#66b2e1] text-white text-2xl font-semibold py-4 px-24 rounded-xl shadow-lg transition-transform active:scale-95">
-                  Save Changes
-                </button>
-              </div>
-
-              {/* Modals remain the same but wrapped in this logic */}
-              {(showSavePrompt || showItemSavedSuccess || showDiscardPrompt) && (
-                <div className="fixed inset-0 bg-black/65 z-50 flex items-center justify-center">
-                  {showSavePrompt && (
-                    <div className="bg-[#2a2a2a] rounded-3xl p-10 shadow-2xl w-full max-w-xl flex flex-col items-center relative border border-[#444]">
-                      <button onClick={() => setShowSavePrompt(false)} className="absolute top-8 left-8 bg-[#5a5a5a] p-3 rounded-xl hover:bg-[#6a6a6a]"><CornerUpLeft size={22} /></button>
-                      <h2 className="text-5xl font-semibold mb-12 text-white mt-4 text-center uppercase tracking-tight">Save Changes?</h2>
-                      <div className="flex flex-col gap-5 w-full max-w-md">
-                        <button onClick={() => { setShowSavePrompt(false); setShowDiscardPrompt(true); }} className="w-full bg-[#4a4a4a] py-5 rounded-2xl text-2xl font-semibold">Discard</button>
-                        <button onClick={finalizeSaveFlow} className="w-full bg-[#56a2d1] py-5 rounded-2xl text-2xl font-semibold text-white">Save</button>
-                      </div>
-                    </div>
-                  )}
-                  {/* ... rest of your success/discard modals ... */}
-                </div>
-              )}
-            </div>
-          )}
-        </main>
-      </div>
-    );
-  }
-  
-  // --- SUB-VIEW: ARCHIVE MENU ITEM  ---
-  if (currentView === 'archive-menu-item') {
-    return (
-      <div className="flex w-full h-full gap-6 relative bg-[#1a1a1a]">
-        <AdminSidebar activePage="maintenance" />
-        <main className="flex-1 bg-[#2a2a2a] rounded-xl p-8 flex flex-col text-white relative">
-          <div className="flex gap-4 mb-10">
-            <button onClick={handleBack} className="bg-[#5a5a5a] p-3 rounded-lg hover:bg-[#6a6a6a]"><CornerUpLeft size={20} /></button>
-            <div className="flex-1 bg-[#5a5a5a] rounded-lg flex items-center px-4 gap-3 text-base font-medium tracking-wide"><WrenchIcon size={20} /><span>Maintenance &gt; Archive &gt; Menu Item</span></div>
-          </div>
-
-          <h1 className="text-4xl font-semibold mb-8">Archive Menu Item</h1>
-
-          {/* TABLE */}
-          <div className="flex-1 w-full bg-[#333] rounded-xl overflow-y-auto border border-[#444] mb-4">
-            <div className="grid grid-cols-[1fr_2fr_0.5fr] bg-[#4a4a4a] p-4 text-xl font-medium px-12 border-b border-[#555] text-center"><span>No.</span><span>Menu Item Name</span><span></span></div>
-            {activeMenuItems.map((item) => (
-              <div key={item.id} className="grid grid-cols-[1fr_2fr_0.5fr] p-6 border-b border-[#444] items-center px-12 hover:bg-[#3d3d3d]">
-                <span className="text-center text-xl">{item.id}</span>
-                <span className="text-center text-xl font-medium">{item.name}</span>
-                <button onClick={() => { setSelectedArchiveMenuItem(item); setShowMenuConfirm(true); }} className="flex justify-center text-gray-300 hover:text-red-400"><Archive size={28} /></button>
-              </div>
-            ))}
-          </div>
-
-          {/* MENU ITEM CONFIRM MODAL */}
-          {showMenuConfirm && selectedArchiveMenuItem && (
-            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-              <div className="fixed inset-0 bg-black/75 backdrop-blur-sm" onClick={() => setShowMenuConfirm(false)} />
-              <div className="bg-[#2d2d2d] rounded-[2rem] p-12 shadow-2xl w-full max-w-4xl flex flex-col items-center relative border border-[#444] z-10">
-                <button onClick={() => setShowMenuConfirm(false)} className="absolute top-8 left-8 bg-[#5a5a5a] p-2 rounded-lg"><CornerUpLeft size={24} /></button>
-                <h2 className="text-5xl font-medium mb-12">Archive Menu Item?</h2>
-                <div className="w-full mb-12">
-                   <div className="grid grid-cols-2 bg-[#4a4a4a] rounded-xl py-2 text-xl mb-4 text-center"><span>No.</span><span>Name</span></div>
-                   <div className="grid grid-cols-2 text-3xl font-bold text-center"><span>{selectedArchiveMenuItem.id}</span><span>{selectedArchiveMenuItem.name}</span></div>
-                </div>
-                <div className="flex flex-col items-center gap-4 mb-12 text-center">
-                  <div className="flex items-center gap-3 text-3xl font-bold"><Info size={32} /><span>Reminder</span></div>
-                  <p className="text-2xl text-gray-300">Are you sure you want to Archive <span className="text-white font-bold">{selectedArchiveMenuItem.id}</span>? It will be unavailable on the <span className="text-white font-bold">POS Module</span>.</p>
-                </div>
-                <button 
-                  onClick={() => { 
-                    setActiveMenuItems(prev => prev.filter(i => i.id !== selectedArchiveMenuItem.id));
-                    setShowMenuConfirm(false); 
-                    setShowMenuSuccess(true); 
-                  }} 
-                  className="bg-[#a83232] text-white text-3xl font-bold py-5 px-24 rounded-2xl"
-                >Confirm</button>
-              </div>
-            </div>
-          )}
-
-          {/* MENU ITEM SUCCESS MODAL */}
-          {showMenuSuccess && selectedArchiveMenuItem && (
-            <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
-              <div className="fixed inset-0 bg-black/80 backdrop-blur-md" />
-              <div className="bg-[#2d2d2d] rounded-[2rem] p-16 shadow-2xl w-full max-w-2xl flex flex-col items-center relative border border-[#444] z-10">
-                <h2 className="text-5xl font-bold mb-10 text-center">Menu Item Archived</h2>
-                <p className="text-2xl text-gray-300 text-center mb-12"><span className="font-bold text-white text-4xl block mb-4">{selectedArchiveMenuItem.id}</span>has been Archived.</p>
-                <button onClick={() => { setShowMenuSuccess(false); setSelectedArchiveMenuItem(null); }} className="bg-[#5a5a5a] text-white text-2xl font-bold py-5 px-24 rounded-xl">Return</button>
-              </div>
-            </div>
-          )}
-        </main>
-      </div>
-    );
-  }
-
-  // --- SUB-VIEW: ARCHIVE ITEM  ---
-  if (currentView === 'archive-item') {
-    return (
-      <div className="flex w-full h-full gap-6 relative bg-[#1a1a1a]">
-        <AdminSidebar activePage="maintenance" />
-        <main className="flex-1 bg-[#2a2a2a] rounded-xl p-8 flex flex-col text-white relative">
-          <div className="flex gap-4 mb-10">
-            <button onClick={handleBack} className="bg-[#5a5a5a] p-3 rounded-lg hover:bg-[#6a6a6a]"><CornerUpLeft size={20} /></button>
-            <div className="flex-1 bg-[#5a5a5a] rounded-lg flex items-center px-4 gap-3 text-base font-medium tracking-wide"><WrenchIcon size={20} /><span>Maintenance &gt; Archive &gt; Item</span></div>
-          </div>
-
-          <h1 className="text-4xl font-semibold mb-8">Archive Item</h1>
-
-          <div className="flex-1 w-full bg-[#333] rounded-xl overflow-y-auto border border-[#444] mb-4">
-            <div className="grid grid-cols-[1fr_2fr_0.5fr] bg-[#4a4a4a] p-4 text-xl font-medium px-12 border-b border-[#555]"><span className="text-center">No.</span><span className="text-center">Item Name</span><span></span></div>
-            {activeItems.map((item) => (
-              <div key={item.id} className="grid grid-cols-[1fr_2fr_0.5fr] p-6 border-b border-[#444] items-center px-12 hover:bg-[#3d3d3d]">
-                <span className="text-center text-xl">{item.id}</span>
-                <span className="text-center text-xl font-medium">{item.name}</span>
-                <button onClick={() => { setSelectedArchiveItem(item); setShowItemConfirm(true); }} className="flex justify-center text-gray-300 hover:text-red-400"><Archive size={28} /></button>
-              </div>
-            ))}
-          </div>
-
-          {/* ITEM CONFIRM MODAL */}
-          {showItemConfirm && selectedArchiveItem && (
-            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-              <div className="fixed inset-0 bg-black/75 backdrop-blur-sm" onClick={() => setShowItemConfirm(false)} />
-              <div className="bg-[#2d2d2d] rounded-[2rem] p-12 shadow-2xl w-full max-w-4xl flex flex-col items-center relative border border-[#444] z-10">
-                <button onClick={() => setShowItemConfirm(false)} className="absolute top-8 left-8 bg-[#5a5a5a] p-2 rounded-lg"><CornerUpLeft size={24} /></button>
-                <h2 className="text-5xl font-medium mb-12">Archive Item?</h2>
-                <div className="w-full mb-12">
-                  <div className="grid grid-cols-2 bg-[#4a4a4a] rounded-xl py-2 text-xl mb-4 text-center"><span>No.</span><span>Name</span></div>
-                  <div className="grid grid-cols-2 text-3xl font-bold text-center"><span>{selectedArchiveItem.id}</span><span>{selectedArchiveItem.name}</span></div>
-                </div>
-                <div className="flex flex-col items-center gap-4 mb-12 text-center">
-                  <div className="flex items-center gap-3 text-3xl font-bold"><Info size={32} /><span>Reminder</span></div>
-                  <p className="text-2xl text-gray-300">Are you sure you want to Archive <span className="text-white font-bold">{selectedArchiveItem.id}</span>? It will be unavailable on the <span className="text-white font-bold">Inventory Module</span>.</p>
-                </div>
-                <button 
-                  onClick={() => { 
-                    setActiveItems(prev => prev.filter(i => i.id !== selectedArchiveItem.id));
-                    setShowItemConfirm(false); 
-                    setShowItemSuccess(true); 
-                  }} 
-                  className="bg-[#a83232] text-white text-3xl font-bold py-5 px-24 rounded-2xl"
-                >Confirm</button>
-              </div>
-            </div>
-          )}
-
-          {/* ITEM SUCCESS MODAL */}
-          {showItemSuccess && selectedArchiveItem && (
-            <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
-              <div className="fixed inset-0 bg-black/80 backdrop-blur-md" />
-              <div className="bg-[#2d2d2d] rounded-[2rem] p-16 shadow-2xl w-full max-w-2xl flex flex-col items-center relative border border-[#444] z-10">
-                <h2 className="text-5xl font-bold mb-10 text-center">Item Archived</h2>
-                <p className="text-2xl text-gray-300 text-center mb-12"><span className="font-bold text-white text-4xl block mb-4">{selectedArchiveItem.id}</span>has been Archived.</p>
-                <button onClick={() => { setShowItemSuccess(false); setSelectedArchiveItem(null); }} className="bg-[#5a5a5a] text-white text-2xl font-bold py-5 px-24 rounded-xl">Return</button>
-              </div>
-            </div>
-          )}
-        </main>
-      </div>
-    );
-  }
-
-  // --- SUB-VIEW: ARCHIVE INGREDIENT ---
-  if (currentView === 'archive-ingredient') {
-    return (
-      <div className="flex w-full h-full gap-6 relative bg-[#1a1a1a]">
-        <AdminSidebar activePage="maintenance" />
-        <main className="flex-1 bg-[#2a2a2a] rounded-xl p-8 flex flex-col text-white relative">
-          
-          <div className="flex gap-4 mb-10">
-            <button onClick={handleBack} className="bg-[#5a5a5a] p-3 rounded-lg hover:bg-[#6a6a6a]">
-              <CornerUpLeft size={20} />
-            </button>
-            <div className="flex-1 bg-[#5a5a5a] rounded-lg flex items-center px-4 gap-3 text-base font-medium tracking-wide">
-              <WrenchIcon size={20} />
-              <span>Maintenance &gt; Archive &gt; Ingredient</span>
-            </div>
-          </div>
-
-          <h1 className="text-4xl font-semibold mb-8">Archive Ingredient</h1>
-
-          <div className="flex-1 w-full bg-[#333] rounded-xl overflow-y-auto border border-[#444] mb-4">
-            <div className="grid grid-cols-[1fr_2fr_0.5fr] bg-[#4a4a4a] p-4 text-xl font-medium px-12 border-b border-[#555] text-center">
-              <span>No.</span>
-              <span>Ingredient Name</span>
-              <span></span>
-            </div>
-            {activeIngredients.map((ing) => (
-              <div key={ing.id} className="grid grid-cols-[1fr_2fr_0.5fr] p-6 border-b border-[#444] items-center px-12 hover:bg-[#3d3d3d]">
-                <span className="text-center text-xl">{ing.id}</span>
-                <span className="text-center text-xl font-medium">{ing.name}</span>
-                <button 
-                  onClick={() => { setSelectedArchiveIngredient(ing); setShowIngConfirm(true); }}
-                  className="flex justify-center text-gray-300 hover:text-red-400 transition-colors"
-                >
-                  <Archive size={28} />
-                </button>
-              </div>
-            ))}
-          </div>
-
-          {/* INGREDIENT CONFIRM MODAL */}
-          {showIngConfirm && selectedArchiveIngredient && (
-            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-              <div className="fixed inset-0 bg-black/75 backdrop-blur-sm" onClick={() => setShowIngConfirm(false)} />
-              <div className="bg-[#2d2d2d] rounded-[2rem] p-12 shadow-2xl w-full max-w-4xl flex flex-col items-center relative border border-[#444] z-10">
-                <button onClick={() => setShowIngConfirm(false)} className="absolute top-8 left-8 bg-[#5a5a5a] p-2 rounded-lg hover:bg-[#6a6a6a]">
-                  <CornerUpLeft size={24} />
-                </button>
-                <h2 className="text-5xl font-medium mb-12">Archive Ingredient?</h2>
-                <div className="w-full mb-12">
-                  <div className="grid grid-cols-2 bg-[#4a4a4a] rounded-xl py-2 text-xl mb-4 text-center font-medium">
-                    <span>No.</span>
-                    <span>Name</span>
-                  </div>
-                  <div className="grid grid-cols-2 text-3xl font-bold text-center">
-                    <span>{selectedArchiveIngredient.id}</span>
-                    <span>{selectedArchiveIngredient.name}</span>
-                  </div>
-                </div>
-                <div className="flex flex-col items-center gap-4 mb-12 text-center">
-                  <div className="flex items-center gap-3 text-3xl font-bold"><Info size={32} /><span>Reminder</span></div>
-                  <p className="text-2xl text-gray-300">
-                    Are you sure you want to <span className="text-white font-bold">Archive</span> the <span className="text-white font-bold">{selectedArchiveIngredient.id}</span>? 
-                    It will be unavailable for <span className="text-white font-bold">Menu Item creation.</span>
-                  </p>
-                </div>
-                <button 
-                  onClick={() => { 
-                    setActiveIngredients(prev => prev.filter(i => i.id !== selectedArchiveIngredient.id));
-                    setShowIngConfirm(false); 
-                    setShowIngSuccess(true); 
-                  }} 
-                  className="bg-[#a83232] text-white text-3xl font-bold py-5 px-24 rounded-2xl shadow-lg active:scale-95 transition-transform"
-                >Confirm</button>
-              </div>
-            </div>
-          )}
-
-          {/* INGREDIENT SUCCESS MODAL */}
-          {showIngSuccess && selectedArchiveIngredient && (
-            <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
-              <div className="fixed inset-0 bg-black/80 backdrop-blur-md" />
-              <div className="bg-[#2d2d2d] rounded-[2rem] p-16 shadow-2xl w-full max-w-2xl flex flex-col items-center relative border border-[#444] z-10">
-                <h2 className="text-5xl font-bold mb-10 text-center">Ingredient Archived</h2>
-                <p className="text-2xl text-gray-300 text-center mb-12">
-                  <span className="font-bold text-white text-4xl block mb-4">{selectedArchiveIngredient.id}</span>
-                  has been successfully Archived.
-                </p>
-                <button 
-                  onClick={() => { setShowIngSuccess(false); setSelectedArchiveIngredient(null); }} 
-                  className="bg-[#5a5a5a] text-white text-2xl font-bold py-5 px-24 rounded-xl hover:bg-[#6a6a6a]"
-                >Return</button>
-              </div>
-            </div>
-          )}
-        </main>
-      </div>
-    );
-  }
-
-  // --- SUB-VIEW: RETRIEVE MENU ITEM  ---
-  if (currentView === 'retrieve-menu-item') {
-    return (
-      <div className="flex w-full h-full gap-6 relative bg-[#1a1a1a]">
-        <AdminSidebar activePage="maintenance" />
-        <main className="flex-1 bg-[#2a2a2a] rounded-xl p-8 flex flex-col text-white relative">
-          <div className="flex gap-4 mb-10">
-            <button onClick={handleBack} className="bg-[#5a5a5a] p-3 rounded-lg hover:bg-[#6a6a6a]"><CornerUpLeft size={20} /></button>
-            <div className="flex-1 bg-[#5a5a5a] rounded-lg flex items-center px-4 gap-3 text-base font-medium tracking-wide">
-              <WrenchIcon size={20} />
-              <span>Maintenance &gt; Retrieve &gt; Menu Item</span>
-            </div>
-          </div>
-          <h1 className="text-4xl font-semibold mb-8">Retrieve Menu Item</h1>
-
-          <div className="flex-1 w-full bg-[#333] rounded-xl overflow-y-auto border border-[#444] mb-4">
-            <div className="grid grid-cols-[1fr_2fr_0.5fr] bg-[#4a4a4a] p-4 text-xl font-medium px-12 border-b border-[#555] text-center">
-              <span>No.</span><span>Menu Item Name</span><span></span>
-            </div>
-            {archivedMenuItems.map((item) => (
-              <div key={item.id} className="grid grid-cols-[1fr_2fr_0.5fr] p-6 border-b border-[#444] items-center px-12 hover:bg-[#3d3d3d]">
-                <span className="text-center text-xl">{item.id}</span>
-                <span className="text-center text-xl font-medium">{item.name}</span>
-                <button onClick={() => { setSelectedRetrieveMenu(item); setShowRetrieveMenuConfirm(true); }} className="flex justify-center text-gray-300 hover:text-green-400"><RotateCcw size={28} /></button>
-              </div>
-            ))}
-          </div>
-
-          {/* CONFIRM MODAL */}
-          {showRetrieveMenuConfirm && selectedRetrieveMenu && (
-            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-              <div className="fixed inset-0 bg-black/75 backdrop-blur-sm" onClick={() => setShowRetrieveMenuConfirm(false)} />
-              <div className="bg-[#2d2d2d] rounded-[2rem] p-12 shadow-2xl w-full max-w-4xl flex flex-col items-center relative border border-[#444] z-10">
-                <button onClick={() => setShowRetrieveMenuConfirm(false)} className="absolute top-8 left-8 bg-[#5a5a5a] p-2 rounded-lg hover:bg-[#6a6a6a]"><CornerUpLeft size={24} /></button>
-                <h2 className="text-5xl font-medium mb-12">Retrieve Menu Item?</h2>
-                <div className="w-full mb-12">
-                  <div className="grid grid-cols-2 bg-[#4a4a4a] rounded-xl py-2 text-xl mb-4 text-center"><span>No.</span><span>Name</span></div>
-                  <div className="grid grid-cols-2 text-3xl font-bold text-center"><span>{selectedRetrieveMenu.id}</span><span>{selectedRetrieveMenu.name}</span></div>
-                </div>
-                <div className="flex flex-col items-center gap-4 mb-12 text-center">
-                  <div className="flex items-center gap-3 text-3xl font-bold"><Info size={32} /><span>Reminder</span></div>
-                  <p className="text-2xl text-gray-300">Are you sure you want to <span className="text-white font-bold">Retrieve</span> {selectedRetrieveMenu.id}? It will be available for <span className="text-white font-bold">POS Module.</span></p>
-                </div>
-                <button 
-                  onClick={() => {
-                    setArchivedMenuItems(prev => prev.filter(i => i.id !== selectedRetrieveMenu.id));
-                    setActiveMenuItems(prev => [...prev, selectedRetrieveMenu]);
-                    setShowRetrieveMenuConfirm(false);
-                    setShowRetrieveMenuSuccess(true);
-                  }}
-                  className="bg-[#166534] text-white text-3xl font-bold py-5 px-24 rounded-2xl"
-                >Confirm</button>
-              </div>
-            </div>
-          )}
-
-          {/* SUCCESS MODAL */}
-          {showRetrieveMenuSuccess && selectedRetrieveMenu && (
-            <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 text-center">
-              <div className="fixed inset-0 bg-black/80 backdrop-blur-md" />
-              <div className="bg-[#2d2d2d] rounded-[2rem] p-16 shadow-2xl w-full max-w-2xl flex flex-col items-center relative border border-[#444] z-10">
-                <h2 className="text-5xl font-bold mb-10 text-white">Menu Item Retrieved</h2>
-                <p className="text-2xl text-gray-300 mb-12"><span className="font-bold text-white text-4xl block mb-4">{selectedRetrieveMenu.id}</span> has been successfully <span className="text-white font-semibold">Retrieved.</span></p>
-                <button onClick={() => { setShowRetrieveMenuSuccess(false); setSelectedRetrieveMenu(null); }} className="bg-[#5a5a5a] text-2xl font-bold py-5 px-24 rounded-xl">Return</button>
-              </div>
-            </div>
-          )}
-        </main>
-      </div>
-    );
-  }
-
-  // --- SUB-VIEW: RETRIEVE ITEM  ---
-  if (currentView === 'retrieve-item') {
-    return (
-      <div className="flex w-full h-full gap-6 relative bg-[#1a1a1a]">
-        <AdminSidebar activePage="maintenance" />
-        <main className="flex-1 bg-[#2a2a2a] rounded-xl p-8 flex flex-col text-white relative">
-          <div className="flex gap-4 mb-10">
-            <button onClick={handleBack} className="bg-[#5a5a5a] p-3 rounded-lg hover:bg-[#6a6a6a]"><CornerUpLeft size={20} /></button>
-            <div className="flex-1 bg-[#5a5a5a] rounded-lg flex items-center px-4 gap-3 text-base font-medium tracking-wide">
-              <WrenchIcon size={20} />
-              <span>Maintenance &gt; Retrieve &gt; Item</span>
-            </div>
-          </div>
-          <h1 className="text-4xl font-semibold mb-8">Retrieve Item</h1>
-
-          <div className="flex-1 w-full bg-[#333] rounded-xl overflow-y-auto border border-[#444] mb-4">
-            <div className="grid grid-cols-[1fr_2fr_0.5fr] bg-[#4a4a4a] p-4 text-xl font-medium px-12 border-b border-[#555] text-center">
-              <span>No.</span><span>Item Name</span><span></span>
-            </div>
-            {archivedItems.map((item) => (
-              <div key={item.id} className="grid grid-cols-[1fr_2fr_0.5fr] p-6 border-b border-[#444] items-center px-12 hover:bg-[#3d3d3d]">
-                <span className="text-center text-xl">{item.id}</span>
-                <span className="text-center text-xl font-medium">{item.name}</span>
-                <button onClick={() => { setSelectedRetrieveItem(item); setShowRetrieveItemConfirm(true); }} className="flex justify-center text-gray-300 hover:text-green-400"><RotateCcw size={28} /></button>
-              </div>
-            ))}
-          </div>
-
-          {/* CONFIRM MODAL */}
-          {showRetrieveItemConfirm && selectedRetrieveItem && (
-            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-              <div className="fixed inset-0 bg-black/75 backdrop-blur-sm" onClick={() => setShowRetrieveItemConfirm(false)} />
-              <div className="bg-[#2d2d2d] rounded-[2rem] p-12 shadow-2xl w-full max-w-4xl flex flex-col items-center relative border border-[#444] z-10">
-                <button onClick={() => setShowRetrieveItemConfirm(false)} className="absolute top-8 left-8 bg-[#5a5a5a] p-2 rounded-lg hover:bg-[#6a6a6a]"><CornerUpLeft size={24} /></button>
-                <h2 className="text-5xl font-medium mb-12">Retrieve Item?</h2>
-                <div className="w-full mb-12">
-                  <div className="grid grid-cols-2 bg-[#4a4a4a] rounded-xl py-2 text-xl mb-4 text-center"><span>No.</span><span>Name</span></div>
-                  <div className="grid grid-cols-2 text-3xl font-bold text-center"><span>{selectedRetrieveItem.id}</span><span>{selectedRetrieveItem.name}</span></div>
-                </div>
-                <div className="flex flex-col items-center gap-4 mb-12 text-center">
-                  <div className="flex items-center gap-3 text-3xl font-bold"><Info size={32} /><span>Reminder</span></div>
-                  <p className="text-2xl text-gray-300">Are you sure you want to <span className="text-white font-bold">Retrieve</span> {selectedRetrieveItem.id}? It will be available on the <span className="text-white font-bold">Inventory Module.</span></p>
-                </div>
-                <button 
-                  onClick={() => {
-                    setArchivedItems(prev => prev.filter(i => i.id !== selectedRetrieveItem.id));
-                    setActiveItems(prev => [...prev, selectedRetrieveItem]);
-                    setShowRetrieveItemConfirm(false);
-                    setShowRetrieveItemSuccess(true);
-                  }}
-                  className="bg-[#166534] text-white text-3xl font-bold py-5 px-24 rounded-2xl shadow-lg"
-                >Confirm</button>
-              </div>
-            </div>
-          )}
-
-          {/* SUCCESS MODAL */}
-          {showRetrieveItemSuccess && selectedRetrieveItem && (
-            <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 text-center">
-              <div className="fixed inset-0 bg-black/80 backdrop-blur-md" />
-              <div className="bg-[#2d2d2d] rounded-[2rem] p-16 shadow-2xl w-full max-w-2xl flex flex-col items-center relative border border-[#444] z-10">
-                <h2 className="text-5xl font-bold mb-10 text-white">Item Retrieved</h2>
-                <p className="text-2xl text-gray-300 mb-12"><span className="font-bold text-white text-4xl block mb-4">{selectedRetrieveItem.id}</span> has been successfully <span className="text-white font-semibold">Retrieved.</span></p>
-                <button onClick={() => { setShowRetrieveItemSuccess(false); setSelectedRetrieveItem(null); }} className="bg-[#5a5a5a] text-2xl font-bold py-5 px-24 rounded-xl">Return</button>
-              </div>
-            </div>
-          )}
-        </main>
-      </div>
-    );
-  }
-
-  // --- SUB-VIEW: RETRIEVE INGREDIENT  ---
-  if (currentView === 'retrieve-ingredient') {
-    return (
-      <div className="flex w-full h-full gap-6 relative bg-[#1a1a1a]">
-        <AdminSidebar activePage="maintenance" />
-        <main className="flex-1 bg-[#2a2a2a] rounded-xl p-8 flex flex-col text-white relative">
-          <div className="flex gap-4 mb-10">
-            <button onClick={handleBack} className="bg-[#5a5a5a] p-3 rounded-lg hover:bg-[#6a6a6a]">
-              <CornerUpLeft size={20} />
-            </button>
-            <div className="flex-1 bg-[#5a5a5a] rounded-lg flex items-center px-4 gap-3 text-base font-medium tracking-wide">
-              <WrenchIcon size={20} />
-              <span>Maintenance &gt; Retrieve &gt; Ingredient</span>
-            </div>
-          </div>
-
-          <h1 className="text-4xl font-semibold mb-8">Retrieve Ingredient</h1>
-
-          <div className="flex-1 w-full bg-[#333] rounded-xl overflow-y-auto border border-[#444] mb-4">
-            <div className="grid grid-cols-[1fr_2fr_0.5fr] bg-[#4a4a4a] p-4 text-xl font-medium px-12 border-b border-[#555] text-center">
-              <span>No.</span><span>Ingredient Name</span><span></span>
-            </div>
-            {archivedIngredients.map((ing) => (
-              <div key={ing.id} className="grid grid-cols-[1fr_2fr_0.5fr] p-6 border-b border-[#444] items-center px-12 hover:bg-[#3d3d3d]">
-                <span className="text-center text-xl">{ing.id}</span>
-                <span className="text-center text-xl font-medium">{ing.name}</span>
-                <button 
-                  onClick={() => { setSelectedRetrieveIng(ing); setShowRetrieveIngConfirm(true); }}
-                  className="flex justify-center text-gray-300 hover:text-green-400"
-                >
-                  <RotateCcw size={28} />
-                </button>
-              </div>
-            ))}
-          </div>
-
-          {/* CONFIRM MODAL */}
-          {showRetrieveIngConfirm && selectedRetrieveIng && (
-            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-              <div className="fixed inset-0 bg-black/75 backdrop-blur-sm" onClick={() => setShowRetrieveIngConfirm(false)} />
-              <div className="bg-[#2d2d2d] rounded-[2rem] p-12 shadow-2xl w-full max-w-4xl flex flex-col items-center relative border border-[#444] z-10">
-                <button onClick={() => setShowRetrieveIngConfirm(false)} className="absolute top-8 left-8 bg-[#5a5a5a] p-2 rounded-lg hover:bg-[#6a6a6a]">
-                  <CornerUpLeft size={24} />
-                </button>
-                <h2 className="text-5xl font-medium mb-12">Retrieve Ingredient?</h2>
-                <div className="w-full mb-12">
-                  <div className="grid grid-cols-2 bg-[#4a4a4a] rounded-xl py-2 text-xl mb-4 text-center"><span>No.</span><span>Name</span></div>
-                  <div className="grid grid-cols-2 text-3xl font-bold text-center"><span>{selectedRetrieveIng.id}</span><span>{selectedRetrieveIng.name}</span></div>
-                </div>
-                <div className="flex flex-col items-center gap-4 mb-12 text-center">
-                  <div className="flex items-center gap-3 text-3xl font-bold"><Info size={32} /><span>Reminder</span></div>
-                  <p className="text-2xl text-gray-300">Are you sure you want to <span className="text-white font-bold">Retrieve</span> {selectedRetrieveIng.id}? It will be available for <span className="text-white font-bold">Menu Item creation.</span></p>
-                </div>
-                <button 
-                  onClick={() => {
-                    setArchivedIngredients(prev => prev.filter(i => i.id !== selectedRetrieveIng.id));
-                    setActiveIngredients(prev => [...prev, selectedRetrieveIng]);
-                    setShowRetrieveIngConfirm(false);
-                    setShowRetrieveIngSuccess(true);
-                  }}
-                  className="bg-[#166534] text-white text-3xl font-bold py-5 px-24 rounded-2xl shadow-lg active:scale-95 transition-transform"
-                >Confirm</button>
-              </div>
-            </div>
-          )}
-
-          {/* SUCCESS MODAL */}
-          {showRetrieveIngSuccess && selectedRetrieveIng && (
-            <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
-              <div className="fixed inset-0 bg-black/80 backdrop-blur-md" />
-              <div className="bg-[#2d2d2d] rounded-[2rem] p-16 shadow-2xl w-full max-w-2xl flex flex-col items-center relative border border-[#444] z-10 text-center">
-                <h2 className="text-5xl font-bold mb-10">Ingredient Retrieved</h2>
-                <p className="text-2xl text-gray-300 mb-12"><span className="font-bold text-white text-4xl block mb-4">{selectedRetrieveIng.id}</span> has been successfully <span className="text-white font-semibold">Retrieved.</span></p>
-                <button onClick={() => { setShowRetrieveIngSuccess(false); setSelectedRetrieveIng(null); }} className="bg-[#5a5a5a] text-2xl font-bold py-5 px-24 rounded-xl">Return</button>
-              </div>
-            </div>
-          )}
-        </main>
-      </div>
-    );
-  }
-
-  // --- SUB-VIEW: MANAGE ACCOUNTS ---
   if (currentView === 'manage-accounts') {
     return (
-      <div className="flex w-full h-full gap-6 relative bg-[#1a1a1a]">
-        <AdminSidebar activePage="maintenance" />
-        <main className="flex-1 bg-[#2a2a2a] rounded-xl p-8 flex flex-col text-white relative">
-          
-          {/* Header Section */}
-          <div className="flex gap-4 mb-10">
-            <button onClick={handleBack} className="bg-[#5a5a5a] p-3 rounded-lg hover:bg-[#6a6a6a]">
-              <CornerUpLeft size={20} />
-            </button>
-            <div className="flex-1 bg-[#5a5a5a] rounded-lg flex items-center px-4 gap-3 text-base font-medium tracking-wide">
-              <WrenchIcon size={20} />
-              <span>Maintenance &gt; Manage Accounts</span>
-            </div>
-          </div>
-
-          <h1 className="text-4xl font-semibold mb-8 text-white">Manage Accounts</h1>
-
-          {/* Table - Re-check that your mapping variable is 'accounts' */}
-          <div className="flex-1 w-full bg-[#333] rounded-xl overflow-y-auto border border-[#444]">
-            <div className="grid grid-cols-[1fr_3fr_1.5fr_1fr] bg-[#4a4a4a] p-4 text-xl font-medium border-b border-[#555]">
-              <span className="text-center">No.</span>
-              <span className="text-center">Name</span>
-              <span className="text-center">Status</span>
-              <span className="text-center">Action</span>
-              <span></span>
-            </div>
-            {accounts && accounts.map((acc) => (
-              <div key={acc.id} className="grid grid-cols-[1fr_3fr_1.5fr_1fr] p-6 border-b border-[#444] items-center hover:bg-[#3d3d3d] transition-colors">
-                <span className="text-center text-xl">{acc.id}</span>
-                <span className="text-center text-xl font-medium">{acc.name}</span>
-                <span className={`text-center text-xl font-bold ${acc.status === 'Active' ? 'text-green-400' : 'text-red-400'}`}>
-                  {acc.status}
-                </span>
-                <button 
-                  onClick={() => { setSelectedAccount(acc); setShowStatusConfirm(true); }}
-                  className="flex justify-center text-white-400 hover:text-white"
-                >
-                  {acc.status === 'Active' ? <UserRoundMinus size={28} /> : <UserRoundPlus size={28} />}
-                </button>
-              </div>
-            ))}
-          </div>
-
-          {/* STATUS CHANGE CONFIRM MODAL */}
-          {showStatusConfirm && selectedAccount && (
-            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-              {/* Backdrop */}
-              <div 
-                className="fixed inset-0 bg-black/75 backdrop-blur-sm" 
-                onClick={() => setShowStatusConfirm(false)} 
-              />
-              
-              <div className="bg-[#2d2d2d] rounded-[2rem] p-12 shadow-2xl w-full max-w-4xl flex flex-col items-center relative border border-[#444] z-10">
-                {/* Back Button */}
-                <button 
-                  onClick={() => setShowStatusConfirm(false)} 
-                  className="absolute top-8 left-8 bg-[#5a5a5a] p-2 rounded-lg hover:bg-[#6a6a6a]"
-                >
-                  <CornerUpLeft size={24} />
-                </button>
-
-                {/* Dynamic Title based on current status */}
-                <h2 className="text-5xl font-medium mb-12">
-                  {selectedAccount.status === 'Active' ? 'Deactivate Account?' : 'Activate Account?'}
-                </h2>
-
-                {/* Center Data Grid */}
-                <div className="w-full mb-12">
-                  <div className="grid grid-cols-2 bg-[#4a4a4a] rounded-xl py-2 text-xl mb-4 text-center">
-                    <span>Employee No.</span>
-                    <span>Name</span>
-                  </div>
-                  <div className="grid grid-cols-2 text-3xl font-bold text-center">
-                    <span>{selectedAccount.id}</span>
-                    <span>{selectedAccount.name}</span>
-                  </div>
-                </div>
-
-                {/* Reminder Section */}
-                <div className="flex flex-col items-center gap-4 mb-12 text-center">
-                  <div className="flex items-center gap-3 text-3xl font-bold">
-                    <Info size={32} />
-                    <span>Reminder</span>
-                  </div>
-                  <p className="text-2xl text-gray-300">
-                    Are you sure you want to 
-                    <span className="text-white font-bold"> {selectedAccount.status === 'Active' ? 'Deactivate' : 'Activate'} </span> 
-                    {selectedAccount.id}? 
-                    <br />
-                    This will update the employee's access permissions.
-                  </p>
-                </div>
-
-                {/* Action Button - Red for Deactivate, Blue for Activate */}
-                <button 
-                  onClick={() => {
-                    setShowStatusConfirm(false);
-                    setShowStatusSuccess(true);
-                  }}
-                  className={`${
-                    selectedAccount.status === 'Active' ? 'bg-[#ca4646]' : 'bg-[#56a2d1]'
-                  } text-white text-3xl font-bold py-5 px-24 rounded-2xl shadow-lg transition-transform active:scale-95`}
-                >
-                  Confirm
-                </button>
-              </div>
-            </div>
-          )}
-
-          
-          {showStatusSuccess && selectedAccount && (
-            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-              <div className="fixed inset-0 bg-black/75 backdrop-blur-sm" />
-              <div className="bg-[#2d2d2d] rounded-[2rem] p-16 shadow-2xl w-full max-w-4xl flex flex-col items-center relative border border-[#444] z-10 text-center">
-                <h2 className="text-6xl font-bold mb-10 text-white leading-tight">
-                  {selectedAccount.status === 'Active' ? 'Account Deactivated!' : 'Account Activated!'}
-                </h2>
-                <p className="text-3xl text-gray-300 mb-14 leading-relaxed">
-                  Employee {selectedAccount.id} has been {selectedAccount.status === 'Active' ? 'deactivated' : 'activated'}.
-                </p>
-                <button 
-                  onClick={() => {
-                    setAccounts(accounts.map(a => 
-                      a.id === selectedAccount.id ? { ...a, status: a.status === 'Active' ? 'Inactive' : 'Active' } : a
-                    ));
-                    setShowStatusSuccess(false);
-                    setSelectedAccount(null);
-                  }} 
-                  className="bg-[#4a4a4a] text-white text-3xl font-bold py-5 px-24 rounded-2xl hover:bg-[#5a5a5a] transition-all"
-                >
-                  Return
-                </button>
-              </div>
-            </div>
-          )}
-
-        </main>
-      </div>
+      <MaintenanceAccounts
+        currentView={currentView}
+        handleBack={handleBack}
+        accounts={accounts}
+        selectedAccount={selectedAccount}
+        setSelectedAccount={setSelectedAccount}
+        showStatusConfirm={showStatusConfirm}
+        setShowStatusConfirm={setShowStatusConfirm}
+        showStatusSuccess={showStatusSuccess}
+        setShowStatusSuccess={setShowStatusSuccess}
+        setAccounts={setAccounts}
+      />
     );
   }
 
-  // --- SAVE/DISCARD PROMPTS (OVERLAY) ---
-  {showSavePrompt && (
-      <div className="fixed inset-0 z-50 flex items-center justify-center">
-        <div className="bg-[#2a2a2a] rounded-3xl p-10 shadow-2xl w-full max-w-xl flex flex-col items-center relative border border-[#444]">
-          
-          {/* Back to form */}
-          <button onClick={() => setShowSavePrompt(false)} className="absolute top-8 left-8 bg-[#5a5a5a] p-3 rounded-xl hover:bg-[#6a6a6a]">
-            <CornerUpLeft size={22} className="text-white" />
-          </button>
-          
-          <h2 className="text-5xl font-semibold mb-12 tracking-tight text-white mt-4">Save Creation?</h2>
-          
-          <div className="flex flex-col gap-5 w-full max-w-md">
-            <button 
-              onClick={() => { setShowSavePrompt(false); setShowDiscardPrompt(true); }}
-              className="w-full bg-[#4a4a4a] hover:bg-[#5a5a5a] py-5 rounded-2xl text-2xl font-semibold text-whitetransition-colors">
-              Discard
-            </button>
-            
-            <button onClick={finalizeSaveFlow} className="w-full bg-[#56a2d1] hover:bg-[#66b2e1] py-5 rounded-2xl text-2xl font-semibold text-white transition-colors">
-              Save
-            </button>
-          </div>
-        </div>
-      </div>
-  )}
-
-  {showItemSavedSuccess && (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="bg-[#2a2a2a] rounded-3xl p-12 shadow-2xl w-full max-w-xl flex flex-col items-center border border-[#444] text-center">
-        <h2 className="text-5xl font-semibold mb-8 tracking-tight text-white">Item Saved!</h2>
-        
-        <p className="text-2xl text-gray-300 mb-10 tracking-wide font-medium leading-relaxed">
-          Graham has been saved<br />and assigned as INGR003.
-        </p>
-        
-        <button 
-          onClick={finalizeDiscardFlow}
-          className="w-full max-w-xs bg-[#4a4a4a] hover:bg-[#5a5a5a] py-4 rounded-2xl text-2xl font-semibold transition-colors"
-        >
-          Return
-        </button>
-      </div>
-    </div>
-  )}
-
-  {showDiscardPrompt && (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="bg-[#2a2a2a] rounded-3xl p-10 shadow-2xl w-full max-w-xl flex flex-col items-center border border-[#444]">
-        
-        <h2 className="text-5xl font-semibold mb-12 tracking-tight text-white">Discard Creation?</h2>
-        
-        <div className="flex flex-col gap-5 w-full max-w-md">
-          {/* Return to form */}
-          <button 
-            onClick={() => setShowDiscardPrompt(false)}
-            className="w-full bg-[#4a4a4a] hover:bg-[#5a5a5a] py-5 rounded-2xl text-2xl font-semibold transition-colors"
-          >
-            Return
-          </button>
-          
-          {/* Finalize the discard */}
-          <button onClick={finalizeDiscardFlow} className="w-full bg-[#ca4646] hover:bg-[#da5656] py-5 rounded-2xl text-2xl font-semibold text-white transition-colors">
-            Discard
-          </button>
-        </div>
-      </div>
-    </div>
-  )}
-
-  // --- MAIN VIEW (ACCORDIONS) ---
+  // --- MAIN VIEW ---
   return (
     <div className="flex w-full h-full gap-6">
       <AdminSidebar activePage="maintenance" />
@@ -2196,3 +678,4 @@ export default function Maintenance({ role }) {
     </div>
   );
 }
+
