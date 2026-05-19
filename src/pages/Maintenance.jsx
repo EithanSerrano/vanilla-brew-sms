@@ -69,6 +69,12 @@ export default function Maintenance({ role }) {
 
   const [selectedEditItem, setSelectedEditItem] = useState(null);
 
+  useEffect(() => {
+    if (currentView === 'edit-menu-item' || currentView === 'edit-item' || currentView === 'edit-ingredient') {
+      setSelectedEditItem(null);
+    }
+  }, [currentView]);
+
   const handleAddRow = () => {
     setAddOns([...addOns, { ingredientId: '', name: '', price: '', unit: '' }]);
   };
@@ -118,9 +124,9 @@ export default function Maintenance({ role }) {
         const itemSnapshot = await getDocs(collection(db, 'items'));
         const menuItemSnapshot = await getDocs(collection(db, 'menuItems'));
 
-        const ingredients = ingredientSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-        const items = itemSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-        const menuItems = menuItemSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+        const ingredients = ingredientSnapshot.docs.map((doc) => ({ docId: doc.id, id: doc.data().id ?? doc.id, ...doc.data() }));
+        const items = itemSnapshot.docs.map((doc) => ({ docId: doc.id, id: doc.data().id ?? doc.id, ...doc.data() }));
+        const menuItems = menuItemSnapshot.docs.map((doc) => ({ docId: doc.id, id: doc.data().id ?? doc.id, ...doc.data() }));
 
         setActiveIngredients(ingredients.filter((item) => !item.archived));
         setArchivedIngredients(ingredients.filter((item) => item.archived));
@@ -254,6 +260,11 @@ export default function Maintenance({ role }) {
     return `${prefix}${String(maxId + 1).padStart(3, '0')}`;
   };
 
+  const stripTrailingSizeSuffix = (name) => {
+    if (!name) return '';
+    return name.replace(/\s*\((Small|Medium|Large)\)$/, '');
+  };
+
   const saveMenuItemToFirestore = async () => {
     try {
       const filteredAddOns = addOns
@@ -267,7 +278,8 @@ export default function Maintenance({ role }) {
       const validConnections = connections.filter(conn => conn.code && conn.units);
       const selectedSize = selectedMenuItemSize || 'Small';
       const selectedPrice = sizes[selectedSize]?.price || '';
-      const savedMenuItemName = menuItemName ? `${menuItemName} (${selectedSize})` : '';
+      const baseMenuItemName = stripTrailingSizeSuffix(menuItemName);
+      const savedMenuItemName = baseMenuItemName ? `${baseMenuItemName} (${selectedSize})` : '';
       const newMenuItemId = generateNextId('MNTM', activeMenuItems);
 
       const menuItemData = {
@@ -294,6 +306,7 @@ export default function Maintenance({ role }) {
         ...prev,
         {
           id: newMenuItemId,
+          docId: docRef.id,
           name: savedMenuItemName,
           category: itemCategory,
           selectedSize,
@@ -316,7 +329,8 @@ export default function Maintenance({ role }) {
   const saveItemToFirestore = async () => {
     try {
       const itemSize = selectedItemSize || 'Small';
-      const savedItemName = itemName ? `${itemName} (${itemSize})` : '';
+      const baseItemName = stripTrailingSizeSuffix(itemName);
+      const savedItemName = baseItemName ? `${baseItemName} (${itemSize})` : '';
       const newItemId = generateNextId('ITEM', activeItems);
       const itemData = {
         id: newItemId,
@@ -338,6 +352,7 @@ export default function Maintenance({ role }) {
         ...prev,
         {
           id: newItemId,
+          docId: docRef.id,
           name: savedItemName,
           size: itemSize,
           startingQty: parseFloat(itemStartingQty) || 0,
@@ -377,6 +392,7 @@ export default function Maintenance({ role }) {
         ...prev,
         {
           id: newIngredientId,
+          docId: docRef.id,
           name: ingredientName,
           type: ingredientType,
           startingQty: parseFloat(startingQty) || 0,
@@ -393,16 +409,139 @@ export default function Maintenance({ role }) {
     }
   };
 
+  const updateMenuItemInFirestore = async () => {
+    if (!selectedEditItem) return false;
+
+    try {
+      const filteredAddOns = addOns
+        .filter(addon => addon.ingredientId && addon.price)
+        .map(addon => ({
+          ingredientId: addon.ingredientId,
+          name: addon.name,
+          price: addon.price,
+        }));
+
+      const validConnections = connections.filter(conn => conn.code && conn.units);
+      const selectedSize = selectedMenuItemSize || 'Small';
+      const selectedPrice = sizes[selectedSize]?.price || '';
+      const baseMenuItemName = stripTrailingSizeSuffix(menuItemName);
+      const savedMenuItemName = baseMenuItemName ? `${baseMenuItemName} (${selectedSize})` : '';
+      const menuItemData = {
+        name: savedMenuItemName,
+        category: itemCategory,
+        selectedSize,
+        price: selectedPrice,
+        sizes,
+        addOns: filteredAddOns,
+        connections: validConnections,
+        updatedAt: new Date(),
+      };
+
+      const documentId = selectedEditItem.docId || selectedEditItem.id;
+      await updateDoc(doc(db, 'menuItems', documentId), menuItemData);
+
+      setActiveMenuItems(prev => prev.map((item) => item.id === selectedEditItem.id ? {
+        ...item,
+        ...menuItemData,
+        id: selectedEditItem.id,
+        docId: selectedEditItem.docId || selectedEditItem.id,
+      } : item));
+
+      setLastSavedKey(selectedEditItem.id);
+      setLastSavedName(savedMenuItemName);
+
+      return true;
+    } catch (error) {
+      console.error('Error updating menu item:', error);
+      alert('Error updating menu item in database');
+      return false;
+    }
+  };
+
+  const updateItemInFirestore = async () => {
+    if (!selectedEditItem) return false;
+
+    try {
+      const itemSize = selectedItemSize || 'Small';
+      const baseItemName = stripTrailingSizeSuffix(itemName);
+      const savedItemName = baseItemName ? `${baseItemName} (${itemSize})` : '';
+      const itemData = {
+        name: savedItemName,
+        size: itemSize,
+        startingQty: parseFloat(itemStartingQty) || 0,
+        updatedAt: new Date(),
+      };
+
+      const documentId = selectedEditItem.docId || selectedEditItem.id;
+      await updateDoc(doc(db, 'items', documentId), itemData);
+
+      setActiveItems(prev => prev.map((item) => item.id === selectedEditItem.id ? {
+        ...item,
+        ...itemData,
+        id: selectedEditItem.id,
+        docId: selectedEditItem.docId || selectedEditItem.id,
+      } : item));
+
+      setLastSavedKey(selectedEditItem.id);
+      setLastSavedName(savedItemName);
+
+      return true;
+    } catch (error) {
+      console.error('Error updating item:', error);
+      alert('Error updating item in database');
+      return false;
+    }
+  };
+
+  const updateIngredientInFirestore = async () => {
+    if (!selectedEditItem) return false;
+
+    try {
+      const ingredientData = {
+        name: ingredientName,
+        type: ingredientType,
+        startingQty: parseFloat(startingQty) || 0,
+        isAddOn: ingredientIsAddOn,
+        updatedAt: new Date(),
+      };
+
+      const documentId = selectedEditItem.docId || selectedEditItem.id;
+      await updateDoc(doc(db, 'ingredients', documentId), ingredientData);
+
+      setActiveIngredients(prev => prev.map((item) => item.id === selectedEditItem.id ? {
+        ...item,
+        ...ingredientData,
+        id: selectedEditItem.id,
+        docId: selectedEditItem.docId || selectedEditItem.id,
+      } : item));
+
+      setLastSavedKey(selectedEditItem.id);
+      setLastSavedName(ingredientName);
+
+      return true;
+    } catch (error) {
+      console.error('Error updating ingredient:', error);
+      alert('Error updating ingredient in database');
+      return false;
+    }
+  };
+
   const finalizeSaveFlow = async () => {
     let saveSuccess = false;
 
     // Determine which form is being saved based on currentView
-    if (currentView === 'create-menu-item' || currentView === 'edit-menu-item') {
+    if (currentView === 'create-menu-item') {
       saveSuccess = await saveMenuItemToFirestore();
-    } else if (currentView === 'create-item' || currentView === 'edit-item') {
+    } else if (currentView === 'edit-menu-item') {
+      saveSuccess = await updateMenuItemInFirestore();
+    } else if (currentView === 'create-item') {
       saveSuccess = await saveItemToFirestore();
-    } else if (currentView === 'create-ingredient' || currentView === 'edit-ingredient') {
+    } else if (currentView === 'edit-item') {
+      saveSuccess = await updateItemInFirestore();
+    } else if (currentView === 'create-ingredient') {
       saveSuccess = await saveIngredientToFirestore();
+    } else if (currentView === 'edit-ingredient') {
+      saveSuccess = await updateIngredientInFirestore();
     }
 
     if (saveSuccess) {
@@ -532,6 +671,8 @@ export default function Maintenance({ role }) {
         handleRemoveRow={handleRemoveRow}
         connections={connections}
         setConnections={setConnections}
+        addConnection={addConnection}
+        removeConnection={removeConnection}
         getSequenceNumber={getSequenceNumber}
         showSavePrompt={showSavePrompt}
         setShowSavePrompt={setShowSavePrompt}
@@ -664,7 +805,7 @@ export default function Maintenance({ role }) {
           <button onClick={handleBack} className="bg-[#5a5a5a] p-3 rounded-lg"><CornerUpLeft size={20} /></button>
           <div className="flex-1 bg-[#5a5a5a] rounded-lg flex items-center px-4 gap-3 font-medium tracking-wide">
             <WrenchIcon size={20} />
-            <span>Maintenance</span>
+            <span>{activeDropdown ? `Maintenance > ${menuItems.find(item => item.id === activeDropdown)?.label || activeDropdown}` : 'Maintenance'}</span>
           </div>
         </div>
 

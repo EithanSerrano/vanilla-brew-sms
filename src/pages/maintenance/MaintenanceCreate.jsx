@@ -61,6 +61,32 @@ export default function MaintenanceCreate({
   lastSavedKey,
   lastSavedName,
 }) {
+  const isCreateMenuItemReady = () => {
+    return menuItemName.trim().length > 0 && itemCategory.trim().length > 0 && (sizes[selectedMenuItemSize]?.price || '').trim().length > 0;
+  };
+
+  const isCreateItemReady = () => {
+    return itemName.trim().length > 0 && selectedItemSize.trim().length > 0 && itemStartingQty.trim().length > 0;
+  };
+
+  const isCreateIngredientReady = () => {
+    return ingredientName.trim().length > 0 && ingredientType.trim().length > 0 && startingQty.trim().length > 0;
+  };
+
+  const getCreateBreadcrumb = () => {
+    switch (currentView) {
+      case 'create-menu-item':
+        return 'Maintenance > Create > Menu Item';
+      case 'create-item':
+        return 'Maintenance > Create > Item';
+      case 'create-ingredient':
+        return 'Maintenance > Create > Ingredient';
+      default:
+        return 'Maintenance > Create';
+    }
+  };
+
+  const breadcrumbHeader = getCreateBreadcrumb();
 
   if (currentView === 'create-menu-item') {
     return (
@@ -73,7 +99,7 @@ export default function MaintenanceCreate({
             </button>
             <div className="flex-1 bg-[#5a5a5a] rounded-lg flex items-center px-4 gap-3 text-base font-medium tracking-wide">
               <WrenchIcon size={20} />
-              <span>Maintenance &gt; Create &gt; Menu Item</span>
+              <span>{breadcrumbHeader}</span>
             </div>
           </div>
 
@@ -321,7 +347,11 @@ export default function MaintenanceCreate({
           </div>
 
           <div className="mt-auto flex justify-center pb-4">
-            <button onClick={() => setShowSavePrompt(true)} className="bg-[#56a2d1] hover:bg-[#66b2e1] text-white text-2xl font-semibold py-4 px-32 rounded-xl shadow-lg transition-transform active:scale-95">
+            <button
+              onClick={() => setShowSavePrompt(true)}
+              disabled={!isCreateMenuItemReady()}
+              className={`bg-[#56a2d1] ${isCreateMenuItemReady() ? 'hover:bg-[#66b2e1]' : 'opacity-50 cursor-not-allowed'} text-white text-2xl font-semibold py-4 px-32 rounded-xl shadow-lg transition-transform active:scale-95`}
+            >
               Save
             </button>
           </div>
@@ -373,7 +403,7 @@ export default function MaintenanceCreate({
             </button>
             <div className="flex-1 bg-[#5a5a5a] rounded-lg flex items-center px-4 gap-3 text-base font-medium tracking-wide">
               <WrenchIcon size={20} />
-              <span>Maintenance &gt; Create &gt; Item</span>
+              <span>{breadcrumbHeader}</span>
             </div>
           </div>
 
@@ -450,7 +480,8 @@ export default function MaintenanceCreate({
           <div className="mt-auto flex justify-center pb-4">
             <button 
               onClick={() => setShowSavePrompt(true)} 
-              className="bg-[#56a2d1] hover:bg-[#66b2e1] text-white text-2xl font-semibold py-4 px-32 rounded-xl shadow-lg transition-transform active:scale-95"
+              disabled={!isCreateItemReady()}
+              className={`bg-[#56a2d1] ${isCreateItemReady() ? 'hover:bg-[#66b2e1]' : 'opacity-50 cursor-not-allowed'} text-white text-2xl font-semibold py-4 px-32 rounded-xl shadow-lg transition-transform active:scale-95`}
             >
               Save
             </button>
@@ -506,7 +537,7 @@ export default function MaintenanceCreate({
             </button>
             <div className="flex-1 bg-[#5a5a5a] rounded-lg flex items-center px-4 gap-3 text-base font-medium tracking-wide">
               <WrenchIcon size={20} />
-              <span>Maintenance &gt; Create &gt; Ingredient</span>
+              <span>{breadcrumbHeader}</span>
             </div>
           </div>
 
@@ -565,7 +596,7 @@ export default function MaintenanceCreate({
           </div>
 
           <div className="mt-auto flex justify-center pb-4">
-            <button onClick={() => setShowSavePrompt(true)} className="bg-[#56a2d1] hover:bg-[#66b2e1] text-white text-2xl font-semibold py-4 px-32 rounded-xl shadow-lg transition-transform active:scale-95">
+            <button onClick={() => setShowSavePrompt(true)} disabled={!isCreateIngredientReady()} className={`bg-[#56a2d1] ${isCreateIngredientReady() ? 'hover:bg-[#66b2e1]' : 'opacity-50 cursor-not-allowed'} text-white text-2xl font-semibold py-4 px-32 rounded-xl shadow-lg transition-transform active:scale-95`}>
               Save
             </button>
           </div>

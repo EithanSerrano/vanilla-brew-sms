@@ -10,6 +10,11 @@ import {
   Check,
 } from 'lucide-react';
 
+const stripTrailingSizeSuffix = (name) => {
+  if (!name) return '';
+  return name.replace(/\s*\((Small|Medium|Large)\)$/, '');
+};
+
 export default function MaintenanceEdit({
   currentView,
   handleBack,
@@ -37,6 +42,8 @@ export default function MaintenanceEdit({
   handleRemoveRow,
   connections,
   setConnections,
+  addConnection,
+  removeConnection,
   getSequenceNumber,
   showSavePrompt,
   setShowSavePrompt,
@@ -55,7 +62,40 @@ export default function MaintenanceEdit({
   setIngredientName,
   ingredientType,
   setIngredientType,
+  ingredientIsAddOn,
+  setIngredientIsAddOn,
+  startingQty,
+  setStartingQty,
 }) {
+  const hasMenuItemEditChanges = () => {
+    if (!selectedEditItem) return false;
+    const originalName = stripTrailingSizeSuffix(selectedEditItem.name || '');
+    const currentName = stripTrailingSizeSuffix(menuItemName || '');
+    const nameChanged = currentName.trim() !== originalName.trim();
+    const categoryChanged = (itemCategory || 'Coffee') !== (selectedEditItem.category || 'Coffee');
+    const sizeChanged = selectedMenuItemSize !== (selectedEditItem.selectedSize || 'Small');
+    const priceChanged = (sizes[selectedMenuItemSize]?.price || '').trim() !== (selectedEditItem.price || '').trim();
+    const addOnsChanged = JSON.stringify(addOns || []) !== JSON.stringify(selectedEditItem.addOns || []);
+    const connectionsChanged = JSON.stringify(connections || []) !== JSON.stringify(selectedEditItem.connections || []);
+    return nameChanged || categoryChanged || sizeChanged || priceChanged || addOnsChanged || connectionsChanged;
+  };
+
+  const hasItemEditChanges = () => {
+    if (!selectedEditItem) return false;
+    const originalName = stripTrailingSizeSuffix(selectedEditItem.name || '');
+    const currentName = stripTrailingSizeSuffix(itemName || '');
+    const nameChanged = currentName.trim() !== originalName.trim();
+    const sizeChanged = selectedItemSize !== (selectedEditItem.size || 'Small');
+    return nameChanged || sizeChanged;
+  };
+
+  const hasIngredientEditChanges = () => {
+    if (!selectedEditItem) return false;
+    const nameChanged = (ingredientName || '').trim() !== (selectedEditItem.name || '').trim();
+    const typeChanged = (ingredientType || 'Dry') !== (selectedEditItem.type || 'Dry');
+    const addOnChanged = (ingredientIsAddOn || false) !== (selectedEditItem.isAddOn || false);
+    return nameChanged || typeChanged || addOnChanged;
+  };
   if (currentView === 'edit-menu-item') {
     return (
       <div className="flex w-full h-full gap-6 relative bg-[#1e1e1e]">
@@ -97,7 +137,7 @@ export default function MaintenanceEdit({
                   <button 
                     onClick={() => { 
                       setSelectedEditItem(item); 
-                      setMenuItemName(item.name);
+                      setMenuItemName(stripTrailingSizeSuffix(item.name));
                       setItemCategory(item.category || 'Coffee');
                       setSelectedMenuItemSize(item.selectedSize || 'Small');
                       setSizes(item.sizes || {
@@ -287,7 +327,11 @@ export default function MaintenanceEdit({
               </div>
 
               <div className="mt-8 flex justify-center">
-                <button onClick={() => setShowSavePrompt(true)} className="bg-[#56a2d1] hover:bg-[#66b2e1] text-white text-2xl font-semibold py-4 px-24 rounded-xl shadow-lg transition-transform active:scale-95">
+                <button
+                  onClick={() => setShowSavePrompt(true)}
+                  disabled={!hasMenuItemEditChanges()}
+                  className={`bg-[#56a2d1] ${hasMenuItemEditChanges() ? 'hover:bg-[#66b2e1]' : 'opacity-50 cursor-not-allowed'} text-white text-2xl font-semibold py-4 px-24 rounded-xl shadow-lg transition-transform active:scale-95`}
+                >
                   Save Changes
                 </button>
               </div>
@@ -366,7 +410,7 @@ export default function MaintenanceEdit({
                   <button 
                     onClick={() => { 
                       setSelectedEditItem(item); 
-                      setItemName(item.name);
+                      setItemName(stripTrailingSizeSuffix(item.name));
                       setSelectedItemSize(item.size || 'Small');
                       setItemStartingQty(item.startingQty?.toString() || '');
                     }}
@@ -424,16 +468,6 @@ export default function MaintenanceEdit({
                         </select>
                         <ChevronDown size={24} className="absolute right-3 top-3 text-black pointer-events-none" />
                       </div>
-
-                      <label className="text-2xl font-medium text-right">Starting Qty.</label>
-                      <input
-                        type="text"
-                        inputMode="numeric"
-                        pattern="[0-9]*"
-                        value={itemStartingQty}
-                        onChange={(e) => setItemStartingQty(e.target.value.replace(/\D/g, ''))}
-                        className="w-full bg-white text-black rounded-lg h-12 px-4 text-xl font-semibold focus:outline-none"
-                      />
                     </div>
                   </div>
                 )}
@@ -442,7 +476,8 @@ export default function MaintenanceEdit({
               <div className="mt-8 flex justify-center">
                 <button 
                   onClick={() => setShowSavePrompt(true)} 
-                  className="bg-[#56a2d1] hover:bg-[#66b2e1] text-white text-2xl font-semibold py-4 px-24 rounded-xl shadow-lg transition-transform active:scale-95"
+                  disabled={!hasItemEditChanges()}
+                  className={`bg-[#56a2d1] ${hasItemEditChanges() ? 'hover:bg-[#66b2e1]' : 'opacity-50 cursor-not-allowed'} text-white text-2xl font-semibold py-4 px-24 rounded-xl shadow-lg transition-transform active:scale-95`}
                 >
                   Save Changes
                 </button>
@@ -562,15 +597,6 @@ export default function MaintenanceEdit({
                       <ChevronDown size={32} strokeWidth={3} />
                     </div>
                   </div>
-                  <label className="text-2xl font-medium text-right">Starting Qty.</label>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                    value={startingQty}
-                    onChange={(e) => setStartingQty(e.target.value.replace(/\D/g, ''))}
-                    className="w-full bg-white text-black rounded-lg h-14 px-6 text-2xl font-semibold focus:outline-none text-center"
-                  />
                   <label className="text-2xl font-medium text-right">Is Add-On</label>
                   <div className="flex items-center gap-3">
                     <input
@@ -587,7 +613,8 @@ export default function MaintenanceEdit({
               <div className="mt-4 mb-10">
                 <button 
                   onClick={() => setShowSavePrompt(true)} 
-                  className="bg-[#56a2d1] hover:bg-[#66b2e1] text-white text-2xl font-semibold py-4 px-24 rounded-xl shadow-lg transition-transform active:scale-95"
+                  disabled={!hasIngredientEditChanges()}
+                  className={`bg-[#56a2d1] ${hasIngredientEditChanges() ? 'hover:bg-[#66b2e1]' : 'opacity-50 cursor-not-allowed'} text-white text-2xl font-semibold py-4 px-24 rounded-xl shadow-lg transition-transform active:scale-95`}
                 >
                   Save Changes
                 </button>
@@ -602,6 +629,22 @@ export default function MaintenanceEdit({
                       <div className="flex flex-col gap-5 w-full max-w-md">
                         <button onClick={() => { setShowSavePrompt(false); setShowDiscardPrompt(true); }} className="w-full bg-[#4a4a4a] py-5 rounded-2xl text-2xl font-semibold">Discard</button>
                         <button onClick={finalizeSaveFlow} className="w-full bg-[#56a2d1] py-5 rounded-2xl text-2xl font-semibold text-white">Save</button>
+                      </div>
+                    </div>
+                  )}
+                  {showItemSavedSuccess && (
+                    <div className="bg-[#2a2a2a] rounded-3xl p-12 shadow-2xl w-full max-w-xl flex flex-col items-center border border-[#444] text-center">
+                      <h2 className="text-5xl font-semibold mb-8 text-white"> Ingredient Updated!</h2>
+                      <p className="text-2xl text-gray-300 mb-10">Ingredient changes were saved successfully.</p>
+                      <button onClick={() => { setShowItemSavedSuccess(false); setSelectedEditItem(null); }} className="w-full max-w-xs bg-[#4a4a4a] py-4 rounded-2xl text-2xl font-semibold transition-colors">Return</button>
+                    </div>
+                  )}
+                  {showDiscardPrompt && (
+                    <div className="bg-[#2a2a2a] rounded-3xl p-10 shadow-2xl w-full max-w-xl flex flex-col items-center border border-[#444]">
+                      <h2 className="text-5xl font-semibold mb-12 text-white text-center">Discard Changes?</h2>
+                      <div className="flex flex-col gap-5 w-full max-w-md">
+                        <button onClick={() => setShowDiscardPrompt(false)} className="w-full bg-[#4a4a4a] py-5 rounded-2xl text-2xl font-semibold">Return</button>
+                        <button onClick={() => { setShowDiscardPrompt(false); setSelectedEditItem(null); }} className="w-full bg-[#ca4646] py-5 rounded-2xl text-2xl font-semibold text-white">Discard</button>
                       </div>
                     </div>
                   )}
