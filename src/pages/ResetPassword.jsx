@@ -36,8 +36,9 @@ export default function ResetPassword() {
       return;
     }
     
-    if (passwords.newPassword.length < 6) {
-      setError('Password must be at least 6 characters long.');
+    // Updated constraints: 8-64 characters
+    if (passwords.newPassword.length < 8 || passwords.newPassword.length > 64) {
+      setError('Password must be between 8 and 64 characters long.');
       return;
     }
 
@@ -131,6 +132,7 @@ export default function ResetPassword() {
                   type="password" name="newPassword" value={passwords.newPassword} onChange={handleChange}
                   className="w-full h-12 px-4 rounded-lg text-lg font-medium text-black focus:outline-none focus:ring-4 focus:ring-[#3ca4c7]/50 transition-colors bg-[#f0f0f0]"
                   required disabled={isSubmitting}
+                  maxLength={64}
                 />
               </div>
               
@@ -140,6 +142,7 @@ export default function ResetPassword() {
                   type="password" name="confirmPassword" value={passwords.confirmPassword} onChange={handleChange}
                   className="w-full h-12 px-4 rounded-lg text-lg font-medium text-black focus:outline-none focus:ring-4 focus:ring-[#3ca4c7]/50 transition-colors bg-[#f0f0f0]"
                   required disabled={isSubmitting}
+                  maxLength={64}
                 />
               </div>
               
