@@ -36,6 +36,7 @@ export default function MaintenanceArchive({
   setArchivedMenuItems,
   setArchivedItems,
   setArchivedIngredients,
+  onRecordTransaction,
 }) {
   if (currentView === 'archive-menu-item') {
     return (
@@ -83,6 +84,13 @@ export default function MaintenanceArchive({
                       ...prev,
                       { ...selectedArchiveMenuItem, archived: true }
                     ]));
+                    onRecordTransaction?.({
+                      action: 'Archived',
+                      entityType: 'Menu Item',
+                      entityId: selectedArchiveMenuItem.id,
+                      entityName: selectedArchiveMenuItem.name,
+                      summary: `Archived Menu Item ${selectedArchiveMenuItem.name} (${selectedArchiveMenuItem.id})`,
+                    });
                     setShowMenuConfirm(false); 
                     setShowMenuSuccess(true); 
                   }} 
@@ -151,6 +159,13 @@ export default function MaintenanceArchive({
                       ...prev,
                       { ...selectedArchiveItem, archived: true }
                     ]));
+                    onRecordTransaction?.({
+                      action: 'Archived',
+                      entityType: 'Item',
+                      entityId: selectedArchiveItem.id,
+                      entityName: selectedArchiveItem.name,
+                      summary: `Archived Item ${selectedArchiveItem.name} (${selectedArchiveItem.id})`,
+                    });
                     setShowItemConfirm(false); 
                     setShowItemSuccess(true); 
                   }} 
@@ -240,6 +255,13 @@ export default function MaintenanceArchive({
                       ...prev,
                       { ...selectedArchiveIngredient, archived: true }
                     ]));
+                    onRecordTransaction?.({
+                      action: 'Archived',
+                      entityType: 'Ingredient',
+                      entityId: selectedArchiveIngredient.id,
+                      entityName: selectedArchiveIngredient.name,
+                      summary: `Archived Ingredient ${selectedArchiveIngredient.name} (${selectedArchiveIngredient.id})`,
+                    });
                     setShowIngConfirm(false); 
                     setShowIngSuccess(true); 
                   }} 

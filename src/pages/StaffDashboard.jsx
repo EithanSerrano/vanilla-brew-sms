@@ -1,20 +1,14 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CornerUpLeft, ClipboardList, Bell, Filter, ChevronDown, ChevronUp, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
+import { collection, getDocs } from 'firebase/firestore';
+import { db } from '../firebase';
+import { CornerUpLeft, ClipboardList, Bell, Filter, ChevronDown, ChevronUp, RefreshCw, ChevronLeft, ChevronRight, Eye } from 'lucide-react';
 import StaffSidebar from '../layouts/StaffSidebar'; // Using the Staff Sidebar!
 
 export default function StaffDashboard() {
   const navigate = useNavigate();
 
-  // --- DUMMY DATA ---
-  const [transactions] = useState([
-    { id: 1, type: 'Inventory', transNo: 'IT110125001', date: '11/01/2025', details: { inCharge: 'Ysabella Trazo', accountNo: 'E002', item: 'INGR001 (Egg)', oldStock: 4, newStock: 54 } },
-    { id: 2, type: 'Inventory', transNo: 'IT103025002', date: '10/30/2025', details: { inCharge: 'Ysabella Trazo', accountNo: 'E002', item: 'ITEM001 (Cup)', oldStock: 20, newStock: 100 } },
-    { id: 3, type: 'Sales', transNo: 'SLS1030250002', date: '10/30/2025', time: '10:30 AM', details: { inCharge: 'Carl Nueva', accountNo: 'E001', orderType: 'Take Out', items: [{ qty: 3, name: 'CMS(16oz), CG, P', price: 'Php 102', total: 'Php 306' }], grandTotal: 'Php 306', amountGiven: 'Php 500' } },
-    { id: 4, type: 'Sales', transNo: 'SLS1030250001', date: '10/30/2025', time: '09:15 AM', details: { inCharge: 'Carl Nueva', accountNo: 'E001', orderType: 'Dine In', items: [{ qty: 1, name: 'Mango Graham', price: 'Php 120', total: 'Php 120' }], grandTotal: 'Php 120', amountGiven: 'Php 150' } },
-    { id: 5, type: 'Inventory', transNo: 'IT103025001', date: '10/30/2025', details: { inCharge: 'Carl Nueva', accountNo: 'E001', item: 'INGR002 (Meat)', oldStock: 10, newStock: 50 } },
-    { id: 6, type: 'Sales', transNo: 'SLS1030240001', date: '10/29/2025', time: '02:15 PM', details: { inCharge: 'Carl Nueva', accountNo: 'E001', orderType: 'Dine In', items: [{ qty: 2, name: 'Shawarma Rice', price: 'Php 99', total: 'Php 198' }], grandTotal: 'Php 198', amountGiven: 'Php 200' } },
-  ]);
+  const [transactions, setTransactions] = useState([]);
 
   const [notifications] = useState([
     { id: 1, type: 'Inventory', reference: 'IT110125001', date: '11/01/2025', status: 'View' },
@@ -35,6 +29,20 @@ export default function StaffDashboard() {
   const [showFilterMenu, setShowFilterMenu] = useState(false);
   const [showDateFilter, setShowDateFilter] = useState(false);
   const [viewingTransaction, setViewingTransaction] = useState(null);
+
+  useEffect(() => {
+    const loadTransactions = async () => {
+      try {
+        const snapshot = await getDocs(collection(db, 'transactions'));
+        const loaded = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+        setTransactions(loaded.sort((a, b) => b.createdAt?.toDate?.()?.getTime() - a.createdAt?.toDate?.()?.getTime()));
+      } catch (error) {
+        console.error('Failed to load transactions:', error);
+      }
+    };
+
+    loadTransactions();
+  }, []);
 
   // --- LOGIC ---
   const isDateInRange = (transDateStr) => {
@@ -195,13 +203,19 @@ export default function StaffDashboard() {
 
           {/* TRANSACTIONS TABLE */}
           <div className="bg-[#4a4a4a] rounded-xl flex-1 p-6 min-h-[400px]">
-            <table className="w-full text-sm text-center">
+            <table className="w-full table-fixed text-base text-center">
+              <colgroup>
+                <col className="w-1/4" />
+                <col className="w-1/4" />
+                <col className="w-1/4" />
+                <col className="w-1/4" />
+              </colgroup>
               <thead>
                 <tr className="border-b border-[#5a5a5a] text-gray-300">
-                  <th className="pb-3 font-medium">Type</th>
-                  <th className="pb-3 font-medium">Transaction Number</th>
-                  <th className="pb-3 font-medium">Date</th>
-                  <th className="pb-3 font-medium">Action</th>
+                  <th className="pb-3 text-base font-bold">Type</th>
+                  <th className="pb-3 text-base font-bold">Transaction Number</th>
+                  <th className="pb-3 text-base font-bold">Date</th>
+                  <th className="pb-3 text-base font-bold">Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -213,9 +227,10 @@ export default function StaffDashboard() {
                     <td className="py-4">
                       <button 
                         onClick={() => openTransaction(trans)}
-                        className="underline hover:text-[#3ca4c7] transition-colors"
+                        className="inline-flex items-center justify-center rounded-full p-2 text-gray-200 hover:bg-[#3ca4c7]/15 hover:text-[#3ca4c7] transition-colors"
+                        aria-label="View transaction"
                       >
-                        View
+                        <Eye size={18} />
                       </button>
                     </td>
                   </tr>
@@ -240,7 +255,7 @@ export default function StaffDashboard() {
             <div className="bg-[#333333] p-8 rounded-xl w-[700px] shadow-2xl flex flex-col items-center">
               <h3 className="text-2xl font-medium tracking-wide mb-6">Notifications</h3>
               
-              <table className="w-full text-sm text-center mb-8">
+              <table className="w-full text-base text-center mb-8">
                 <tbody>
                   {notifications.map((notif) => (
                     <tr key={notif.id} className="border-b border-[#4a4a4a] text-gray-200">

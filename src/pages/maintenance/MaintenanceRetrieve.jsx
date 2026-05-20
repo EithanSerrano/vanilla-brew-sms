@@ -36,6 +36,7 @@ export default function MaintenanceRetrieve({
   setActiveMenuItems,
   setActiveItems,
   setActiveIngredients,
+  onRecordTransaction,
 }) {
   if (currentView === 'retrieve-menu-item') {
     return (
@@ -82,6 +83,13 @@ export default function MaintenanceRetrieve({
                   onClick={() => {
                     setArchivedMenuItems(prev => prev.filter(i => i.id !== selectedRetrieveMenu.id));
                     setActiveMenuItems(prev => [...prev, { ...selectedRetrieveMenu, archived: false }]);
+                    onRecordTransaction?.({
+                      action: 'Retrieved',
+                      entityType: 'Menu Item',
+                      entityId: selectedRetrieveMenu.id,
+                      entityName: selectedRetrieveMenu.name,
+                      summary: `Retrieved Menu Item ${selectedRetrieveMenu.name} (${selectedRetrieveMenu.id})`,
+                    });
                     setShowRetrieveMenuConfirm(false);
                     setShowRetrieveMenuSuccess(true);
                   }}
@@ -151,6 +159,13 @@ export default function MaintenanceRetrieve({
                   onClick={() => {
                     setArchivedItems(prev => prev.filter(i => i.id !== selectedRetrieveItem.id));
                     setActiveItems(prev => [...prev, { ...selectedRetrieveItem, archived: false }]);
+                    onRecordTransaction?.({
+                      action: 'Retrieved',
+                      entityType: 'Item',
+                      entityId: selectedRetrieveItem.id,
+                      entityName: selectedRetrieveItem.name,
+                      summary: `Retrieved Item ${selectedRetrieveItem.name} (${selectedRetrieveItem.id})`,
+                    });
                     setShowRetrieveItemConfirm(false);
                     setShowRetrieveItemSuccess(true);
                   }}
@@ -226,6 +241,13 @@ export default function MaintenanceRetrieve({
                   onClick={() => {
                     setArchivedIngredients(prev => prev.filter(i => i.id !== selectedRetrieveIng.id));
                     setActiveIngredients(prev => [...prev, { ...selectedRetrieveIng, archived: false }]);
+                    onRecordTransaction?.({
+                      action: 'Retrieved',
+                      entityType: 'Ingredient',
+                      entityId: selectedRetrieveIng.id,
+                      entityName: selectedRetrieveIng.name,
+                      summary: `Retrieved Ingredient ${selectedRetrieveIng.name} (${selectedRetrieveIng.id})`,
+                    });
                     setShowRetrieveIngConfirm(false);
                     setShowRetrieveIngSuccess(true);
                   }}

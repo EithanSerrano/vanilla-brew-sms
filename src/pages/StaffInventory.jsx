@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Package, Filter, Layers, Edit, CornerUpLeft, AlertCircle } from 'lucide-react'; // <-- Added AlertCircle
 import StaffSidebar from '../layouts/StaffSidebar';
+import { saveTransaction, formatTransactionDate } from '../utils/transactionHelpers';
 
 export default function StaffInventory() {
   const navigate = useNavigate();
@@ -31,9 +32,32 @@ export default function StaffInventory() {
   // State for the item currently being adjusted in the modal
   const [selectedItem, setSelectedItem] = useState(null);
   const [adjustValue, setAdjustValue] = useState(0);
+  const adjustTimer = useRef(null);
 
-  // Automatically calculate critical stock
-  const criticalStock = inventory.filter(item => item.stock < 10);
+  const updateAdjustValue = (delta) => {
+    setAdjustValue(prev => Math.max(0, prev + delta));
+  };
+
+  const startAdjustRepeat = (delta) => {
+    updateAdjustValue(delta);
+    if (adjustTimer.current) clearInterval(adjustTimer.current);
+    adjustTimer.current = window.setInterval(() => updateAdjustValue(delta), 120);
+  };
+
+  const stopAdjustRepeat = () => {
+    if (adjustTimer.current) {
+      clearInterval(adjustTimer.current);
+      adjustTimer.current = null;
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      if (adjustTimer.current) {
+        clearInterval(adjustTimer.current);
+      }
+    };
+  }, []);
 
   // Derive the filtered inventory
   const filteredInventory = activeFilter === "All" 
@@ -69,14 +93,34 @@ export default function StaffInventory() {
     }
   };
 
-  const saveAdjustment = () => {
+  const saveAdjustment = async () => {
+    if (!selectedItem) return;
+    const oldStock = selectedItem.stock;
+    const newStock = adjustValue;
+
+    try {
+      await saveTransaction('INV', {
+        type: 'Inventory',
+        action: 'Adjusted',
+        entityType: selectedItem.type,
+        entityId: selectedItem.elementNo,
+        entityName: selectedItem.name,
+        oldStock,
+        newStock,
+        summary: `Adjusted ${selectedItem.type} ${selectedItem.elementNo} (${selectedItem.name}) from ${oldStock} to ${newStock}`,
+        date: formatTransactionDate(),
+      });
+    } catch (error) {
+      console.error('Error recording inventory transaction:', error);
+    }
+
     setInventory(prev => prev.map(item => 
       item.id === selectedItem.id 
-        ? { ...item, stock: adjustValue, lastChecked: "02/28/26" } 
+        ? { ...item, stock: newStock, lastChecked: formatTransactionDate() } 
         : item
     ));
     setShowAdjustModal(false);
-    setSelectedRowId(null); 
+    setSelectedRowId(null);
   };
 
   const applyFilter = (type) => {
@@ -287,7 +331,7 @@ export default function StaffInventory() {
         {/* 3. Manual Adjustment Modal */}
         {showAdjustModal && selectedItem && (
           <div className="absolute inset-0 bg-black/50 rounded-xl flex items-center justify-center z-50">
-            <div className="bg-[#333333] p-8 rounded-xl w-[450px] shadow-2xl">
+            <div className="bg-[#333333] p-8 rounded-xl w-[520px] max-w-[90vw] shadow-2xl">
               
               <div className="flex items-center gap-4 mb-6">
                 <button 
@@ -340,9 +384,41 @@ export default function StaffInventory() {
               {/* Set New Stock Section */}
               <div className="flex flex-col items-center">
                 <h4 className="text-sm font-semibold mb-4 text-gray-300 self-start">Set New Stock</h4>
-                <div className="flex items-center gap-4 mb-6">
-                  <button 
-                    onClick={() => setAdjustValue(prev => Math.max(0, prev - 1))}
+                <div className="flex items-center gap-3 mb-6">
+                  <button
+                    type="button"
+                    onMouseDown={() => startAdjustRepeat(-10)}
+                    onMouseUp={stopAdjustRepeat}
+                    onMouseLeave={stopAdjustRepeat}
+                    onTouchStart={() => startAdjustRepeat(-10)}
+                    onTouchEnd={stopAdjustRepeat}
+                    onTouchCancel={stopAdjustRepeat}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        updateAdjustValue(-10);
+                      }
+                    }}
+                    onClick={(e) => e.preventDefault()}
+                    className="bg-[#5a5a5a] hover:bg-[#6a6a6a] w-14 h-12 rounded-lg text-lg font-semibold flex items-center justify-center transition-colors"
+                  >
+                    -10
+                  </button>
+                  <button
+                    type="button"
+                    onMouseDown={() => startAdjustRepeat(-1)}
+                    onMouseUp={stopAdjustRepeat}
+                    onMouseLeave={stopAdjustRepeat}
+                    onTouchStart={() => startAdjustRepeat(-1)}
+                    onTouchEnd={stopAdjustRepeat}
+                    onTouchCancel={stopAdjustRepeat}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        updateAdjustValue(-1);
+                      }
+                    }}
+                    onClick={(e) => e.preventDefault()}
                     className="bg-[#5a5a5a] hover:bg-[#6a6a6a] w-12 h-12 rounded-lg text-2xl font-medium flex items-center justify-center transition-colors"
                   >
                     -
@@ -351,13 +427,45 @@ export default function StaffInventory() {
                     type="number" 
                     value={adjustValue}
                     onChange={(e) => setAdjustValue(Number(e.target.value))}
-                    className="w-24 h-12 rounded-lg text-center text-2xl font-bold text-black bg-white focus:outline-none"
+                    className="w-24 h-12 rounded-lg text-center text-2xl font-bold text-black bg-white focus:outline-none no-spinner"
                   />
-                  <button 
-                    onClick={() => setAdjustValue(prev => prev + 1)}
+                  <button
+                    type="button"
+                    onMouseDown={() => startAdjustRepeat(1)}
+                    onMouseUp={stopAdjustRepeat}
+                    onMouseLeave={stopAdjustRepeat}
+                    onTouchStart={() => startAdjustRepeat(1)}
+                    onTouchEnd={stopAdjustRepeat}
+                    onTouchCancel={stopAdjustRepeat}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        updateAdjustValue(1);
+                      }
+                    }}
+                    onClick={(e) => e.preventDefault()}
                     className="bg-[#5a5a5a] hover:bg-[#6a6a6a] w-12 h-12 rounded-lg text-2xl font-medium flex items-center justify-center transition-colors"
                   >
                     +
+                  </button>
+                  <button
+                    type="button"
+                    onMouseDown={() => startAdjustRepeat(10)}
+                    onMouseUp={stopAdjustRepeat}
+                    onMouseLeave={stopAdjustRepeat}
+                    onTouchStart={() => startAdjustRepeat(10)}
+                    onTouchEnd={stopAdjustRepeat}
+                    onTouchCancel={stopAdjustRepeat}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        updateAdjustValue(10);
+                      }
+                    }}
+                    onClick={(e) => e.preventDefault()}
+                    className="bg-[#5a5a5a] hover:bg-[#6a6a6a] w-14 h-12 rounded-lg text-lg font-semibold flex items-center justify-center transition-colors"
+                  >
+                    +10
                   </button>
                 </div>
                 <button 

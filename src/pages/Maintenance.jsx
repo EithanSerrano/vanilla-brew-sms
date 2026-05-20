@@ -28,8 +28,9 @@ import MaintenanceEdit from './maintenance/MaintenanceEdit';
 import MaintenanceArchive from './maintenance/MaintenanceArchive';
 import MaintenanceRetrieve from './maintenance/MaintenanceRetrieve';
 import MaintenanceAccounts from './maintenance/MaintenanceAccounts';
-import { collection, addDoc, updateDoc, doc, getDocs } from "firebase/firestore"; 
+import { collection, addDoc, updateDoc, doc, getDocs, setDoc } from "firebase/firestore"; 
 import { db } from "../firebase";
+import { saveTransaction, formatTransactionDate } from '../utils/transactionHelpers';
 
 export default function Maintenance({ role }) {
   const navigate = useNavigate();
@@ -43,7 +44,6 @@ export default function Maintenance({ role }) {
   const [showItemSavedSuccess, setShowItemSavedSuccess] = useState(false);
   const [showDiscardPrompt, setShowDiscardPrompt] = useState(false);
 
-  //MOCK VALUES
   const [menuItemName, setMenuItemName] = useState('');
   const [sizes, setSizes] = useState({
     Small: { enabled: true, price: '' },
@@ -250,6 +250,23 @@ export default function Maintenance({ role }) {
     }
   };
 
+  const recordMaintenanceTransaction = async ({ action, entityType, entityId, entityName, summary, extra = {} }) => {
+    try {
+      await saveTransaction('MTN', {
+        type: 'Maintenance',
+        action,
+        entityType,
+        entityId,
+        entityName,
+        summary,
+        date: formatTransactionDate(),
+        ...extra,
+      });
+    } catch (error) {
+      console.error('Failed to record maintenance transaction:', error);
+    }
+  };
+
   // --- FIRESTORE SAVE FUNCTIONS ---
   const generateNextId = (prefix, itemsArray) => {
     const existingIds = itemsArray.map(item => {
@@ -318,6 +335,14 @@ export default function Maintenance({ role }) {
         },
       ]));
 
+      await recordMaintenanceTransaction({
+        action: 'Created',
+        entityType: 'Menu Item',
+        entityId: newMenuItemId,
+        entityName: savedMenuItemName,
+        summary: `Created Menu Item ${savedMenuItemName} (${newMenuItemId})`,
+      });
+
       return true;
     } catch (error) {
       console.error('Error saving menu item:', error);
@@ -360,6 +385,14 @@ export default function Maintenance({ role }) {
         },
       ]));
 
+      await recordMaintenanceTransaction({
+        action: 'Created',
+        entityType: 'Item',
+        entityId: newItemId,
+        entityName: savedItemName,
+        summary: `Created Item ${savedItemName} (${newItemId})`,
+      });
+
       return true;
     } catch (error) {
       console.error('Error saving item:', error);
@@ -400,6 +433,14 @@ export default function Maintenance({ role }) {
           archived: false,
         },
       ]));
+
+      await recordMaintenanceTransaction({
+        action: 'Created',
+        entityType: 'Ingredient',
+        entityId: newIngredientId,
+        entityName: ingredientName,
+        summary: `Created Ingredient ${ingredientName} (${newIngredientId})`,
+      });
 
       return true;
     } catch (error) {
@@ -450,6 +491,14 @@ export default function Maintenance({ role }) {
       setLastSavedKey(selectedEditItem.id);
       setLastSavedName(savedMenuItemName);
 
+      await recordMaintenanceTransaction({
+        action: 'Updated',
+        entityType: 'Menu Item',
+        entityId: selectedEditItem.id,
+        entityName: savedMenuItemName,
+        summary: `Updated Menu Item ${savedMenuItemName} (${selectedEditItem.id})`,
+      });
+
       return true;
     } catch (error) {
       console.error('Error updating menu item:', error);
@@ -485,6 +534,14 @@ export default function Maintenance({ role }) {
       setLastSavedKey(selectedEditItem.id);
       setLastSavedName(savedItemName);
 
+      await recordMaintenanceTransaction({
+        action: 'Updated',
+        entityType: 'Item',
+        entityId: selectedEditItem.id,
+        entityName: savedItemName,
+        summary: `Updated Item ${savedItemName} (${selectedEditItem.id})`,
+      });
+
       return true;
     } catch (error) {
       console.error('Error updating item:', error);
@@ -517,6 +574,14 @@ export default function Maintenance({ role }) {
 
       setLastSavedKey(selectedEditItem.id);
       setLastSavedName(ingredientName);
+
+      await recordMaintenanceTransaction({
+        action: 'Updated',
+        entityType: 'Ingredient',
+        entityId: selectedEditItem.id,
+        entityName: ingredientName,
+        summary: `Updated Ingredient ${ingredientName} (${selectedEditItem.id})`,
+      });
 
       return true;
     } catch (error) {
@@ -739,6 +804,7 @@ export default function Maintenance({ role }) {
         setArchivedMenuItems={setArchivedMenuItems}
         setArchivedItems={setArchivedItems}
         setArchivedIngredients={setArchivedIngredients}
+        onRecordTransaction={recordMaintenanceTransaction}
       />
     );
   }
@@ -775,6 +841,7 @@ export default function Maintenance({ role }) {
         setActiveMenuItems={setActiveMenuItems}
         setActiveItems={setActiveItems}
         setActiveIngredients={setActiveIngredients}
+        onRecordTransaction={recordMaintenanceTransaction}
       />
     );
   }
