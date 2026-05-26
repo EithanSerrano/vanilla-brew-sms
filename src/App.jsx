@@ -11,6 +11,7 @@ import Dashboard from "./pages/Dashboard";
 import AdminHome from "./pages/AdminHome";
 import Inventory from "./pages/Inventory";
 import AdminRegistration from "./pages/AdminRegistration";
+import MenuItems from "./pages/MenuItems";
 import AdminHelp from "./pages/AdminHelp";
 import AdminSearch from "./pages/AdminSearch";
 
@@ -44,6 +45,7 @@ function App() {
             <Route path="/admin" element={<AdminHome />} /> 
             <Route path="/admin-dashboard" element={<Dashboard role="admin" />} />
             <Route path="/inventory" element={<Inventory />} />
+            <Route path="/menu-items" element={<MenuItems />} />
             <Route path="/registration" element={<AdminRegistration />} />
             <Route path="/search" element={<AdminSearch />} />
             

@@ -81,48 +81,40 @@ export default function Dashboard({ role }) {
             </div>
 
             {/* Table */}
-            <div className="flex-1 overflow-y-auto">
-              <table className="w-full text-xl text-center">
-                <thead className="sticky top-0 bg-white">
-                  <tr className="border-b border-gray-200">
-                    <th className="py-3 px-4 font-semibold text-gray-800">Sales ID</th>
-                    <th className="py-3 px-4 font-semibold text-gray-800">Date</th>
-                    <th className="py-3 px-4 font-semibold text-gray-800">Time</th>
-                    <th className="py-3 px-4 font-semibold text-gray-800">Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {loading && (
-                    <tr>
-                      <td colSpan="4" className="py-12 text-gray-400">Loading…</td>
-                    </tr>
-                  )}
-                  {!loading && filtered.length === 0 && (
-                    <tr>
-                      <td colSpan="4" className="py-12 text-gray-400">No sales records found.</td>
-                    </tr>
-                  )}
-                  {filtered.map((sale, i) => (
-                    <tr
-                      key={sale.id}
-                      className={`border-b border-gray-100 ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
+            {/* Column headers */}
+            <div className="flex items-center px-5 py-3 border-b border-gray-200 bg-white shrink-0">
+              <span className="w-[30%] text-xl font-semibold text-gray-800 text-center">Sales ID</span>
+              <span className="w-[25%] text-xl font-semibold text-gray-800 text-center">Date</span>
+              <span className="w-[25%] text-xl font-semibold text-gray-800 text-center">Time</span>
+              <span className="flex-1 text-xl font-semibold text-gray-800 text-center">Action</span>
+            </div>
+            {/* Scrollable cards */}
+            <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-2">
+              {loading && (
+                <p className="py-12 text-gray-400 text-xl text-center">Loading…</p>
+              )}
+              {!loading && filtered.length === 0 && (
+                <p className="py-12 text-gray-400 text-xl text-center">No sales records found.</p>
+              )}
+              {filtered.map(sale => (
+                <div
+                  key={sale.id}
+                  className="flex items-center bg-white rounded-xl border border-gray-200 shadow-sm px-5 py-3.5"
+                >
+                  <span className="w-[30%] text-xl text-gray-700 text-center">{sale.transNo || sale.id}</span>
+                  <span className="w-[25%] text-xl text-gray-700 text-center">{sale.date || '—'}</span>
+                  <span className="w-[25%] text-xl text-gray-700 text-center">{sale.time || '—'}</span>
+                  <div className="flex-1 flex justify-center">
+                    <button
+                      onClick={() => setViewingSale(sale)}
+                      className="inline-flex items-center gap-2 bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white px-4 py-1.5 rounded-full text-xl transition-colors"
                     >
-                      <td className="py-3 px-4 text-gray-700">{sale.transNo || sale.id}</td>
-                      <td className="py-3 px-4 text-gray-700">{sale.date || '—'}</td>
-                      <td className="py-3 px-4 text-gray-700">{sale.time || '—'}</td>
-                      <td className="py-3 px-4">
-                        <button
-                          onClick={() => setViewingSale(sale)}
-                          className="inline-flex items-center gap-2 bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white px-4 py-1.5 rounded-full text-xl transition-colors"
-                        >
-                          <Eye size={16} />
-                          View
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                      <Eye size={16} />
+                      View
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
 
