@@ -1,4 +1,4 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   CornerUpLeft, 
@@ -60,7 +60,7 @@ export default function StaffSearch() {
     : [];
 
   return (
-    <div className="flex w-full h-full gap-6">
+    <div className="flex w-full h-full">
       <StaffSidebar activePage="search" />
       
       <main className="flex-1 bg-[#2a2a2a] rounded-xl p-8 flex flex-col text-white relative overflow-hidden">
@@ -81,7 +81,7 @@ export default function StaffSearch() {
 
         {/* Dynamic Content Area */}
         <div className="flex flex-col flex-1 animate-in fade-in duration-300">
-          <h1 className="text-4xl font-semibold mb-8 tracking-wide">Search</h1>
+          <h1 className="text-3xl font-semibold mb-8 tracking-wide">Search</h1>
 
           {/* VIEW 1: CATEGORY SELECTION */}
           {!selectedCategory ? (
@@ -124,7 +124,7 @@ export default function StaffSearch() {
                 title="Clear Category"
               >
                 <ActiveIcon size={20} />
-                <span className="text-lg font-medium">{selectedCategory}</span>
+                <span className="text-xl font-medium">{selectedCategory}</span>
                 <X size={20} className="text-gray-300 group-hover:text-white transition-colors ml-2" />
               </button>
 

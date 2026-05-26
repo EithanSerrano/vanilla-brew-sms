@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { signInWithEmailAndPassword, sendPasswordResetEmail, signOut } from 'firebase/auth';
 import { doc, getDoc, collection, query, where, getDocs, updateDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase';
+import { Eye, EyeOff } from 'lucide-react';
 
 
 export default function Login() {
@@ -24,6 +25,10 @@ export default function Login() {
   const [lockoutUntil, setLockoutUntil] = useState(0);
   const [countdown, setCountdown] = useState(0);
 
+
+  const [showPassword, setShowPassword] = useState(false);
+  const [loginBannerMsg, setLoginBannerMsg] = useState('');
+  const [credFailed, setCredFailed] = useState(false);
 
   const [credentials, setCredentials] = useState({
     username: '',
@@ -53,6 +58,8 @@ export default function Login() {
           setLockoutUntil(0);
           setAttempts(0);
           setCountdown(0);
+          setLoginBannerMsg('');
+          setCredFailed(false);
           clearInterval(interval);
         } else {
           setCountdown(remaining);
@@ -67,6 +74,8 @@ export default function Login() {
     setCredentials({ ...credentials, [e.target.name]: e.target.value });
     if (e.target.name === 'username' && usernameError) setUsernameError('');
     if (e.target.name === 'password' && passwordError) setPasswordError('');
+    if (loginBannerMsg) setLoginBannerMsg('');
+    if (credFailed) setCredFailed(false);
   };
 
 
@@ -103,10 +112,9 @@ export default function Login() {
       const newAttempts = attempts + 1;
       setAttempts(newAttempts);
 
-
       if (newAttempts >= 3) {
-        setLockoutUntil(Date.now() + 30000);
-        alert("Locked Out: Too many invalid attempts. Please wait 30 seconds.");
+        setLockoutUntil(Date.now() + 300000);
+        setCredFailed(true);
       }
       return;
     }
@@ -147,15 +155,15 @@ export default function Login() {
       }
     } catch (error) {
       console.error("Login error:", error);
-     
+
       const newAttempts = attempts + 1;
       setAttempts(newAttempts);
 
+      setCredFailed(true);
 
       if (newAttempts >= 3) {
-        setLockoutUntil(Date.now() + 30000);
-        alert("Locked Out: Too many failed attempts. Please wait 30 seconds.");
-       
+        setLockoutUntil(Date.now() + 300000);
+
         try {
           await fetch('https://api.emailjs.com/api/v1.0/email/send', {
             method: 'POST',
@@ -173,9 +181,8 @@ export default function Login() {
         } catch (err) {
           console.error("Could not send EmailJS alert:", err);
         }
-       
       } else {
-        alert(`Login Failed: Incorrect credentials. (${newAttempts}/3 attempts)`);
+        setLoginBannerMsg(`Invalid Credentials! (${newAttempts}/3 Attempts remaining)`);
       }
     }
   };
@@ -290,107 +297,119 @@ export default function Login() {
 
 
   const isLockedOut = lockoutUntil > Date.now();
+  const bannerMessage = isLockedOut
+    ? 'Attempts used, please try again later (5 minutes)'
+    : loginBannerMsg;
 
 
   return (
-    <div className="h-full w-full flex items-center justify-center font-sans">
-      <div className="bg-[#333333] p-10 rounded-2xl shadow-2xl flex flex-col items-center w-[480px] z-10">
-       
-        <div className="flex items-center justify-center gap-8 mb-8 w-full">
-          <img src="/logo.png" alt="Vanilla Brew Logo" className="w-[180px] object-contain" />
-          <div className="flex flex-col items-center">
-            <h1 className="text-white text-xl font-bold text-center leading-tight tracking-wider mb-3">
-              SHOP<br />MANAGEMENT<br />SYSTEM
-            </h1>
-            <div className="flex gap-4">
-              <img src="/coffee.png" alt="Coffee" className="w-5 h-5 object-contain" />
-              <img src="/clipboard.png" alt="Clipboard" className="w-5 h-5 object-contain" />
-              <img src="/monitor.png" alt="Monitor" className="w-5 h-5 object-contain" />
-            </div>
-          </div>
-        </div>
+    <div
+      className="h-full w-full flex items-center justify-center font-sans"
+      style={{ background: 'linear-gradient(135deg, #d4a07a 0%, #7a3018 100%)' }}
+    >
+      <div className="bg-white p-10 rounded-2xl shadow-2xl flex flex-col items-center w-[480px] z-10">
 
+        <img src="/VNLBrewIcon.png" alt="Vanilla Brew Shop Management System" className="w-full max-w-[380px] object-contain mb-6" />
 
         {currentView === 'login' && (
           <div className="w-full flex flex-col items-center animate-in fade-in duration-300">
-            <p className="text-gray-200 text-sm mb-6 tracking-wide">Please enter your credentials</p>
+            {bannerMessage ? (
+              <p className="text-red-500 text-xl font-medium mb-4 text-center tracking-wide">{bannerMessage}</p>
+            ) : (
+              <p className="text-gray-500 text-xl mb-6 tracking-wide">Please enter your credentials</p>
+            )}
             <form onSubmit={handleLogin} className="w-full flex flex-col gap-5 px-8">
               <div className="flex flex-col gap-1.5">
-                <label className="text-white text-sm font-medium tracking-wide">Username</label>
+                <label className="text-gray-800 text-xl font-medium tracking-wide">Email</label>
                 <input
                   type="text" name="username" value={credentials.username} onChange={handleLoginChange}
-                  className={`w-full h-12 px-4 rounded-lg text-lg font-medium text-black focus:outline-none focus:ring-4 focus:ring-[#3ca4c7]/50 transition-colors ${(usernameError && usernameError !== '_hide') ? 'bg-[#ffadad] border-2 border-[#e63946]' : 'bg-[#f0f0f0]'}`}
+                  className={`w-full h-12 px-4 rounded-lg text-xl font-medium text-black focus:outline-none focus:ring-2 focus:ring-[#b87050]/40 border transition-colors ${
+                    (usernameError && usernameError !== '_hide') || credFailed || isLockedOut
+                      ? 'bg-red-100 border-red-400'
+                      : 'bg-white border-gray-300'
+                  }`}
                   required
                   maxLength={254}
                   disabled={isLockedOut}
                 />
-                {(usernameError && usernameError !== '_hide') && <span className="text-[#ffadad] text-xs font-medium tracking-wide">{usernameError}</span>}
+                {(usernameError && usernameError !== '_hide') && <span className="text-red-500 text-xl font-medium tracking-wide">{usernameError}</span>}
               </div>
               <div className="flex flex-col gap-1.5">
-                <label className="text-white text-sm font-medium tracking-wide">Password</label>
-                <input
-                  type="password" name="password" value={credentials.password} onChange={handleLoginChange}
-                  className={`w-full h-12 px-4 rounded-lg text-lg font-medium text-black focus:outline-none focus:ring-4 focus:ring-[#3ca4c7]/50 transition-colors ${passwordError ? 'bg-[#ffadad] border-2 border-[#e63946]' : 'bg-[#f0f0f0]'}`}
-                  required
-                  maxLength={64}
-                  disabled={isLockedOut}
-                />
-                {passwordError && <span className="text-[#ffadad] text-xs font-medium tracking-wide">{passwordError}</span>}
+                <label className="text-gray-800 text-xl font-medium tracking-wide">Password</label>
+                <div className="relative">
+                  <input
+                    type={showPassword ? 'text' : 'password'} name="password" value={credentials.password} onChange={handleLoginChange}
+                    className={`w-full h-12 px-4 pr-12 rounded-lg text-xl font-medium text-black focus:outline-none focus:ring-2 focus:ring-[#b87050]/40 border transition-colors ${
+                      passwordError || credFailed || isLockedOut
+                        ? 'bg-red-100 border-red-400'
+                        : 'bg-white border-gray-300'
+                    }`}
+                    required
+                    maxLength={64}
+                    disabled={isLockedOut}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(v => !v)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                    tabIndex={-1}
+                  >
+                    {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                  </button>
+                </div>
+                {passwordError && <span className="text-red-500 text-xl font-medium tracking-wide">{passwordError}</span>}
               </div>
               <div className="flex flex-col items-center mt-4">
                 <button
                   type="submit"
                   disabled={isLockedOut}
-                  className={`bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white font-medium text-lg py-2.5 px-12 rounded-full transition-colors tracking-wide ${isLockedOut ? 'opacity-50 cursor-not-allowed bg-[#621b1b] hover:bg-[#621b1b]' : ''}`}
+                  className={`text-white font-medium text-xl py-3 px-16 rounded-full transition-colors tracking-wide ${isLockedOut ? 'opacity-50 cursor-not-allowed bg-gray-400' : 'bg-[#b87050] hover:bg-[#9e5e3e]'}`}
                 >
-                  {isLockedOut ? `Locked (${countdown}s)` : 'Log In'}
+                  Log In
                 </button>
               </div>
             </form>
-            <button onClick={() => setCurrentView('passkey')} disabled={isLockedOut} className="text-xs text-gray-300 hover:text-white mt-6 transition-colors tracking-wide disabled:opacity-50">
+            <button onClick={() => setCurrentView('passkey')} disabled={isLockedOut} className="text-xl text-gray-500 hover:text-gray-800 mt-6 transition-colors tracking-wide disabled:opacity-50">
               Forgot Password?
             </button>
           </div>
         )}
 
-
         {currentView === 'passkey' && (
           <div className="w-full flex flex-col items-center animate-in fade-in duration-300">
-            <p className="text-white text-sm mb-1 tracking-wide font-medium">Admin Authorization Required</p>
-            <p className="text-gray-300 text-[13px] mb-6 text-center leading-relaxed">
+            <p className="text-gray-800 text-xl mb-1 tracking-wide font-semibold">Admin Authorization Required</p>
+            <p className="text-gray-500 text-xl mb-6 text-center leading-relaxed">
               {otpSentMessage ? otpSentMessage : "Please request a one-time Passkey\nto authorize a password reset."}
             </p>
             <form onSubmit={handlePasskeySubmit} className="w-full flex flex-col gap-5 px-8">
               <div className="flex flex-col gap-2 w-full items-center">
-                <label className="text-white text-sm font-medium tracking-wide self-start">
-                  {passkeyError ? passkeyError : 'Admin Passkey'}
+                <label className="text-gray-800 text-xl font-medium tracking-wide self-start">
+                  {passkeyError ? <span className="text-red-500">{passkeyError}</span> : 'Admin Passkey'}
                 </label>
-               
-                {/* Visual OTP 6-Box Grid Layout matching login.js */}
+
                 <div className="relative flex justify-center gap-2.5 w-full my-2">
                   {[...Array(6)].map((_, index) => {
                     const char = passkeyInput[index] || '';
                     const isCurrent = index === passkeyInput.length;
                     const isLastAndFull = index === 5 && passkeyInput.length === 6;
                     const isActive = isOtpFocused && (isCurrent || isLastAndFull);
-                   
+
                     return (
                       <div
                         key={index}
                         className={`w-12 h-14 bg-white rounded-xl flex items-center justify-center text-2xl font-bold text-black border-2 transition-all ${
                           passkeyError
-                            ? 'border-[#e63946] bg-[#ffadad]'
+                            ? 'border-red-400 bg-red-50'
                             : isActive
-                              ? 'border-[#3ca4c7] ring-2 ring-[#3ca4c7]/20'
-                              : 'border-transparent'
+                              ? 'border-[#b87050] ring-2 ring-[#b87050]/20'
+                              : 'border-gray-300'
                         }`}
                       >
                         {char}
                       </div>
                     );
                   })}
-                 
-                  {/* Invisible base input covering box containers for click actions */}
+
                   <input
                     type="text"
                     pattern="\d*"
@@ -406,7 +425,7 @@ export default function Login() {
                   />
                 </div>
               </div>
-             
+
               <div className="flex flex-col items-center mt-4">
                 {!adminOTP ? (
                   <button
@@ -414,7 +433,7 @@ export default function Login() {
                     type="button"
                     onClick={handleRequestPasskey}
                     disabled={isSendingOTP}
-                    className="bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white font-medium text-lg py-2.5 px-12 rounded-full transition-colors tracking-wide disabled:opacity-70"
+                    className="bg-[#b87050] hover:bg-[#9e5e3e] text-white font-medium text-xl py-3 px-12 rounded-full transition-colors tracking-wide disabled:opacity-70"
                   >
                     {isSendingOTP ? 'Sending...' : 'Request'}
                   </button>
@@ -422,62 +441,60 @@ export default function Login() {
                   <button
                     key="btn-verify"
                     type="submit"
-                    className="bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white font-medium text-lg py-2.5 px-12 rounded-full transition-colors tracking-wide"
+                    className="bg-[#b87050] hover:bg-[#9e5e3e] text-white font-medium text-xl py-3 px-12 rounded-full transition-colors tracking-wide"
                   >
                     Verify
                   </button>
                 )}
               </div>
             </form>
-            <button onClick={() => { setCurrentView('login'); setPasskeyError(''); setPasskeyInput(''); setOtpSentMessage(''); setAdminOTP(''); setOtpExpiry(0); }} className="text-xs text-gray-300 hover:text-white mt-6 transition-colors tracking-wide">
+            <button onClick={() => { setCurrentView('login'); setPasskeyError(''); setPasskeyInput(''); setOtpSentMessage(''); setAdminOTP(''); setOtpExpiry(0); }} className="text-xl text-gray-500 hover:text-gray-800 mt-6 transition-colors tracking-wide">
               Go Back
             </button>
           </div>
         )}
 
-
         {currentView === 'forgot' && (
           <div className="w-full flex flex-col items-center animate-in fade-in duration-300">
             {successMessage ? (
               <div className="flex flex-col items-center w-full px-8">
-                <h2 className="text-white text-3xl font-bold mb-4 tracking-wide">Link Sent!</h2>
-                <p className="text-gray-300 text-[15px] mb-8 text-center leading-relaxed">
+                <h2 className="text-gray-800 text-3xl font-bold mb-4 tracking-wide">Link Sent!</h2>
+                <p className="text-gray-500 text-xl mb-8 text-center leading-relaxed">
                   A secure password reset link has been<br/>sent to the requested email.
                 </p>
-                <button onClick={() => { setCurrentView('login'); setSuccessMessage(false); setResetError(false); setResetEmail(''); }} className="bg-[#505050] hover:bg-[#666666] text-white font-medium text-lg py-3 w-full rounded-xl transition-colors tracking-wide">
+                <button onClick={() => { setCurrentView('login'); setSuccessMessage(false); setResetError(false); setResetEmail(''); }} className="bg-[#b87050] hover:bg-[#9e5e3e] text-white font-medium text-xl py-3 w-full rounded-full transition-colors tracking-wide">
                   Return to Login
                 </button>
               </div>
             ) : (
               <>
-                <p className="text-gray-200 text-[14px] mb-6 text-center leading-relaxed tracking-wide">
+                <p className="text-gray-500 text-xl mb-6 text-center leading-relaxed tracking-wide">
                   Authorization successful. Enter the account<br/>email to send a secure reset link.
                 </p>
                 <form onSubmit={handleResetPassword} className="w-full flex flex-col gap-5 px-8">
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-white text-sm font-medium tracking-wide">
-                      {resetError ? 'Email Not Found' : 'Email Address'}
+                    <label className="text-gray-800 text-xl font-medium tracking-wide">
+                      {resetError ? <span className="text-red-500">Email Not Found</span> : 'Email Address'}
                     </label>
                     <input
                       type="email" value={resetEmail} onChange={(e) => { setResetEmail(e.target.value); setResetError(false); }}
-                      className={`w-full h-12 px-4 rounded-lg text-lg font-medium text-black focus:outline-none focus:ring-4 focus:ring-[#3ca4c7]/50 transition-colors ${resetError ? 'bg-[#ffadad]' : 'bg-[#f0f0f0]'}`}
+                      className={`w-full h-12 px-4 rounded-lg text-xl font-medium text-black focus:outline-none focus:ring-2 focus:ring-[#b87050]/40 border transition-colors ${resetError ? 'bg-red-50 border-red-400' : 'bg-white border-gray-300'}`}
                       required disabled={isSubmitting}
                     />
                   </div>
                   <div className="flex flex-col items-center mt-4">
-                    <button type="submit" disabled={isSubmitting} className="bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white font-medium text-lg py-2.5 px-10 rounded-full transition-colors tracking-wide disabled:opacity-70 flex items-center justify-center min-w-[200px]">
+                    <button type="submit" disabled={isSubmitting} className="bg-[#b87050] hover:bg-[#9e5e3e] text-white font-medium text-xl py-3 px-10 rounded-full transition-colors tracking-wide disabled:opacity-70 flex items-center justify-center min-w-[200px]">
                       {isSubmitting ? 'Sending...' : 'Send Reset Link'}
                     </button>
                   </div>
                 </form>
-                <button onClick={() => { setCurrentView('login'); setResetError(false); setResetEmail(''); }} disabled={isSubmitting} className="text-xs text-gray-300 hover:text-white mt-6 transition-colors tracking-wide disabled:opacity-50">
+                <button onClick={() => { setCurrentView('login'); setResetError(false); setResetEmail(''); }} disabled={isSubmitting} className="text-xl text-gray-500 hover:text-gray-800 mt-6 transition-colors tracking-wide disabled:opacity-50">
                   Go Back
                 </button>
               </>
             )}
           </div>
         )}
-
 
       </div>
     </div>

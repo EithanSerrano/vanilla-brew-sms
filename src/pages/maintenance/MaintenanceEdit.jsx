@@ -1,4 +1,4 @@
-import AdminSidebar from '../../layouts/AdminSidebar';
+﻿import AdminSidebar from '../../layouts/AdminSidebar';
 import {
   WrenchIcon,
   CornerUpLeft,
@@ -98,7 +98,7 @@ export default function MaintenanceEdit({
   };
   if (currentView === 'edit-menu-item') {
     return (
-      <div className="flex w-full h-full gap-6 relative bg-[#1e1e1e]">
+      <div className="flex w-full h-full relative bg-[#1e1e1e]">
         <AdminSidebar activePage="maintenance" />
         <main className="flex-1 bg-[#2a2a2a] rounded-xl p-8 flex flex-col text-white relative overflow-y-auto">
           <div className="flex gap-4 mb-10">
@@ -108,18 +108,18 @@ export default function MaintenanceEdit({
             >
               <CornerUpLeft size={20} />
             </button>
-            <div className="flex-1 bg-[#5a5a5a] rounded-lg flex items-center px-4 gap-3 text-base font-medium tracking-wide">
+            <div className="flex-1 bg-[#5a5a5a] rounded-lg flex items-center px-4 gap-3 text-xl font-medium tracking-wide">
               <WrenchIcon size={20} />
               <span>
                 Maintenance &gt; Edit &gt; Menu Item
                 {selectedEditItem && (
-                  <span className="text-base font-medium tracking-wide"> &gt; {selectedEditItem.id}</span>
+                  <span className="text-xl font-medium tracking-wide"> &gt; {selectedEditItem.id}</span>
                 )}
               </span>
             </div>
           </div>
 
-          <h1 className="text-4xl font-semibold mb-8">
+          <h1 className="text-3xl font-semibold mb-8">
             Edit Menu Item {selectedEditItem ? `(${selectedEditItem.id})` : ''}
           </h1>
 
@@ -194,7 +194,7 @@ export default function MaintenanceEdit({
                 </button>
                 {activeAccordion === 'sizes' && (
                   <div className="p-10 border-t border-[#444]">
-                    <div className="grid grid-cols-[1fr_2.5fr] gap-y-8 gap-x-12 text-lg text-gray-300">
+                    <div className="grid grid-cols-[1fr_2.5fr] gap-y-8 gap-x-12 text-xl text-gray-300">
                       <label className="text-2xl font-medium text-right">Size</label>
                       <div className="relative">
                         <select
@@ -375,7 +375,7 @@ export default function MaintenanceEdit({
 
   if (currentView === 'edit-item') {
     return (
-      <div className="flex w-full h-full gap-6 relative bg-[#1e1e1e]">
+      <div className="flex w-full h-full relative bg-[#1e1e1e]">
         <AdminSidebar activePage="maintenance" />
         <main className="flex-1 bg-[#2a2a2a] rounded-xl p-8 flex flex-col text-white.relative overflow-y-auto custom-scrollbar-gutter">
           <div className="flex gap-4 mb-10">
@@ -385,13 +385,13 @@ export default function MaintenanceEdit({
             >
               <CornerUpLeft size={20} />
             </button>
-            <div className="flex-1 bg-[#5a5a5a] rounded-lg flex items-center px-4 gap-3 text-base font-medium tracking-wide">
+            <div className="flex-1 bg-[#5a5a5a] rounded-lg flex items-center px-4 gap-3 text-xl font-medium tracking-wide">
               <WrenchIcon size={20} />
-              <span> Maintenance &gt; Edit &gt; Item {selectedEditItem && (<span className="text-base font-medium tracking-wide"> &gt; {selectedEditItem.id}</span>)}</span>
+              <span> Maintenance &gt; Edit &gt; Item {selectedEditItem && (<span className="text-xl font-medium tracking-wide"> &gt; {selectedEditItem.id}</span>)}</span>
             </div>
           </div>
 
-          <h1 className="text-4xl font-semibold mb-8">
+          <h1 className="text-3xl font-semibold mb-8">
             Edit Item {selectedEditItem ? `(${selectedEditItem.id})` : ''}
           </h1>
 
@@ -454,7 +454,7 @@ export default function MaintenanceEdit({
                 </button>
                 {activeAccordion === 'sizes' && (
                   <div className="p-10 border-t border-[#444] space-y-8 animate-in slide-in-from-top-2">
-                    <div className="grid grid-cols-[1fr_2.5fr] gap-y-8 gap-x-12 text-lg text-gray-300">
+                    <div className="grid grid-cols-[1fr_2.5fr] gap-y-8 gap-x-12 text-xl text-gray-300">
                       <label className="text-2xl font-medium text-right">Size</label>
                       <div className="relative">
                         <select
@@ -522,7 +522,7 @@ export default function MaintenanceEdit({
 
   if (currentView === 'edit-ingredient') {
     return (
-      <div className="flex w-full h-full gap-6 relative bg-[#1e1e1e]">
+      <div className="flex w-full h-full relative bg-[#1e1e1e]">
         <AdminSidebar activePage="maintenance" />
         <main className="flex-1 bg-[#2a2a2a] rounded-xl p-8 flex flex-col text-white relative overflow-hidden">
           <div className="flex gap-4 mb-10 w-full">
@@ -532,13 +532,13 @@ export default function MaintenanceEdit({
             >
               <CornerUpLeft size={20} />
             </button>
-            <div className="flex-1 bg-[#5a5a5a] rounded-lg flex items-center px-4 gap-3 text-base font-medium tracking-wide">
+            <div className="flex-1 bg-[#5a5a5a] rounded-lg flex items-center px-4 gap-3 text-xl font-medium tracking-wide">
               <WrenchIcon size={20} />
-              <span> Maintenance &gt; Edit &gt; Ingredient {selectedEditItem && (<span className="text-base font-medium tracking-wide"> &gt; {selectedEditItem.id}</span>)}</span>
+              <span> Maintenance &gt; Edit &gt; Ingredient {selectedEditItem && (<span className="text-xl font-medium tracking-wide"> &gt; {selectedEditItem.id}</span>)}</span>
             </div>
           </div>
 
-          <h1 className="text-4xl font-semibold mb-8 px-2">
+          <h1 className="text-3xl font-semibold mb-8 px-2">
             Edit Ingredient {selectedEditItem ? `(${selectedEditItem.id})` : ''}
           </h1>
 

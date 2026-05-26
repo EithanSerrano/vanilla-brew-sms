@@ -1,4 +1,4 @@
-export default function DashboardContent() {
+﻿export default function DashboardContent() {
   return (
     <main className="flex-1 bg-[#2a2a2a] rounded-xl flex flex-col items-center justify-center p-8">
       

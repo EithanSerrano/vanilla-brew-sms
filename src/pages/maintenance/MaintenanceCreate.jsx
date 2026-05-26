@@ -1,4 +1,4 @@
-import AdminSidebar from '../../layouts/AdminSidebar';
+﻿import AdminSidebar from '../../layouts/AdminSidebar';
 import { 
   WrenchIcon,
   CornerUpLeft,
@@ -90,20 +90,20 @@ export default function MaintenanceCreate({
 
   if (currentView === 'create-menu-item') {
     return (
-      <div className="flex w-full h-full gap-6 relative"> 
+      <div className="flex w-full h-full relative"> 
         <AdminSidebar activePage="maintenance" />
         <main className="flex-1 bg-[#2a2a2a] rounded-xl p-8 flex flex-col text-white relative overflow-y-auto">
           <div className="flex gap-4 mb-10">
             <button onClick={handleBack} className="bg-[#5a5a5a] p-3 rounded-lg hover:bg-[#6a6a6a]">
               <CornerUpLeft size={20} />
             </button>
-            <div className="flex-1 bg-[#5a5a5a] rounded-lg flex items-center px-4 gap-3 text-base font-medium tracking-wide">
+            <div className="flex-1 bg-[#5a5a5a] rounded-lg flex items-center px-4 gap-3 text-xl font-medium tracking-wide">
               <WrenchIcon size={20} />
               <span>{breadcrumbHeader}</span>
             </div>
           </div>
 
-          <h1 className="text-4xl font-semibold mb-8">Create Menu Item</h1>
+          <h1 className="text-3xl font-semibold mb-8">Create Menu Item</h1>
 
           <div className="flex flex-col gap-4 w-full pb-24">
             <div className="bg-[#3d3d3d] rounded-2xl overflow-hidden border border-[#444]">
@@ -149,7 +149,7 @@ export default function MaintenanceCreate({
               </button>
               {activeAccordion === 'sizes' && (
                 <div className="p-10 border-t border-[#444]">
-                  <div className="grid grid-cols-[1fr_2.5fr] gap-y-8 gap-x-12 text-lg text-gray-300">
+                  <div className="grid grid-cols-[1fr_2.5fr] gap-y-8 gap-x-12 text-xl text-gray-300">
                     <label className="text-2xl font-medium text-right">Size</label>
                     <div className="relative">
                       <select
@@ -394,20 +394,20 @@ export default function MaintenanceCreate({
 
   if (currentView === 'create-item') {
     return (
-      <div className="flex w-full h-full gap-6 relative">
+      <div className="flex w-full h-full relative">
         <AdminSidebar activePage="maintenance" />
         <main className="flex-1 bg-[#2a2a2a] rounded-xl p-8 flex flex-col text-white relative overflow-y-auto custom-scrollbar-gutter">
           <div className="flex gap-4 mb-10">
             <button onClick={handleBack} className="bg-[#5a5a5a] p-3 rounded-lg hover:bg-[#6a6a6a]">
               <CornerUpLeft size={20} />
             </button>
-            <div className="flex-1 bg-[#5a5a5a] rounded-lg flex items-center px-4 gap-3 text-base font-medium tracking-wide">
+            <div className="flex-1 bg-[#5a5a5a] rounded-lg flex items-center px-4 gap-3 text-xl font-medium tracking-wide">
               <WrenchIcon size={20} />
               <span>{breadcrumbHeader}</span>
             </div>
           </div>
 
-          <h1 className="text-4xl font-semibold mb-8">Create Item</h1>
+          <h1 className="text-3xl font-semibold mb-8">Create Item</h1>
 
           <div className="flex flex-col gap-4 w-full pb-24">
             <div className="bg-[#3d3d3d] rounded-2xl overflow-hidden border border-[#444]">
@@ -441,7 +441,7 @@ export default function MaintenanceCreate({
               </button>
               {activeAccordion === 'sizes' && (
                 <div className="p-10 border-t border-[#444]">
-                  <div className="grid grid-cols-[1fr_2.5fr] gap-y-8 gap-x-12 text-lg text-gray-300">
+                  <div className="grid grid-cols-[1fr_2.5fr] gap-y-8 gap-x-12 text-xl text-gray-300">
                     <label className="text-2xl font-medium text-right">Size</label>
                     <div className="relative">
                       <select
@@ -528,20 +528,20 @@ export default function MaintenanceCreate({
 
   if (currentView === 'create-ingredient') {
     return (
-      <div className="flex w-full h-full gap-6 relative"> 
+      <div className="flex w-full h-full relative"> 
         <AdminSidebar activePage="maintenance" />
         <main className="flex-1 bg-[#2a2a2a] rounded-xl p-8 flex flex-col text-white relative">
           <div className="flex gap-4 mb-10">
             <button onClick={handleBack} className="bg-[#5a5a5a] p-3 rounded-lg hover:bg-[#6a6a6a]">
               <CornerUpLeft size={20} />
             </button>
-            <div className="flex-1 bg-[#5a5a5a] rounded-lg flex items-center px-4 gap-3 text-base font-medium tracking-wide">
+            <div className="flex-1 bg-[#5a5a5a] rounded-lg flex items-center px-4 gap-3 text-xl font-medium tracking-wide">
               <WrenchIcon size={20} />
               <span>{breadcrumbHeader}</span>
             </div>
           </div>
 
-          <h1 className="text-4xl font-semibold mb-8">Create Ingredient</h1>
+          <h1 className="text-3xl font-semibold mb-8">Create Ingredient</h1>
 
           <div className="bg-[#3d3d3d] rounded-2xl p-10 w-full shadow-inner border border-[#444]">
             <h3 className="text-2xl font-medium mb-10 text-gray-200">General Information</h3>

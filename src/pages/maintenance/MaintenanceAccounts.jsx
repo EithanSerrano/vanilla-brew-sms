@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { collection, onSnapshot, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../../firebase';
 import AdminSidebar from '../../layouts/AdminSidebar';
@@ -84,21 +84,21 @@ export default function MaintenanceAccounts({ currentView, handleBack }) {
 
 
   return (
-    <div className="flex w-full h-full gap-6 relative bg-[#1a1a1a]">
+    <div className="flex w-full h-full relative bg-[#1a1a1a]">
       <AdminSidebar activePage="maintenance" />
       <main className="flex-1 bg-[#2a2a2a] rounded-xl p-8 flex flex-col text-white relative">
         <div className="flex gap-4 mb-10">
           <button onClick={handleBack} className="bg-[#5a5a5a] p-3 rounded-lg hover:bg-[#6a6a6a]">
             <CornerUpLeft size={20} />
           </button>
-          <div className="flex-1 bg-[#5a5a5a] rounded-lg flex items-center px-4 gap-3 text-base font-medium tracking-wide">
+          <div className="flex-1 bg-[#5a5a5a] rounded-lg flex items-center px-4 gap-3 text-xl font-medium tracking-wide">
             <WrenchIcon size={20} />
             <span>Maintenance &gt; Manage Accounts</span>
           </div>
         </div>
 
 
-        <h1 className="text-4xl font-semibold mb-8 text-white">Manage Accounts</h1>
+        <h1 className="text-3xl font-semibold mb-8 text-white">Manage Accounts</h1>
 
 
         <div className="flex-1 w-full bg-[#333] rounded-xl overflow-y-auto border border-[#444]">
@@ -214,7 +214,7 @@ export default function MaintenanceAccounts({ currentView, handleBack }) {
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
             <div className="fixed inset-0 bg-black/75 backdrop-blur-sm" />
             <div className="bg-[#2d2d2d] rounded-[2rem] p-16 shadow-2xl w-full max-w-4xl flex flex-col items-center relative border border-[#444] z-10 text-center">
-              <h2 className="text-6xl font-bold mb-10 text-white leading-tight">
+              <h2 className="text-5xl font-bold mb-10 text-white leading-tight">
                 {appliedStatus === 'Active' ? 'Account Activated!' : 'Account Deactivated!'}
               </h2>
               <p className="text-3xl text-gray-300 mb-14 leading-relaxed">

@@ -1,4 +1,4 @@
-import AdminSidebar from '../../layouts/AdminSidebar';
+﻿import AdminSidebar from '../../layouts/AdminSidebar';
 import { 
   WrenchIcon,
   CornerUpLeft,
@@ -40,15 +40,15 @@ export default function MaintenanceArchive({
 }) {
   if (currentView === 'archive-menu-item') {
     return (
-      <div className="flex w-full h-full gap-6 relative bg-[#1a1a1a]">
+      <div className="flex w-full h-full relative bg-[#1a1a1a]">
         <AdminSidebar activePage="maintenance" />
         <main className="flex-1 bg-[#2a2a2a] rounded-xl p-8 flex flex-col text-white relative">
           <div className="flex gap-4 mb-10">
             <button onClick={handleBack} className="bg-[#5a5a5a] p-3 rounded-lg hover:bg-[#6a6a6a]"><CornerUpLeft size={20} /></button>
-            <div className="flex-1 bg-[#5a5a5a] rounded-lg flex items-center px-4 gap-3 text-base font-medium tracking-wide"><WrenchIcon size={20} /><span>Maintenance &gt; Archive &gt; Menu Item</span></div>
+            <div className="flex-1 bg-[#5a5a5a] rounded-lg flex items-center px-4 gap-3 text-xl font-medium tracking-wide"><WrenchIcon size={20} /><span>Maintenance &gt; Archive &gt; Menu Item</span></div>
           </div>
 
-          <h1 className="text-4xl font-semibold mb-8">Archive Menu Item</h1>
+          <h1 className="text-3xl font-semibold mb-8">Archive Menu Item</h1>
 
           <div className="flex-1 w-full bg-[#333] rounded-xl overflow-y-auto border border-[#444] mb-4">
             <div className="grid grid-cols-[1fr_2fr_0.5fr] bg-[#4a4a4a] p-4 text-xl font-medium px-12 border-b border-[#555] text-center">
@@ -105,7 +105,7 @@ export default function MaintenanceArchive({
               <div className="fixed inset-0 bg-black/80 backdrop-blur-md" />
               <div className="bg-[#2d2d2d] rounded-[2rem] p-16 shadow-2xl w-full max-w-2xl flex flex-col items-center relative border border-[#444] z-10">
                 <h2 className="text-5xl font-bold mb-10 text-center">Menu Item Archived</h2>
-                <p className="text-2xl text-gray-300 text-center mb-12"><span className="font-bold text-white text-4xl block mb-4">{selectedArchiveMenuItem.id}</span>has been Archived.</p>
+                <p className="text-2xl text-gray-300 text-center mb-12"><span className="font-bold text-white text-3xl block mb-4">{selectedArchiveMenuItem.id}</span>has been Archived.</p>
                 <button onClick={() => { setShowMenuSuccess(false); setSelectedArchiveMenuItem(null); }} className="bg-[#5a5a5a] text-white text-2xl font-bold py-5 px-24 rounded-xl">Return</button>
               </div>
             </div>
@@ -117,15 +117,15 @@ export default function MaintenanceArchive({
 
   if (currentView === 'archive-item') {
     return (
-      <div className="flex w-full h-full gap-6 relative bg-[#1a1a1a]">
+      <div className="flex w-full h-full relative bg-[#1a1a1a]">
         <AdminSidebar activePage="maintenance" />
         <main className="flex-1 bg-[#2a2a2a] rounded-xl p-8 flex flex-col text-white relative">
           <div className="flex gap-4 mb-10">
             <button onClick={handleBack} className="bg-[#5a5a5a] p-3 rounded-lg hover:bg-[#6a6a6a]"><CornerUpLeft size={20} /></button>
-            <div className="flex-1 bg-[#5a5a5a] rounded-lg flex items-center px-4 gap-3 text-base font-medium tracking-wide"><WrenchIcon size={20} /><span>Maintenance &gt; Archive &gt; Item</span></div>
+            <div className="flex-1 bg-[#5a5a5a] rounded-lg flex items-center px-4 gap-3 text-xl font-medium tracking-wide"><WrenchIcon size={20} /><span>Maintenance &gt; Archive &gt; Item</span></div>
           </div>
 
-          <h1 className="text-4xl font-semibold mb-8">Archive Item</h1>
+          <h1 className="text-3xl font-semibold mb-8">Archive Item</h1>
 
           <div className="flex-1 w-full bg-[#333] rounded-xl overflow-y-auto border border-[#444] mb-4">
             <div className="grid grid-cols-[1fr_2fr_0.5fr] bg-[#4a4a4a] p-4 text-xl font-medium px-12 border-b border-[#555] text-center"><span className="text-center">No.</span><span className="text-center">Item Name</span><span></span></div>
@@ -180,7 +180,7 @@ export default function MaintenanceArchive({
               <div className="fixed inset-0 bg-black/80 backdrop-blur-md" />
               <div className="bg-[#2d2d2d] rounded-[2rem] p-16 shadow-2xl w-full max-w-2xl flex flex-col items-center relative border border-[#444] z-10">
                 <h2 className="text-5xl font-bold mb-10 text-center">Item Archived</h2>
-                <p className="text-2xl text-gray-300 text-center mb-12"><span className="font-bold text-white text-4xl block mb-4">{selectedArchiveItem.id}</span>has been Archived.</p>
+                <p className="text-2xl text-gray-300 text-center mb-12"><span className="font-bold text-white text-3xl block mb-4">{selectedArchiveItem.id}</span>has been Archived.</p>
                 <button onClick={() => { setShowItemSuccess(false); setSelectedArchiveItem(null); }} className="bg-[#5a5a5a] text-white text-2xl font-bold py-5 px-24 rounded-xl">Return</button>
               </div>
             </div>
@@ -192,18 +192,18 @@ export default function MaintenanceArchive({
 
   if (currentView === 'archive-ingredient') {
     return (
-      <div className="flex w-full h-full gap-6 relative bg-[#1a1a1a]">
+      <div className="flex w-full h-full relative bg-[#1a1a1a]">
         <AdminSidebar activePage="maintenance" />
         <main className="flex-1 bg-[#2a2a2a] rounded-xl p-8 flex flex-col text-white relative">
           <div className="flex gap-4 mb-10">
             <button onClick={handleBack} className="bg-[#5a5a5a] p-3 rounded-lg hover:bg-[#6a6a6a]"><CornerUpLeft size={20} /></button>
-            <div className="flex-1 bg-[#5a5a5a] rounded-lg flex items-center px-4 gap-3 text-base font-medium tracking-wide">
+            <div className="flex-1 bg-[#5a5a5a] rounded-lg flex items-center px-4 gap-3 text-xl font-medium tracking-wide">
               <WrenchIcon size={20} />
               <span>Maintenance &gt; Archive &gt; Ingredient</span>
             </div>
           </div>
 
-          <h1 className="text-4xl font-semibold mb-8">Archive Ingredient</h1>
+          <h1 className="text-3xl font-semibold mb-8">Archive Ingredient</h1>
 
           <div className="flex-1 w-full bg-[#333] rounded-xl overflow-y-auto border border-[#444] mb-4">
             <div className="grid grid-cols-[1fr_2fr_0.5fr] bg-[#4a4a4a] p-4 text-xl font-medium px-12 border-b border-[#555] text-center">
@@ -277,7 +277,7 @@ export default function MaintenanceArchive({
               <div className="bg-[#2d2d2d] rounded-[2rem] p-16 shadow-2xl w-full max-w-2xl flex flex-col items-center relative border border-[#444] z-10">
                 <h2 className="text-5xl font-bold mb-10 text-center">Ingredient Archived</h2>
                 <p className="text-2xl text-gray-300 text-center mb-12">
-                  <span className="font-bold text-white text-4xl block mb-4">{selectedArchiveIngredient.id}</span>
+                  <span className="font-bold text-white text-3xl block mb-4">{selectedArchiveIngredient.id}</span>
                   has been successfully Archived.
                 </p>
                 <button 

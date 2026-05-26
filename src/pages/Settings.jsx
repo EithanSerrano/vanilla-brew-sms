@@ -1,4 +1,4 @@
-import { useState } from 'react'; 
+﻿import { useState } from 'react'; 
 import { useNavigate } from 'react-router-dom'; 
 import { Settings as SettingsIcon, ChevronDown, ChevronUp, CornerUpLeft } from 'lucide-react';
 import AdminSidebar from '../layouts/AdminSidebar';
@@ -14,7 +14,7 @@ export default function Settings({ role }) {
   };
 
   return (
-    <div className="flex w-full h-full gap-6">
+    <div className="flex w-full h-full">
       <Sidebar activePage="settings" />
       
       <main className="flex-1 bg-[#2a2a2a] rounded-xl p-8 flex flex-col text-white relative h-full min-h-0">
@@ -27,7 +27,7 @@ export default function Settings({ role }) {
           >
             <CornerUpLeft size={20} />
           </button>
-          <div className="flex-1 bg-[#5a5a5a] rounded-lg flex items-center px-4 gap-3 text-base font-medium tracking-wide">
+          <div className="flex-1 bg-[#5a5a5a] rounded-lg flex items-center px-4 gap-3 text-xl font-medium tracking-wide">
             <SettingsIcon size={20} className="text-white" /> 
             <span>
               Settings {activeAccordion && (
@@ -37,7 +37,7 @@ export default function Settings({ role }) {
           </div>
         </div>
 
-        <h1 className="text-4xl font-semibold mb-10 shrink-0">System Information</h1>
+        <h1 className="text-3xl font-semibold mb-10 shrink-0">System Information</h1>
 
         {/* SINGLE CONTAINER FOR BOTH ACCORDIONS */}
         <div className="flex flex-col gap-4 w-full pb-10">

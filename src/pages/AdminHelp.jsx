@@ -1,4 +1,4 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   HelpCircle, 
@@ -71,7 +71,7 @@ export default function AdminHelp() {
           >
             <CornerUpLeft size={20} />
           </button>
-          <div className="flex-1 bg-[#5a5a5a] rounded-lg flex items-center px-4 gap-3 text-base font-medium tracking-wide">
+          <div className="flex-1 bg-[#5a5a5a] rounded-lg flex items-center px-4 gap-3 text-xl font-medium tracking-wide">
             <HelpCircle size={20} className="text-white" />
             <span>
               Help {activeAccordion && (
@@ -81,7 +81,7 @@ export default function AdminHelp() {
           </div>
         </div>
 
-        <h1 className= "text-4xl font-semibold mb-10 shrink-0">Admin Instructions</h1>
+        <h1 className= "text-3xl font-semibold mb-10 shrink-0">Admin Instructions</h1>
 
         {/* Accordion Container */}
         <div className="flex flex-col gap-4 w-full pb-10">

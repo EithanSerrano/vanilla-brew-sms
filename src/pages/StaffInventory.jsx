@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+﻿import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Package, Filter, Layers, Edit, CornerUpLeft, AlertCircle } from 'lucide-react'; // <-- Added AlertCircle
 import StaffSidebar from '../layouts/StaffSidebar';
@@ -135,7 +135,7 @@ export default function StaffInventory() {
   };
 
   return (
-    <div className="flex w-full h-full gap-6">
+    <div className="flex w-full h-full">
       <StaffSidebar activePage="inventory" />
       
       <main className="flex-1 bg-[#2a2a2a] rounded-xl p-8 flex flex-col text-white relative">
@@ -156,8 +156,8 @@ export default function StaffInventory() {
 
         {/* Critical Stock Levels Panel */}
         <div className="bg-[#4a4a4a] rounded-xl p-6 mb-6">
-          <h2 className="text-lg font-semibold mb-4 tracking-wide text-gray-200">Critical Stock Levels</h2>
-          <div className="grid grid-cols-4 gap-4 text-sm font-medium mb-2 border-b border-[#5a5a5a] pb-2 text-center text-gray-400">
+          <h2 className="text-xl font-semibold mb-4 tracking-wide text-gray-200">Critical Stock Levels</h2>
+          <div className="grid grid-cols-4 gap-4 text-xl font-medium mb-2 border-b border-[#5a5a5a] pb-2 text-center text-gray-400">
             <div>Element</div>
             <div>Remaining Units</div>
             <div>Last Checked</div>
@@ -166,7 +166,7 @@ export default function StaffInventory() {
           
           {criticalStock.length > 0 ? (
             criticalStock.map(item => (
-              <div key={`crit-${item.id}`} className="grid grid-cols-4 gap-4 text-sm mb-3 text-center items-center">
+              <div key={`crit-${item.id}`} className="grid grid-cols-4 gap-4 text-xl mb-3 text-center items-center">
                 <div className="font-medium">{item.elementNo}</div>
                 <div>{item.stock} units</div>
                 <div>Today</div>
@@ -182,7 +182,7 @@ export default function StaffInventory() {
         <div className="flex justify-end gap-4 mb-4">
           <button 
             onClick={() => setShowFilterModal(true)}
-            className={`flex items-center gap-2 px-5 py-2 rounded-full text-sm font-medium transition-colors ${
+            className={`flex items-center gap-2 px-5 py-2 rounded-full text-xl font-medium transition-colors ${
               activeFilter !== "All" ? "bg-[#3ca4c7] hover:bg-[#2b8aa8]" : "bg-[#5a5a5a] hover:bg-[#6a6a6a]"
             }`}
           >
@@ -191,7 +191,7 @@ export default function StaffInventory() {
           
           <button 
             onClick={() => setShowArrangeModal(true)}
-            className={`flex items-center gap-2 px-5 py-2 rounded-full text-sm font-medium transition-colors ${
+            className={`flex items-center gap-2 px-5 py-2 rounded-full text-xl font-medium transition-colors ${
               activeArrangement !== "Alphabetically (A-Z)" ? "bg-[#3ca4c7] hover:bg-[#2b8aa8]" : "bg-[#5a5a5a] hover:bg-[#6a6a6a]"
             }`}
           >
@@ -200,7 +200,7 @@ export default function StaffInventory() {
           
           <button 
             onClick={handleAdjustClick}
-            className="flex items-center gap-2 bg-[#5a5a5a] hover:bg-[#6a6a6a] px-5 py-2 rounded-full text-sm font-medium transition-colors"
+            className="flex items-center gap-2 bg-[#5a5a5a] hover:bg-[#6a6a6a] px-5 py-2 rounded-full text-xl font-medium transition-colors"
           >
             <Edit size={16} /> Adjust
           </button>
@@ -208,7 +208,7 @@ export default function StaffInventory() {
 
         {/* Main Inventory Table */}
         <div className="bg-[#4a4a4a] rounded-t-xl rounded-b flex-1 p-6 overflow-auto">
-          <table className="w-full text-sm text-center">
+          <table className="w-full text-xl text-center">
             <thead>
               <tr className="border-b border-[#5a5a5a] text-gray-300">
                 <th className="pb-3 font-medium">Type</th>
@@ -264,19 +264,19 @@ export default function StaffInventory() {
               <div className="flex flex-col gap-4 px-4 pb-4">
                 <button 
                   onClick={() => applyFilter("Ingredient")}
-                  className={`text-lg font-medium py-3 rounded-lg transition-colors ${activeFilter === "Ingredient" ? "bg-[#3ca4c7]" : "bg-[#5a5a5a] hover:bg-[#6a6a6a]"}`}
+                  className={`text-xl font-medium py-3 rounded-lg transition-colors ${activeFilter === "Ingredient" ? "bg-[#3ca4c7]" : "bg-[#5a5a5a] hover:bg-[#6a6a6a]"}`}
                 >
                   Ingredient
                 </button>
                 <button 
                   onClick={() => applyFilter("Item")}
-                  className={`text-lg font-medium py-3 rounded-lg transition-colors ${activeFilter === "Item" ? "bg-[#3ca4c7]" : "bg-[#5a5a5a] hover:bg-[#6a6a6a]"}`}
+                  className={`text-xl font-medium py-3 rounded-lg transition-colors ${activeFilter === "Item" ? "bg-[#3ca4c7]" : "bg-[#5a5a5a] hover:bg-[#6a6a6a]"}`}
                 >
                   Item
                 </button>
                 <button 
                   onClick={() => applyFilter("All")}
-                  className={`text-lg font-medium py-3 rounded-lg transition-colors ${activeFilter === "All" ? "bg-[#3ca4c7]" : "bg-[#5a5a5a] hover:bg-[#6a6a6a]"}`}
+                  className={`text-xl font-medium py-3 rounded-lg transition-colors ${activeFilter === "All" ? "bg-[#3ca4c7]" : "bg-[#5a5a5a] hover:bg-[#6a6a6a]"}`}
                 >
                   All Types
                 </button>
@@ -301,25 +301,25 @@ export default function StaffInventory() {
               <div className="flex flex-col gap-4 px-4 pb-4">
                 <button 
                   onClick={() => applyArrangement("Alphabetically (A-Z)")}
-                  className={`text-lg font-medium py-3 rounded-lg transition-colors ${activeArrangement === "Alphabetically (A-Z)" ? "bg-[#3ca4c7]" : "bg-[#5a5a5a] hover:bg-[#6a6a6a]"}`}
+                  className={`text-xl font-medium py-3 rounded-lg transition-colors ${activeArrangement === "Alphabetically (A-Z)" ? "bg-[#3ca4c7]" : "bg-[#5a5a5a] hover:bg-[#6a6a6a]"}`}
                 >
                   Alphabetically (A-Z)
                 </button>
                 <button 
                   onClick={() => applyArrangement("Alphabetically (Z-A)")}
-                  className={`text-lg font-medium py-3 rounded-lg transition-colors ${activeArrangement === "Alphabetically (Z-A)" ? "bg-[#3ca4c7]" : "bg-[#5a5a5a] hover:bg-[#6a6a6a]"}`}
+                  className={`text-xl font-medium py-3 rounded-lg transition-colors ${activeArrangement === "Alphabetically (Z-A)" ? "bg-[#3ca4c7]" : "bg-[#5a5a5a] hover:bg-[#6a6a6a]"}`}
                 >
                   Alphabetically (Z-A)
                 </button>
                 <button 
                   onClick={() => applyArrangement("Last Checked")}
-                  className={`text-lg font-medium py-3 rounded-lg transition-colors ${activeArrangement === "Last Checked" ? "bg-[#3ca4c7]" : "bg-[#5a5a5a] hover:bg-[#6a6a6a]"}`}
+                  className={`text-xl font-medium py-3 rounded-lg transition-colors ${activeArrangement === "Last Checked" ? "bg-[#3ca4c7]" : "bg-[#5a5a5a] hover:bg-[#6a6a6a]"}`}
                 >
                   Last Checked
                 </button>
                 <button 
                   onClick={() => applyArrangement("Last Restocked")}
-                  className={`text-lg font-medium py-3 rounded-lg transition-colors ${activeArrangement === "Last Restocked" ? "bg-[#3ca4c7]" : "bg-[#5a5a5a] hover:bg-[#6a6a6a]"}`}
+                  className={`text-xl font-medium py-3 rounded-lg transition-colors ${activeArrangement === "Last Restocked" ? "bg-[#3ca4c7]" : "bg-[#5a5a5a] hover:bg-[#6a6a6a]"}`}
                 >
                   Last Restocked
                 </button>
@@ -345,18 +345,18 @@ export default function StaffInventory() {
 
               {/* Selected Element Section */}
               <div className="mb-6">
-                <h4 className="text-sm font-semibold mb-2 text-gray-300">Selected Element</h4>
-                <div className="bg-[#4a4a4a] rounded-lg p-3 flex justify-between text-center text-sm">
+                <h4 className="text-xl font-semibold mb-2 text-gray-300">Selected Element</h4>
+                <div className="bg-[#4a4a4a] rounded-lg p-3 flex justify-between text-center text-xl">
                   <div>
-                    <div className="text-xs text-gray-400 mb-1">Type</div>
+                    <div className="text-xl text-gray-400 mb-1">Type</div>
                     <div>{selectedItem.type}</div>
                   </div>
                   <div>
-                    <div className="text-xs text-gray-400 mb-1">Element No.</div>
+                    <div className="text-xl text-gray-400 mb-1">Element No.</div>
                     <div>{selectedItem.elementNo}</div>
                   </div>
                   <div>
-                    <div className="text-xs text-gray-400 mb-1">Name</div>
+                    <div className="text-xl text-gray-400 mb-1">Name</div>
                     <div>{selectedItem.name}</div>
                   </div>
                 </div>
@@ -364,18 +364,18 @@ export default function StaffInventory() {
 
               {/* Current Status Section */}
               <div className="mb-8">
-                <h4 className="text-sm font-semibold mb-2 text-gray-300">Current Status</h4>
-                <div className="bg-[#4a4a4a] rounded-lg p-3 flex justify-between text-center text-sm">
+                <h4 className="text-xl font-semibold mb-2 text-gray-300">Current Status</h4>
+                <div className="bg-[#4a4a4a] rounded-lg p-3 flex justify-between text-center text-xl">
                   <div>
-                    <div className="text-xs text-gray-400 mb-1">Stock</div>
+                    <div className="text-xl text-gray-400 mb-1">Stock</div>
                     <div>{selectedItem.stock}</div>
                   </div>
                   <div>
-                    <div className="text-xs text-gray-400 mb-1">Last Updated</div>
+                    <div className="text-xl text-gray-400 mb-1">Last Updated</div>
                     <div>{selectedItem.lastChecked.replace('/26', '/2026')}</div>
                   </div>
                   <div>
-                    <div className="text-xs text-gray-400 mb-1">Last Restocked</div>
+                    <div className="text-xl text-gray-400 mb-1">Last Restocked</div>
                     <div>{selectedItem.lastRestocked.replace('/26', '/2026')}</div>
                   </div>
                 </div>
@@ -383,7 +383,7 @@ export default function StaffInventory() {
 
               {/* Set New Stock Section */}
               <div className="flex flex-col items-center">
-                <h4 className="text-sm font-semibold mb-4 text-gray-300 self-start">Set New Stock</h4>
+                <h4 className="text-xl font-semibold mb-4 text-gray-300 self-start">Set New Stock</h4>
                 <div className="flex items-center gap-3 mb-6">
                   <button
                     type="button"
@@ -400,7 +400,7 @@ export default function StaffInventory() {
                       }
                     }}
                     onClick={(e) => e.preventDefault()}
-                    className="bg-[#5a5a5a] hover:bg-[#6a6a6a] w-14 h-12 rounded-lg text-lg font-semibold flex items-center justify-center transition-colors"
+                    className="bg-[#5a5a5a] hover:bg-[#6a6a6a] w-14 h-12 rounded-lg text-xl font-semibold flex items-center justify-center transition-colors"
                   >
                     -10
                   </button>
@@ -463,7 +463,7 @@ export default function StaffInventory() {
                       }
                     }}
                     onClick={(e) => e.preventDefault()}
-                    className="bg-[#5a5a5a] hover:bg-[#6a6a6a] w-14 h-12 rounded-lg text-lg font-semibold flex items-center justify-center transition-colors"
+                    className="bg-[#5a5a5a] hover:bg-[#6a6a6a] w-14 h-12 rounded-lg text-xl font-semibold flex items-center justify-center transition-colors"
                   >
                     +10
                   </button>
@@ -491,13 +491,13 @@ export default function StaffInventory() {
               
               <h3 className="text-2xl font-semibold tracking-wide mb-4 text-white">Selection Required</h3>
               
-              <p className="text-lg text-gray-200 mb-8 leading-relaxed">
+              <p className="text-xl text-gray-200 mb-8 leading-relaxed">
                 Please click on an item in the table to select it first!
               </p>
 
               <button 
                 onClick={() => setShowWarningModal(false)}
-                className="bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white px-12 py-3 rounded-full text-lg font-medium transition-colors tracking-wide w-full"
+                className="bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white px-12 py-3 rounded-full text-xl font-medium transition-colors tracking-wide w-full"
               >
                 Got it
               </button>

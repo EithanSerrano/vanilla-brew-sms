@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { UserPlus, CornerUpLeft } from 'lucide-react';
 import AdminSidebar from '../layouts/AdminSidebar';
@@ -152,7 +152,7 @@ export default function AdminRegistration() {
 
 
   return (
-    <div className="flex w-full h-full gap-6">
+    <div className="flex w-full h-full">
       <AdminSidebar activePage="registration" />
      
       <main className="flex-1 bg-[#2a2a2a] rounded-xl p-8 flex flex-col text-white relative overflow-hidden">
@@ -184,7 +184,7 @@ export default function AdminRegistration() {
 
             <div className="flex-1 overflow-auto flex flex-col gap-4 pr-2">
               {accounts.length === 0 ? (
-                <div className="text-center text-gray-400 mt-10 text-lg italic">
+                <div className="text-center text-gray-400 mt-10 text-xl italic">
                   Loading accounts or database is empty. Click above to create one.
                 </div>
               ) : (
@@ -200,7 +200,7 @@ export default function AdminRegistration() {
                       <span className="text-2xl font-medium">{account.name}</span>
                     </div>
                     {/* --- CHANGED TEXT TO ACTIVATED / DEACTIVATED --- */}
-                    <span className={`text-lg tracking-wide font-bold ${account.status === 'Active' ? 'text-green-400' : 'text-red-400'}`}>
+                    <span className={`text-xl tracking-wide font-bold ${account.status === 'Active' ? 'text-green-400' : 'text-red-400'}`}>
                       {account.status === 'Active' ? 'Activated' : 'Deactivated'}
                     </span>
                   </div>
@@ -229,7 +229,7 @@ export default function AdminRegistration() {
             </div>
 
 
-            <h2 className="text-4xl font-semibold mb-10 tracking-wide">New Account</h2>
+            <h2 className="text-3xl font-semibold mb-10 tracking-wide">New Account</h2>
 
 
             <form onSubmit={handleCreateAccount} className="w-full max-w-[1000px] flex flex-col gap-8">
@@ -311,11 +311,11 @@ export default function AdminRegistration() {
              
               <h3 className="text-3xl font-semibold tracking-wide mb-8 text-[#3ca4c7]">Account Created!</h3>
              
-              <p className="text-lg text-gray-200 mb-6 leading-relaxed">
+              <p className="text-xl text-gray-200 mb-6 leading-relaxed">
                 The Account for <span className="font-bold text-white">{formData.name}</span> has been created and saved into the Database.
               </p>
              
-              <p className="text-lg text-gray-200 mb-10 leading-relaxed">
+              <p className="text-xl text-gray-200 mb-10 leading-relaxed">
                 They can now log in using the email and password you just provided.
               </p>
 

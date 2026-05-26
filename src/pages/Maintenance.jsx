@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   WrenchIcon, 
@@ -865,7 +865,7 @@ export default function Maintenance({ role }) {
 
   // --- MAIN VIEW ---
   return (
-    <div className="flex w-full h-full gap-6">
+    <div className="flex w-full h-full">
       <AdminSidebar activePage="maintenance" />
       <main className="flex-1 bg-[#2a2a2a] rounded-xl p-8 flex flex-col text-white">
         <div className="flex gap-4 mb-10">
@@ -877,7 +877,7 @@ export default function Maintenance({ role }) {
         </div>
 
         <div className="flex flex-col flex-1 animate-in fade-in duration-300">
-          <h1 className="text-4xl font-semibold mb-8">Maintenance</h1>
+          <h1 className="text-3xl font-semibold mb-8">Maintenance</h1>
 
           <div className="flex flex-col gap-4 w-full"> 
             {menuItems.map((item) => (
@@ -898,7 +898,7 @@ export default function Maintenance({ role }) {
                       <button
                         key={opt}
                         onClick={() => setCurrentView(`${item.id}-${opt.toLowerCase().replace(' ', '-')}`)}
-                        className="bg-[#56a2d1] hover:bg-[#66b2e1] text-white px-10 py-3 rounded-lg transition-colors text-lg font-medium min-w-[160px]"
+                        className="bg-[#56a2d1] hover:bg-[#66b2e1] text-white px-10 py-3 rounded-lg transition-colors text-xl font-medium min-w-[160px]"
                       >
                         {opt}
                       </button>

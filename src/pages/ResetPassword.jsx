@@ -1,4 +1,4 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { confirmPasswordReset } from 'firebase/auth';
 import { auth } from '../firebase'; 
@@ -68,12 +68,12 @@ export default function ResetPassword() {
       <div className="h-full w-full flex items-center justify-center font-sans z-10">
         <div className="bg-[#333333] p-10 rounded-2xl shadow-2xl flex flex-col items-center w-[480px]">
           <h2 className="text-white text-2xl font-bold mb-4 tracking-wide">Invalid Link</h2>
-          <p className="text-gray-300 text-[15px] mb-8 text-center leading-relaxed">
+          <p className="text-gray-300 text-xl mb-8 text-center leading-relaxed">
             No secure reset code was found. Please request a new password reset link from the login screen.
           </p>
           <button 
             onClick={() => navigate('/login')}
-            className="bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white font-medium text-lg py-3 w-full rounded-xl transition-colors tracking-wide"
+            className="bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white font-medium text-xl py-3 w-full rounded-xl transition-colors tracking-wide"
           >
             Return to Login
           </button>
@@ -103,44 +103,44 @@ export default function ResetPassword() {
         {isSuccess ? (
           <div className="w-full flex flex-col items-center animate-in fade-in duration-300 px-4">
             <h2 className="text-white text-3xl font-bold mb-4 tracking-wide text-center">Password Reset<br/>Complete!</h2>
-            <p className="text-gray-300 text-[15px] mb-8 text-center leading-relaxed">
+            <p className="text-gray-300 text-xl mb-8 text-center leading-relaxed">
               Your password has been successfully updated. You can now log into your account using your new credentials.
             </p>
             <button 
               onClick={() => navigate('/login')}
-              className="bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white font-medium text-lg py-3 w-full rounded-xl transition-colors tracking-wide"
+              className="bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white font-medium text-xl py-3 w-full rounded-xl transition-colors tracking-wide"
             >
               Return to Login
             </button>
           </div>
         ) : (
           <div className="w-full flex flex-col items-center animate-in fade-in duration-300">
-            <p className="text-gray-200 text-sm mb-6 tracking-wide text-center">
+            <p className="text-gray-200 text-xl mb-6 tracking-wide text-center">
               Secure link verified. Please enter your new password below.
             </p>
 
             {error && (
-              <div className="w-full bg-[#ffadad] text-[#b91c1c] text-sm font-bold text-center py-3 px-4 rounded-lg mb-6">
+              <div className="w-full bg-[#ffadad] text-[#b91c1c] text-xl font-bold text-center py-3 px-4 rounded-lg mb-6">
                 {error}
               </div>
             )}
 
             <form onSubmit={handleFinalReset} className="w-full flex flex-col gap-5 px-8">
               <div className="flex flex-col gap-1.5">
-                <label className="text-white text-sm font-medium tracking-wide">New Password</label>
+                <label className="text-white text-xl font-medium tracking-wide">New Password</label>
                 <input 
                   type="password" name="newPassword" value={passwords.newPassword} onChange={handleChange}
-                  className="w-full h-12 px-4 rounded-lg text-lg font-medium text-black focus:outline-none focus:ring-4 focus:ring-[#3ca4c7]/50 transition-colors bg-[#f0f0f0]"
+                  className="w-full h-12 px-4 rounded-lg text-xl font-medium text-black focus:outline-none focus:ring-4 focus:ring-[#3ca4c7]/50 transition-colors bg-[#f0f0f0]"
                   required disabled={isSubmitting}
                   maxLength={64}
                 />
               </div>
               
               <div className="flex flex-col gap-1.5">
-                <label className="text-white text-sm font-medium tracking-wide">Confirm Password</label>
+                <label className="text-white text-xl font-medium tracking-wide">Confirm Password</label>
                 <input 
                   type="password" name="confirmPassword" value={passwords.confirmPassword} onChange={handleChange}
-                  className="w-full h-12 px-4 rounded-lg text-lg font-medium text-black focus:outline-none focus:ring-4 focus:ring-[#3ca4c7]/50 transition-colors bg-[#f0f0f0]"
+                  className="w-full h-12 px-4 rounded-lg text-xl font-medium text-black focus:outline-none focus:ring-4 focus:ring-[#3ca4c7]/50 transition-colors bg-[#f0f0f0]"
                   required disabled={isSubmitting}
                   maxLength={64}
                 />
@@ -149,7 +149,7 @@ export default function ResetPassword() {
               <div className="flex flex-col items-center mt-4">
                 <button 
                   type="submit" disabled={isSubmitting}
-                  className="bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white font-medium text-lg py-2.5 px-10 rounded-full transition-colors tracking-wide disabled:opacity-70 flex items-center justify-center min-w-[200px]"
+                  className="bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white font-medium text-xl py-2.5 px-10 rounded-full transition-colors tracking-wide disabled:opacity-70 flex items-center justify-center min-w-[200px]"
                 >
                   {isSubmitting ? 'Saving...' : 'Save Password'}
                 </button>

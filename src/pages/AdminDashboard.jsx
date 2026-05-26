@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
@@ -95,7 +95,7 @@ export default function AdminDashboard() {
   };
 
   return (
-    <div className="flex w-full h-full gap-6">
+    <div className="flex w-full h-full">
       <style>{`
         .custom-scrollbar::-webkit-scrollbar { width: 8px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
@@ -149,28 +149,28 @@ export default function AdminDashboard() {
 
             {isTopSalesExpanded && (
               <div className="px-6 pb-6 animate-in fade-in slide-in-from-top-4 duration-300">
-                <p className="text-lg text-gray-200 mb-6">The top selling products for this week are:</p>
+                <p className="text-xl text-gray-200 mb-6">The top selling products for this week are:</p>
                 
                 <div className="grid grid-cols-2 gap-16">
                   <div>
                     <h3 className="text-xl font-medium text-center mb-6">Beverage</h3>
                     <div className="flex flex-col gap-5">
-                      <div><div className="text-sm mb-1">Classic Mango Float</div><div className="h-4 bg-[#3ca4c7] rounded-sm w-[95%]"></div></div>
-                      <div><div className="text-sm mb-1">Mango Oreo Shake</div><div className="h-4 bg-[#3ca4c7] rounded-sm w-[80%]"></div></div>
-                      <div><div className="text-sm mb-1">Mango Overload Pop</div><div className="h-4 bg-[#3ca4c7] rounded-sm w-[65%]"></div></div>
-                      <div><div className="text-sm mb-1">Mango Graham Shake</div><div className="h-4 bg-[#3ca4c7] rounded-sm w-[60%]"></div></div>
-                      <div><div className="text-sm mb-1">Mango Cheesecake</div><div className="h-4 bg-[#3ca4c7] rounded-sm w-[45%]"></div></div>
+                      <div><div className="text-xl mb-1">Classic Mango Float</div><div className="h-4 bg-[#3ca4c7] rounded-sm w-[95%]"></div></div>
+                      <div><div className="text-xl mb-1">Mango Oreo Shake</div><div className="h-4 bg-[#3ca4c7] rounded-sm w-[80%]"></div></div>
+                      <div><div className="text-xl mb-1">Mango Overload Pop</div><div className="h-4 bg-[#3ca4c7] rounded-sm w-[65%]"></div></div>
+                      <div><div className="text-xl mb-1">Mango Graham Shake</div><div className="h-4 bg-[#3ca4c7] rounded-sm w-[60%]"></div></div>
+                      <div><div className="text-xl mb-1">Mango Cheesecake</div><div className="h-4 bg-[#3ca4c7] rounded-sm w-[45%]"></div></div>
                     </div>
                   </div>
 
                   <div>
                     <h3 className="text-xl font-medium text-center mb-6">Food</h3>
                     <div className="flex flex-col gap-5">
-                      <div><div className="text-sm mb-1">Nachowarma</div><div className="h-4 bg-[#3ca4c7] rounded-sm w-[90%]"></div></div>
-                      <div><div className="text-sm mb-1">Shawarma Rice</div><div className="h-4 bg-[#3ca4c7] rounded-sm w-[75%]"></div></div>
-                      <div><div className="text-sm mb-1">Shawarma Wraps</div><div className="h-4 bg-[#3ca4c7] rounded-sm w-[65%]"></div></div>
-                      <div><div className="text-sm mb-1">French Fries</div><div className="h-4 bg-[#3ca4c7] rounded-sm w-[60%]"></div></div>
-                      <div><div className="text-sm mb-1">Shawarma Salad</div><div className="h-4 bg-[#3ca4c7] rounded-sm w-[45%]"></div></div>
+                      <div><div className="text-xl mb-1">Nachowarma</div><div className="h-4 bg-[#3ca4c7] rounded-sm w-[90%]"></div></div>
+                      <div><div className="text-xl mb-1">Shawarma Rice</div><div className="h-4 bg-[#3ca4c7] rounded-sm w-[75%]"></div></div>
+                      <div><div className="text-xl mb-1">Shawarma Wraps</div><div className="h-4 bg-[#3ca4c7] rounded-sm w-[65%]"></div></div>
+                      <div><div className="text-xl mb-1">French Fries</div><div className="h-4 bg-[#3ca4c7] rounded-sm w-[60%]"></div></div>
+                      <div><div className="text-xl mb-1">Shawarma Salad</div><div className="h-4 bg-[#3ca4c7] rounded-sm w-[45%]"></div></div>
                     </div>
                   </div>
                 </div>
@@ -184,14 +184,14 @@ export default function AdminDashboard() {
             <div className="flex gap-4">
               <button 
                 onClick={() => setShowNotifications(true)}
-                className="flex items-center gap-2 bg-[#5a5a5a] hover:bg-[#6a6a6a] px-5 py-2 rounded-full text-sm font-medium transition-colors relative"
+                className="flex items-center gap-2 bg-[#5a5a5a] hover:bg-[#6a6a6a] px-5 py-2 rounded-full text-xl font-medium transition-colors relative"
               >
                 <Bell size={16} /> Notifications
                 <span className="absolute top-0 right-2 w-2 h-2 bg-red-500 rounded-full"></span>
               </button>
               <button 
                 onClick={() => setShowFilterMenu(true)}
-                className={`flex items-center gap-2 px-5 py-2 rounded-full text-sm font-medium transition-colors ${
+                className={`flex items-center gap-2 px-5 py-2 rounded-full text-xl font-medium transition-colors ${
                   activeFilter !== 'All' ? 'bg-[#3ca4c7]' : 'bg-[#5a5a5a] hover:bg-[#6a6a6a]'
                 }`}
               >
@@ -202,7 +202,7 @@ export default function AdminDashboard() {
 
           {/* TRANSACTIONS TABLE */}
           <div className="bg-[#4a4a4a] rounded-xl flex-1 p-6 min-h-[400px]">
-            <table className="w-full table-fixed text-base text-center">
+            <table className="w-full table-fixed text-xl text-center">
               <colgroup>
                 <col className="w-1/4" />
                 <col className="w-1/4" />
@@ -211,10 +211,10 @@ export default function AdminDashboard() {
               </colgroup>
               <thead>
                 <tr className="border-b border-[#5a5a5a] text-gray-300">
-                  <th className="pb-3 text-base font-bold">Type</th>
-                  <th className="pb-3 text-base font-bold">Transaction Number</th>
-                  <th className="pb-3 text-base font-bold">Date</th>
-                  <th className="pb-3 text-base font-bold">Action</th>
+                  <th className="pb-3 text-xl font-bold">Type</th>
+                  <th className="pb-3 text-xl font-bold">Transaction Number</th>
+                  <th className="pb-3 text-xl font-bold">Date</th>
+                  <th className="pb-3 text-xl font-bold">Action</th>
                 </tr>
               </thead>
               <tbody>
@@ -254,7 +254,7 @@ export default function AdminDashboard() {
             <div className="bg-[#333333] p-8 rounded-xl w-[700px] shadow-2xl flex flex-col items-center">
               <h3 className="text-2xl font-medium tracking-wide mb-6">Notifications</h3>
               
-              <table className="w-full text-base text-center mb-8">
+              <table className="w-full text-xl text-center mb-8">
                 <tbody>
                   {notifications.map((notif) => (
                     <tr key={notif.id} className="border-b border-[#4a4a4a] text-gray-200">
@@ -303,10 +303,10 @@ export default function AdminDashboard() {
                 <h3 className="text-xl font-medium tracking-wide">Select Filter</h3>
               </div>
               <div className="flex flex-col gap-4 px-4 pb-4">
-                <button onClick={() => applyFilter('Inventory')} className="bg-[#5a5a5a] hover:bg-[#6a6a6a] text-lg font-medium py-3 rounded-lg transition-colors">Inventory</button>
-                <button onClick={() => applyFilter('Sales')} className="bg-[#5a5a5a] hover:bg-[#6a6a6a] text-lg font-medium py-3 rounded-lg transition-colors">Sales</button>
-                <button onClick={() => applyFilter('Date')} className="bg-[#5a5a5a] hover:bg-[#6a6a6a] text-lg font-medium py-3 rounded-lg transition-colors">Date</button>
-                <button onClick={() => applyFilter('All')} className="mt-2 text-sm text-gray-400 hover:text-white transition-colors">Clear Filters</button>
+                <button onClick={() => applyFilter('Inventory')} className="bg-[#5a5a5a] hover:bg-[#6a6a6a] text-xl font-medium py-3 rounded-lg transition-colors">Inventory</button>
+                <button onClick={() => applyFilter('Sales')} className="bg-[#5a5a5a] hover:bg-[#6a6a6a] text-xl font-medium py-3 rounded-lg transition-colors">Sales</button>
+                <button onClick={() => applyFilter('Date')} className="bg-[#5a5a5a] hover:bg-[#6a6a6a] text-xl font-medium py-3 rounded-lg transition-colors">Date</button>
+                <button onClick={() => applyFilter('All')} className="mt-2 text-xl text-gray-400 hover:text-white transition-colors">Clear Filters</button>
               </div>
             </div>
           </div>
@@ -326,21 +326,21 @@ export default function AdminDashboard() {
               <div className="flex gap-8 px-4 pb-4">
                 <div className="flex flex-col flex-1 gap-6 justify-center">
                   <div>
-                    <label className="text-sm font-medium mb-2 block">Date Picked</label>
+                    <label className="text-xl font-medium mb-2 block">Date Picked</label>
                     <input 
                       type="date" 
                       value={startDate}
                       onChange={(e) => setStartDate(e.target.value)}
-                      className="bg-[#5a5a5a] text-white py-2 px-4 rounded-full text-center text-sm focus:outline-none w-full border border-transparent focus:border-[#3ca4c7]"
+                      className="bg-[#5a5a5a] text-white py-2 px-4 rounded-full text-center text-xl focus:outline-none w-full border border-transparent focus:border-[#3ca4c7]"
                     />
                   </div>
                   <div>
-                    <label className="text-sm font-medium mb-2 block">Date Picked (End)</label>
+                    <label className="text-xl font-medium mb-2 block">Date Picked (End)</label>
                     <input 
                       type="date" 
                       value={endDate}
                       onChange={(e) => setEndDate(e.target.value)}
-                      className="bg-[#5a5a5a] text-white py-2 px-4 rounded-full text-center text-sm focus:outline-none w-full border border-transparent focus:border-[#3ca4c7]"
+                      className="bg-[#5a5a5a] text-white py-2 px-4 rounded-full text-center text-xl focus:outline-none w-full border border-transparent focus:border-[#3ca4c7]"
                     />
                   </div>
                   <button 
@@ -352,12 +352,12 @@ export default function AdminDashboard() {
                 </div>
 
                 <div className="flex-1 bg-[#5a5a5a] p-4 rounded-xl">
-                  <div className="flex justify-between items-center mb-4 text-sm font-medium">
+                  <div className="flex justify-between items-center mb-4 text-xl font-medium">
                     <ChevronLeft size={16} />
                     <span>October 2025</span>
                     <ChevronRight size={16} />
                   </div>
-                  <div className="grid grid-cols-7 gap-y-3 text-center text-xs font-medium">
+                  <div className="grid grid-cols-7 gap-y-3 text-center text-xl font-medium">
                     <div className="text-gray-300">S</div><div className="text-gray-300">M</div><div className="text-gray-300">T</div><div className="text-gray-300">W</div><div className="text-gray-300">T</div><div className="text-gray-300">F</div><div className="text-gray-300">S</div>
                     <div></div><div></div><div></div><div>1</div><div>2</div><div>3</div><div>4</div>
                     <div>5</div><div>6</div><div>7</div><div>8</div><div>9</div><div>10</div><div>11</div>
@@ -389,26 +389,26 @@ export default function AdminDashboard() {
                 <div className="flex flex-col gap-6">
                   <div className="grid grid-cols-2 gap-x-8 gap-y-6">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium">Date</span>
-                      <div className="bg-[#5a5a5a] px-6 py-2 rounded-lg text-sm">{viewingTransaction.date}</div>
+                      <span className="text-xl font-medium">Date</span>
+                      <div className="bg-[#5a5a5a] px-6 py-2 rounded-lg text-xl">{viewingTransaction.date}</div>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium">Transaction No.</span>
-                      <div className="bg-[#5a5a5a] px-6 py-2 rounded-lg text-sm">{viewingTransaction.transNo}</div>
+                      <span className="text-xl font-medium">Transaction No.</span>
+                      <div className="bg-[#5a5a5a] px-6 py-2 rounded-lg text-xl">{viewingTransaction.transNo}</div>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium">In Charge</span>
-                      <div className="bg-[#5a5a5a] px-6 py-2 rounded-lg text-sm">{viewingTransaction.details.inCharge}</div>
+                      <span className="text-xl font-medium">In Charge</span>
+                      <div className="bg-[#5a5a5a] px-6 py-2 rounded-lg text-xl">{viewingTransaction.details.inCharge}</div>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium">Account No.</span>
-                      <div className="bg-[#5a5a5a] px-6 py-2 rounded-lg text-sm">{viewingTransaction.details.accountNo}</div>
+                      <span className="text-xl font-medium">Account No.</span>
+                      <div className="bg-[#5a5a5a] px-6 py-2 rounded-lg text-xl">{viewingTransaction.details.accountNo}</div>
                     </div>
                   </div>
 
                   <div>
-                    <h4 className="text-lg font-medium mb-3">Summary</h4>
-                    <div className="bg-[#5a5a5a] p-5 rounded-lg text-gray-200 text-lg">
+                    <h4 className="text-xl font-medium mb-3">Summary</h4>
+                    <div className="bg-[#5a5a5a] p-5 rounded-lg text-gray-200 text-xl">
                       Changed stock of <span className="font-bold text-white">{viewingTransaction.details.item}</span> from <span className="font-bold text-white">{viewingTransaction.details.oldStock}</span> to <span className="font-bold text-white">{viewingTransaction.details.newStock}</span>.
                     </div>
                   </div>
@@ -417,34 +417,34 @@ export default function AdminDashboard() {
                 <div className="flex flex-col gap-6">
                   <div className="grid grid-cols-2 gap-x-8 gap-y-4">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium">Date</span>
-                      <div className="bg-[#5a5a5a] px-6 py-2 rounded-lg text-sm">{viewingTransaction.date}</div>
+                      <span className="text-xl font-medium">Date</span>
+                      <div className="bg-[#5a5a5a] px-6 py-2 rounded-lg text-xl">{viewingTransaction.date}</div>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium">Transaction No.</span>
-                      <div className="bg-[#5a5a5a] px-4 py-2 rounded-lg text-sm">{viewingTransaction.transNo}</div>
+                      <span className="text-xl font-medium">Transaction No.</span>
+                      <div className="bg-[#5a5a5a] px-4 py-2 rounded-lg text-xl">{viewingTransaction.transNo}</div>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium">Time</span>
-                      <div className="bg-[#5a5a5a] px-6 py-2 rounded-lg text-sm">{viewingTransaction.time}</div>
+                      <span className="text-xl font-medium">Time</span>
+                      <div className="bg-[#5a5a5a] px-6 py-2 rounded-lg text-xl">{viewingTransaction.time}</div>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium">In Charge</span>
-                      <div className="bg-[#5a5a5a] px-6 py-2 rounded-lg text-sm">{viewingTransaction.details.inCharge}</div>
+                      <span className="text-xl font-medium">In Charge</span>
+                      <div className="bg-[#5a5a5a] px-6 py-2 rounded-lg text-xl">{viewingTransaction.details.inCharge}</div>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium">Order Type</span>
-                      <div className="bg-[#5a5a5a] px-6 py-2 rounded-lg text-sm">{viewingTransaction.details.orderType}</div>
+                      <span className="text-xl font-medium">Order Type</span>
+                      <div className="bg-[#5a5a5a] px-6 py-2 rounded-lg text-xl">{viewingTransaction.details.orderType}</div>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium">Account No.</span>
-                      <div className="bg-[#5a5a5a] px-6 py-2 rounded-lg text-sm">{viewingTransaction.details.accountNo}</div>
+                      <span className="text-xl font-medium">Account No.</span>
+                      <div className="bg-[#5a5a5a] px-6 py-2 rounded-lg text-xl">{viewingTransaction.details.accountNo}</div>
                     </div>
                   </div>
 
                   <div>
-                    <h4 className="text-lg font-medium mb-2">Receipt</h4>
-                    <div className="bg-[#5a5a5a] p-5 rounded-lg text-sm">
+                    <h4 className="text-xl font-medium mb-2">Receipt</h4>
+                    <div className="bg-[#5a5a5a] p-5 rounded-lg text-xl">
                       <table className="w-full text-center mb-4">
                         <thead>
                           <tr className="text-gray-300 border-b border-[#4a4a4a]">

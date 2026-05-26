@@ -1,4 +1,4 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Info, ChevronDown, ChevronUp, CornerUpLeft } from 'lucide-react';
 import AdminSidebar from '../layouts/AdminSidebar';
@@ -32,7 +32,7 @@ export default function About({ role }) {
           >
             <CornerUpLeft size={20} />
           </button>
-          <div className="flex-1 bg-[#5a5a5a] rounded-lg flex items-center px-4 gap-3 text-base font-medium tracking-wide">
+          <div className="flex-1 bg-[#5a5a5a] rounded-lg flex items-center px-4 gap-3 text-xl font-medium tracking-wide">
             <Info size={20} className="text-white" />
             <span>
               About {activeAccordion && (
@@ -44,7 +44,7 @@ export default function About({ role }) {
 
         {/* Main Content Container (Nested Style) */}
         
-          <h1 className="text-4xl font-semibold mb-10 shrink-0">System Information</h1>
+          <h1 className="text-3xl font-semibold mb-10 shrink-0">System Information</h1>
 
           {/* Accordion List */}
           <div className="flex flex-col gap-4 w-full pb-10">

@@ -1,12 +1,14 @@
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+﻿import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
 // Pages
 import Login from "./pages/Login";
 import ResetPassword from "./pages/ResetPassword"; // <-- Added this import
 
+// Shared Pages
+import Dashboard from "./pages/Dashboard";
+
 // Admin Pages
-import AdminHome from "./pages/AdminHome"; 
-import AdminDashboard from "./pages/AdminDashboard";
+import AdminHome from "./pages/AdminHome";
 import Inventory from "./pages/Inventory";
 import AdminRegistration from "./pages/AdminRegistration";
 import AdminHelp from "./pages/AdminHelp";
@@ -14,7 +16,6 @@ import AdminSearch from "./pages/AdminSearch";
 
 // Staff Pages
 import StaffHome from "./pages/StaffHome";
-import StaffDashboard from "./pages/StaffDashboard";
 import StaffInventory from "./pages/StaffInventory";
 import StaffSearch from "./pages/StaffSearch";
 import StaffHelp from "./pages/StaffHelp";
@@ -27,7 +28,7 @@ import Settings from "./pages/Settings";
 function App() {
   return (
     <BrowserRouter>
-      <div className="h-screen bg-[#1e1e1e] p-6 font-sans flex flex-col relative">
+      <div className="h-screen font-sans flex flex-col">
         <div className="flex-1 overflow-hidden">
           <Routes>
             {/* Default redirect is strictly to LOGIN */}
@@ -41,7 +42,7 @@ function App() {
             
             {/* --- ADMIN ROUTES --- */}
             <Route path="/admin" element={<AdminHome />} /> 
-            <Route path="/admin-dashboard" element={<AdminDashboard />} />
+            <Route path="/admin-dashboard" element={<Dashboard role="admin" />} />
             <Route path="/inventory" element={<Inventory />} />
             <Route path="/registration" element={<AdminRegistration />} />
             <Route path="/search" element={<AdminSearch />} />
@@ -54,7 +55,7 @@ function App() {
             
             {/* --- STAFF ROUTES --- */}
             <Route path="/staff" element={<StaffHome />} />
-            <Route path="/staff-dashboard" element={<StaffDashboard />} />
+            <Route path="/staff-dashboard" element={<Dashboard role="staff" />} />
             <Route path="/staff-inventory" element={<StaffInventory />} />
             <Route path="/staff-search" element={<StaffSearch />} />
             
