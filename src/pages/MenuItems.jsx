@@ -359,16 +359,16 @@ export default function MenuItems() {
         <div className="flex-1 rounded-xl border border-gray-200 overflow-hidden flex flex-col min-h-0">
           {/* Column headers */}
           <div className="flex items-center px-5 py-3 bg-white border-b border-gray-200 shrink-0">
-            <span className="w-[12%] text-xl font-semibold text-gray-800 text-center">ID</span>
-            <span className="w-[22%] text-xl font-semibold text-gray-800 pl-2">Name</span>
+            <span className="w-[14%] text-xl font-semibold text-gray-800 text-center">ID</span>
+            <span className="w-[20%] text-xl font-semibold text-gray-800 pl-2">Name</span>
             <span className="w-[14%] text-xl font-semibold text-gray-800 text-center">Category</span>
-            <span className="w-[14%] text-xl font-semibold text-gray-800 text-center">
+            <span className="w-[13%] text-xl font-semibold text-gray-800 text-center">
               {showInactive ? 'Date Hidden' : 'Status'}
             </span>
             <span className="flex-1 text-xl font-semibold text-gray-800 text-center">Actions</span>
           </div>
           {/* Scrollable cards */}
-          <div className="flex-1 overflow-y-auto min-h-0 px-4 py-3 flex flex-col gap-2">
+          <div className="flex-1 overflow-y-auto min-h-0 px-4 py-3 flex flex-col gap-2" style={{ scrollbarGutter: 'stable' }}>
             {displayed.length === 0 && (
               <p className="py-12 text-gray-400 text-xl text-center">No items found.</p>
             )}
@@ -380,9 +380,9 @@ export default function MenuItems() {
                   key={item.id}
                   className="flex items-center bg-white rounded-xl border border-gray-200 shadow-sm px-5 py-3.5"
                 >
-                  <span className="w-[12%] text-xl text-gray-700 text-center">{item.menuItemId}</span>
-                  <span className="w-[22%] text-xl text-gray-700 pl-2">{item.name}</span>
-                  <span className="w-[14%] text-xl text-gray-700 text-center">{item.category}</span>
+                  <span className="w-[14%] text-xl text-gray-700 text-center">{item.menuItemId}</span>
+                  <span className="w-[20%] text-xl text-gray-700 pl-2">{item.name}</span>
+                  <span className="w-[13%] text-xl text-gray-700 text-center">{item.category}</span>
                   {showInactive
                     ? <span className="w-[14%] text-xl text-gray-700 text-center">{fmtDate(item.hiddenAt)}</span>
                     : <span className={`w-[14%] text-xl font-medium text-center ${s.className}`}>{s.label}</span>}
@@ -436,7 +436,7 @@ export default function MenuItems() {
       ══════════════════════════════════════════ */}
       {showStep1 && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl shadow-2xl w-[1320px] max-h-[92vh] overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-2xl w-[95vw] max-h-[92vh] overflow-y-auto">
             <div className="flex items-center justify-between px-12 py-6 border-b border-gray-200">
               <h3 className="text-2xl font-semibold text-gray-800">Creating a new Menu Item</h3>
               <button onClick={handleCloseStep1} className="text-gray-400 hover:text-gray-600 transition-colors">
@@ -577,7 +577,7 @@ export default function MenuItems() {
       ══════════════════════════════════════════ */}
       {showStep2 && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl shadow-2xl w-[1320px] max-h-[92vh] flex flex-col overflow-hidden">
+          <div className="bg-white rounded-2xl shadow-2xl w-[95vw] max-h-[92vh] flex flex-col overflow-hidden">
             {/* Modal header */}
             <div className="flex items-center justify-between px-12 py-6 border-b border-gray-200 shrink-0">
               <h3 className="text-2xl font-semibold text-gray-800">Creating a new Menu Item</h3>

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { collection, getDocs, doc, addDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
-import { Search, Filter, Plus, Lock, X, RefreshCw } from 'lucide-react';
+import { Search, Filter, Plus, Lock, X, RefreshCw, ChevronLeft, ChevronRight, AlertTriangle, MoreVertical } from 'lucide-react';
 import AdminSidebar from '../layouts/AdminSidebar';
 
 const STATUS_STYLES = {
@@ -34,11 +34,11 @@ function computeIngredientStatus(ing) {
   const max    = ing.maxLimit || 0;
   const total  = bats.reduce((s, b) => s + (b.quantity || 0), 0);
   const isLow  = max > 0 && total < max * 0.1;
-  const isExp  = bats.some(b => {
-    if (!b.quantity) return false;
-    const e = b.expirationDate?.toDate?.() || (b.expirationDate ? new Date(b.expirationDate) : null);
+  const first  = bats[0];
+  const isExp  = first && (first.quantity || 0) > 0 && (() => {
+    const e = first.expirationDate?.toDate?.() || (first.expirationDate ? new Date(first.expirationDate) : null);
     return e && e <= cutoff;
-  });
+  })();
   if (isLow && isExp) return 'expiring_low';
   if (isLow)          return 'low';
   if (isExp)          return 'expiring_normal';
@@ -127,6 +127,58 @@ export default function Inventory() {
   const [showRetIngConf, setShowRetIngConf] = useState(false);
   const [showRetIngDisc, setShowRetIngDisc] = useState(false);
 
+  // ── Resupply Material ──
+  const [resupMatRow,      setResupMatRow]      = useState(null);
+  const [resupMatAmount,   setResupMatAmount]   = useState('');
+  const [showResupMatForm, setShowResupMatForm] = useState(false);
+  const [showResupMatConf, setShowResupMatConf] = useState(false);
+  const [showResupMatOk,   setShowResupMatOk]   = useState(false);
+  const [showResupMatDisc, setShowResupMatDisc] = useState(false);
+
+  // ── Resupply Ingredient ──
+  const [resupIngRow,      setResupIngRow]      = useState(null);
+  const [resupIngExpDate,  setResupIngExpDate]  = useState('');
+  const [resupIngQty,      setResupIngQty]      = useState('');
+  const [showResupIngForm, setShowResupIngForm] = useState(false);
+  const [showResupIngConf, setShowResupIngConf] = useState(false);
+  const [showResupIngOk,   setShowResupIngOk]   = useState(false);
+  const [showResupIngDisc, setShowResupIngDisc] = useState(false);
+
+  // ── View Batches ──
+  const [viewBatchRow, setViewBatchRow] = useState(null);
+
+  // ── Adjust ──
+  const [adjRow,        setAdjRow]        = useState(null);
+  const [adjMatQty,     setAdjMatQty]     = useState('');
+  const [adjIngBatches, setAdjIngBatches] = useState([]);
+  const [adjBatchIdx,   setAdjBatchIdx]   = useState(0);
+  const [adjReason,     setAdjReason]     = useState('');
+  const [showAdjForm,   setShowAdjForm]   = useState(false);
+  const [showAdjConf,   setShowAdjConf]   = useState(false);
+  const [showAdjOk,     setShowAdjOk]     = useState(false);
+  const [showAdjDisc,   setShowAdjDisc]   = useState(false);
+
+  // ── Connected Items (for Hide) ──
+  const [connectedItems,   setConnectedItems]   = useState([]);
+  const [showConflictList, setShowConflictList] = useState(false);
+  const [conflictActions,  setConflictActions]  = useState({});
+  const [loadingConflicts, setLoadingConflicts] = useState(false);
+
+  // ── Dropdown ──
+  const [openDropdownId, setOpenDropdownId] = useState(null);
+
+  // ── Edit ──
+  const [editRow,         setEditRow]         = useState(null);
+  const [editName,        setEditName]        = useState('');
+  const [editMaxLimit,    setEditMaxLimit]    = useState('');
+  const [editIngType,     setEditIngType]     = useState('Dry');
+  const [editIngUnit,     setEditIngUnit]     = useState('grams');
+  const [editIngIsAddOn,  setEditIngIsAddOn]  = useState(false);
+  const [showEditForm,    setShowEditForm]    = useState(false);
+  const [showEditConf,    setShowEditConf]    = useState(false);
+  const [showEditOk,      setShowEditOk]      = useState(false);
+  const [showEditDisc,    setShowEditDisc]    = useState(false);
+
   // ── Load ──
   const loadData = async () => {
     try {
@@ -139,6 +191,11 @@ export default function Inventory() {
     } catch (e) { console.error('Inventory load error:', e); }
   };
   useEffect(() => { loadData(); }, []);
+  useEffect(() => {
+    const close = () => setOpenDropdownId(null);
+    document.addEventListener('click', close);
+    return () => document.removeEventListener('click', close);
+  }, []);
 
   // ── Combined rows ──
   const allRows = [
@@ -148,6 +205,8 @@ export default function Inventory() {
       displayName:  `${sizePrefix(m.size)}${m.name}`,
       displayCat:   m.category || 'Material',
       displayStock: String(m.stock ?? '—'),
+      displayUnit:        'units',
+      displayLastUpdated: fmtDate(m.lastUpdated),
       status:  computeMaterialStatus(m),
       active:  m.isActive !== false,
       hiddenAt: m.hiddenAt, raw: m,
@@ -158,6 +217,8 @@ export default function Inventory() {
       displayName:  ing.name,
       displayCat:   ing.category || 'Ingredient',
       displayStock: String(computeIngStock(ing)),
+      displayUnit:        ing.unit || 'units',
+      displayLastUpdated: fmtDate(ing.lastUpdated),
       status:  computeIngredientStatus(ing),
       active:  ing.isActive !== false && ing.archived !== true,
       hiddenAt: ing.hiddenAt, raw: ing,
@@ -244,13 +305,47 @@ export default function Inventory() {
   // ════════════════════════════════════
   // HIDE
   // ════════════════════════════════════
-  const handleClickHide = row => { setHideRow(row); setShowHideConf(true); };
+  const handleClickHide = async row => {
+    setHideRow(row);
+    setLoadingConflicts(true);
+    setConnectedItems([]);
+    setConflictActions({});
+    setShowConflictList(false);
+    setShowHideConf(true);
+    try {
+      const snap = await getDocs(collection(db, 'menuItems'));
+      const all = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(m => m.menuItemId);
+      const connected = all.filter(m =>
+        (m.sizes || []).some(sz => (sz.connections || []).some(c => c.refId === row._docId))
+      );
+      setConnectedItems(connected);
+      setConflictActions({});
+    } catch (err) {
+      console.error('Error loading connected items:', err);
+    } finally {
+      setLoadingConflicts(false);
+    }
+  };
   const handleConfirmHide = async () => {
     if (!hideRow) return;
+    for (const item of connectedItems) {
+      const action = conflictActions[item.id] || 'unavailable';
+      if (action === 'unavailable') {
+        await updateDoc(doc(db, 'menuItems', item.id), { isAvailable: false });
+      } else {
+        const updatedSizes = (item.sizes || []).map(sz => ({
+          ...sz,
+          connections: (sz.connections || []).filter(c => c.refId !== hideRow._docId),
+        }));
+        await updateDoc(doc(db, 'menuItems', item.id), { sizes: updatedSizes });
+      }
+    }
     const coll   = hideRow._type === 'material' ? 'materials' : 'ingredients';
     const update = hideRow.raw.archived !== undefined ? { archived: true, hiddenAt: new Date() } : { isActive: false, hiddenAt: new Date() };
     await updateDoc(doc(db, coll, hideRow._docId), update);
-    setShowHideConf(false); setHideRow(null); await loadData();
+    setShowHideConf(false); setHideRow(null);
+    setConnectedItems([]); setConflictActions({}); setShowConflictList(false);
+    await loadData();
   };
 
   // ════════════════════════════════════
@@ -293,6 +388,99 @@ export default function Inventory() {
   // Derived for forms
   const retMatMaxLimit = retMatSibs[0]?.maxLimit || 0;
   const retIngMaxLimit = retIngRow?.raw?.maxLimit || 0;
+
+  // ════════════════════════════════════
+  // RESUPPLY MATERIAL
+  // ════════════════════════════════════
+  const handleResupMat = row => { setResupMatRow(row); setResupMatAmount(''); setShowResupMatForm(true); };
+  const closeResupMat  = () => { resupMatAmount !== '' ? setShowResupMatDisc(true) : (setShowResupMatForm(false), setResupMatRow(null)); };
+  const handleConfirmResupMat = async () => {
+    const newStock = (resupMatRow.raw.stock || 0) + (parseInt(resupMatAmount) || 0);
+    await updateDoc(doc(db, 'materials', resupMatRow._docId), { stock: newStock, lastUpdated: new Date() });
+    await loadData(); setShowResupMatConf(false); setShowResupMatOk(true);
+  };
+
+  // ════════════════════════════════════
+  // RESUPPLY INGREDIENT
+  // ════════════════════════════════════
+  const handleResupIng = row => { setResupIngRow(row); setResupIngExpDate(''); setResupIngQty(''); setShowResupIngForm(true); };
+  const closeResupIng  = () => { (resupIngExpDate !== '' || resupIngQty !== '') ? setShowResupIngDisc(true) : (setShowResupIngForm(false), setResupIngRow(null)); };
+  const handleConfirmResupIng = async () => {
+    const existing = resupIngRow.raw.batches || [];
+    const batchId  = genBatchId(resupIngExpDate, existing.length);
+    const newBatch = { batchId, expirationDate: new Date(resupIngExpDate), quantity: parseInt(resupIngQty) || 0, createdAt: new Date() };
+    await updateDoc(doc(db, 'ingredients', resupIngRow._docId), { batches: [...existing, newBatch], lastUpdated: new Date() });
+    await loadData(); setShowResupIngConf(false); setShowResupIngOk(true);
+  };
+
+  // ════════════════════════════════════
+  // ADJUST
+  // ════════════════════════════════════
+  const handleAdjClick = row => {
+    setAdjRow(row);
+    setAdjBatchIdx(0);
+    setAdjReason('');
+    if (row._type === 'material') {
+      setAdjMatQty(String(row.raw.stock ?? ''));
+    } else {
+      setAdjIngBatches((row.raw.batches || []).map(b => ({ ...b, newQty: String(b.quantity ?? '') })));
+    }
+    setShowAdjForm(true);
+  };
+  const adjHasChanges = () => {
+    if (!adjRow) return false;
+    if (adjReason !== '') return true;
+    if (adjRow._type === 'material') return adjMatQty !== String(adjRow.raw.stock ?? '');
+    return adjIngBatches.some((b, i) => b.newQty !== String((adjRow.raw.batches || [])[i]?.quantity ?? ''));
+  };
+  const closeAdj = () => { adjHasChanges() ? setShowAdjDisc(true) : (setShowAdjForm(false), setAdjRow(null)); };
+  const handleConfirmAdj = async () => {
+    if (!adjRow) return;
+    if (adjRow._type === 'material') {
+      await updateDoc(doc(db, 'materials', adjRow._docId), { stock: parseInt(adjMatQty) || 0, lastUpdated: new Date() });
+    } else {
+      const updated = adjIngBatches.map(b => ({ ...b, quantity: parseInt(b.newQty) || 0 }));
+      await updateDoc(doc(db, 'ingredients', adjRow._docId), { batches: updated, lastUpdated: new Date() });
+    }
+    await loadData(); setShowAdjConf(false); setShowAdjOk(true);
+  };
+
+  // ════════════════════════════════════
+  // EDIT
+  // ════════════════════════════════════
+  const handleEditClick = row => {
+    setEditRow(row);
+    setEditName(row.raw.name || '');
+    setEditMaxLimit(String(row.raw.maxLimit || ''));
+    if (row._type === 'ingredient') {
+      setEditIngType(row.raw.type || 'Dry');
+      setEditIngUnit(row.raw.unit || 'grams');
+      setEditIngIsAddOn(row.raw.isAddOn || false);
+    }
+    setShowEditForm(true);
+  };
+  const editHasChanges = () => {
+    if (!editRow) return false;
+    const base = editName !== (editRow.raw.name || '') || editMaxLimit !== String(editRow.raw.maxLimit || '');
+    if (editRow._type === 'material') return base;
+    return base || editIngType !== (editRow.raw.type || 'Dry') || editIngUnit !== (editRow.raw.unit || 'grams') || editIngIsAddOn !== (editRow.raw.isAddOn || false);
+  };
+  const closeEdit = () => { editHasChanges() ? setShowEditDisc(true) : (setShowEditForm(false), setEditRow(null)); };
+  const handleConfirmEdit = async () => {
+    if (!editRow) return;
+    if (editRow._type === 'material') {
+      const sibs = materials.filter(m => m.name === editRow.raw.name);
+      for (const sib of sibs) {
+        await updateDoc(doc(db, 'materials', sib.id), { name: editName.trim(), maxLimit: parseInt(editMaxLimit) || 0 });
+      }
+    } else {
+      await updateDoc(doc(db, 'ingredients', editRow._docId), {
+        name: editName.trim(), type: editIngType, unit: editIngUnit,
+        isAddOn: editIngIsAddOn, maxLimit: parseInt(editMaxLimit) || 0,
+      });
+    }
+    await loadData(); setShowEditConf(false); setShowEditOk(true);
+  };
 
   // ════════════════════════════════════════════════════════════
   //  RENDER
@@ -339,20 +527,26 @@ export default function Inventory() {
         {/* List */}
         <div className="flex-1 rounded-xl border border-gray-200 overflow-hidden flex flex-col min-h-0">
           {/* Column headers */}
-          <div className="flex items-center px-5 py-3 bg-white border-b border-gray-200 shrink-0">
-            <span className="w-[12%] text-xl font-semibold text-gray-800 text-center">ID</span>
-            <span className="w-[22%] text-xl font-semibold text-gray-800 pl-2">Name</span>
-            <span className="w-[13%] text-xl font-semibold text-gray-800 text-center">Category</span>
-            {showInactive
-              ? <span className="w-[15%] text-xl font-semibold text-gray-800 text-center">Date Hidden</span>
-              : <>
-                  <span className="w-[10%] text-xl font-semibold text-gray-800 text-center">Stock</span>
-                  <span className="w-[15%] text-xl font-semibold text-gray-800 text-center">Status</span>
-                </>}
-            <span className="flex-1 text-xl font-semibold text-gray-800 text-center">Actions</span>
+          <div className="flex items-center pl-9 pr-5 py-3 bg-white border-b border-gray-200 shrink-0">
+            <span className="w-[9%] text-xl font-semibold text-gray-800 text-center">ID</span>
+            <span className="w-[14%] text-xl font-semibold text-gray-800 text-center">Name</span>
+            <span className="w-[12%] text-xl font-semibold text-gray-800 text-center">Category</span>
+            {showInactive ? (
+              <>
+                <span className="w-[16%] text-xl font-semibold text-gray-800 text-center">Date Hidden</span>
+                <span className="w-[24%] text-xl font-semibold text-gray-800 text-center">Actions</span>
+              </>
+            ) : (
+              <>
+                <span className="w-[16%] text-xl font-semibold text-gray-800 text-center">Stock</span>
+                <span className="w-[18%] text-xl font-semibold text-gray-800 text-center">Status</span>
+                <span className="w-[10%] text-xl font-semibold text-gray-800 text-center">Last Updated</span>
+                <span className="flex-1 text-xl font-semibold text-gray-800 text-center">Actions</span>
+              </>
+            )}
           </div>
           {/* Scrollable cards */}
-          <div className="flex-1 overflow-y-auto min-h-0 px-4 py-3 flex flex-col gap-2">
+          <div className="flex-1 overflow-y-auto min-h-0 px-4 py-3 flex flex-col gap-2" style={{ scrollbarGutter: 'stable' }}>
             {displayed.length === 0 && (
               <p className="py-12 text-gray-400 text-xl text-center">No items found.</p>
             )}
@@ -363,25 +557,47 @@ export default function Inventory() {
                   key={`${row._type}-${row._docId}`}
                   className="flex items-center bg-white rounded-xl border border-gray-200 shadow-sm px-5 py-3.5"
                 >
-                  <span className="w-[12%] text-xl text-gray-700 text-center">{row.displayId}</span>
-                  <span className="w-[22%] text-xl text-gray-700 pl-2">{row.displayName}</span>
-                  <span className="w-[13%] text-xl text-gray-700 text-center">{row.displayCat}</span>
-                  {showInactive
-                    ? <span className="w-[15%] text-xl text-gray-700 text-center">{fmtDate(row.hiddenAt)}</span>
-                    : <>
-                        <span className="w-[10%] text-xl text-gray-700 text-center">{row.displayStock}</span>
-                        <span className={`w-[15%] text-xl font-medium text-center ${s.className}`}>{s.label}</span>
-                      </>}
-                  <div className="flex-1 flex items-center justify-center gap-2">
-                    {showInactive
-                      ? <button onClick={() => handleClickRetrieve(row)} className="bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white px-4 py-1.5 rounded-full text-xl transition-colors">Retrieve</button>
-                      : <>
-                          <button className="bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white px-3 py-1.5 rounded-full text-xl transition-colors">Adjust</button>
-                          <button className="bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white px-3 py-1.5 rounded-full text-xl transition-colors">Resupply</button>
-                          <button className="bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white px-3 py-1.5 rounded-full text-xl transition-colors">Edit</button>
-                          <button onClick={() => handleClickHide(row)} className="bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white px-3 py-1.5 rounded-full text-xl transition-colors">Hide</button>
-                        </>}
-                  </div>
+                  <span className="w-[9%] text-xl text-gray-700 text-center">{row.displayId}</span>
+                  <span className="w-[14%] text-xl text-gray-700 text-center">{row.displayName}</span>
+                  <span className="w-[12%] text-xl text-gray-700 text-center">{row.displayCat}</span>
+                  {showInactive ? (
+                    <>
+                      <span className="w-[16%] text-xl text-gray-700 text-center">{fmtDate(row.hiddenAt)}</span>
+                      <div className="w-[24%] flex items-center justify-center">
+                        <button onClick={() => handleClickRetrieve(row)} className="bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white px-4 py-1.5 rounded-full text-xl transition-colors">Retrieve</button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <span className="w-[17%] text-xl text-gray-700 text-center">{row.displayStock} {row.displayUnit}</span>
+                      <span className={`w-[17%] text-xl font-medium text-center ${s.className}`}>{s.label}</span>
+                      <span className="w-[12%] text-xl text-gray-500 text-center">{row.displayLastUpdated}</span>
+                      <div className="flex-1 flex items-center justify-center gap-2">
+                        <button onClick={() => handleAdjClick(row)} className="bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white px-3 py-1.5 rounded-full text-xl transition-colors">Adjust</button>
+                        <button onClick={() => row._type === 'material' ? handleResupMat(row) : handleResupIng(row)} className="bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white px-3 py-1.5 rounded-full text-xl transition-colors">Resupply</button>
+                        <div className="relative">
+                          <button
+                            onClick={e => { e.stopPropagation(); setOpenDropdownId(openDropdownId === row._docId ? null : row._docId); }}
+                            className="p-1.5 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+                          >
+                            <MoreVertical size={18} />
+                          </button>
+                          {openDropdownId === row._docId && (
+                            <div
+                              className="absolute right-0 top-9 bg-white border border-gray-200 rounded-xl shadow-lg z-20 min-w-[160px] py-1"
+                              onClick={e => e.stopPropagation()}
+                            >
+                              {row._type === 'ingredient' && (
+                                <button onClick={() => { setOpenDropdownId(null); setViewBatchRow(row); }} className="w-full px-4 py-2.5 text-left text-xl text-gray-700 hover:bg-gray-50 rounded-t-xl">View Batches</button>
+                              )}
+                              <button onClick={() => { setOpenDropdownId(null); handleEditClick(row); }} className="w-full px-4 py-2.5 text-left text-xl text-gray-700 hover:bg-gray-50">Edit</button>
+                              <button onClick={() => { setOpenDropdownId(null); handleClickHide(row); }} className="w-full px-4 py-2.5 text-left text-xl text-red-500 hover:bg-gray-50 rounded-b-xl">Hide</button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
               );
             })}
@@ -394,7 +610,7 @@ export default function Inventory() {
       ══════════════════════════════════════════ */}
       {showNewMat && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl shadow-2xl w-[1100px] max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-2xl w-[1300px] max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between px-12 py-6 border-b border-gray-200">
               <h3 className="text-2xl font-semibold text-gray-800">New Material</h3>
               <button onClick={closeMat} className="text-gray-400 hover:text-gray-600 transition-colors"><X size={22} /></button>
@@ -455,7 +671,7 @@ export default function Inventory() {
       ══════════════════════════════════════════ */}
       {showNewIng && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl shadow-2xl w-[1100px] max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-2xl w-[1300px] max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between px-12 py-6 border-b border-gray-200">
               <h3 className="text-2xl font-semibold text-gray-800">New Ingredient</h3>
               <button onClick={closeIng} className="text-gray-400 hover:text-gray-600 transition-colors"><X size={22} /></button>
@@ -600,12 +816,92 @@ export default function Inventory() {
       ══════════════════════════════════════════ */}
       {showHideConf && hideRow && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[60]">
-          <div className="bg-white rounded-2xl shadow-2xl w-[460px] px-8 py-6 flex flex-col gap-4">
-            <h3 className="text-2xl font-semibold text-gray-800">Hide this item?</h3>
-            <p className="text-xl text-gray-600"><span className="font-semibold">{hideRow.displayName}</span> will be moved to the inactive list.</p>
-            <div className="flex gap-3 justify-end mt-1">
-              <button onClick={() => { setShowHideConf(false); setHideRow(null); }} className="px-6 py-2 rounded-full border border-gray-300 text-xl text-gray-600 hover:bg-gray-50 transition-colors">Cancel</button>
-              <button onClick={handleConfirmHide} className="px-6 py-2 rounded-full bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white text-xl transition-colors">Confirm</button>
+          <div className="bg-white rounded-2xl shadow-2xl w-[95vw] max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between px-10 py-6 border-b border-gray-200">
+              <h3 className="text-2xl font-semibold text-gray-800">Hide {hideRow.displayName}?</h3>
+              <button onClick={() => { setShowHideConf(false); setHideRow(null); setConnectedItems([]); setConflictActions({}); setShowConflictList(false); }} className="text-gray-400 hover:text-gray-600 transition-colors"><X size={22} /></button>
+            </div>
+            <div className="px-10 py-8 flex flex-col gap-6">
+              <p className="text-xl text-gray-600">
+                <span className="font-semibold">{hideRow.displayName}</span> will be moved to the inactive list.
+              </p>
+
+              {loadingConflicts ? (
+                <p className="text-xl text-gray-400 italic">Checking connected menu items…</p>
+              ) : connectedItems.length > 0 ? (
+                <div className="flex flex-col gap-4">
+                  <div className="flex items-start gap-3 p-5 bg-yellow-50 border border-yellow-200 rounded-xl">
+                    <AlertTriangle size={22} className="text-yellow-600 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-xl text-gray-700 font-medium">Hiding this {hideRow._type} will affect the availability of its connected menu items.</p>
+                      <button
+                        onClick={() => setShowConflictList(v => !v)}
+                        className="text-[#3ca4c7] hover:underline text-xl mt-1"
+                      >
+                        {showConflictList ? 'Hide' : 'See'} the list of conflicted menu items ({connectedItems.length})
+                      </button>
+                    </div>
+                  </div>
+
+                  {showConflictList && (
+                    <div className="border border-gray-200 rounded-xl overflow-hidden">
+                      <div className="flex items-center px-6 py-3 bg-gray-50 border-b border-gray-200">
+                        <span className="w-[28%] text-xl font-semibold text-gray-700">Menu Item</span>
+                        <span className="w-[14%] text-xl font-semibold text-gray-700">Category</span>
+                        <span className="w-[10%] text-xl font-semibold text-gray-700 text-center">Status</span>
+                        <span className="flex-1 text-xl font-semibold text-gray-700 text-center">Action</span>
+                      </div>
+                      <div className="flex flex-col divide-y divide-gray-100">
+                        {connectedItems.map(item => (
+                          <div key={item.id} className="flex items-center px-6 py-4">
+                            <span className="w-[28%] text-xl text-gray-700 font-medium">{item.name}</span>
+                            <span className="w-[14%] text-xl text-gray-600">{item.category}</span>
+                            <span className={`w-[10%] text-xl text-center font-medium ${item.isActive !== false ? 'text-[#06BC2E]' : 'text-gray-400'}`}>
+                              {item.isActive !== false ? 'Active' : 'Inactive'}
+                            </span>
+                            <div className="flex-1 flex items-center justify-center gap-10">
+                              <label className="flex items-center gap-2 cursor-pointer text-xl text-gray-700">
+                                <input type="radio" name={`conflict-${item.id}`}
+                                  checked={conflictActions[item.id] === 'remove'}
+                                  onChange={() => setConflictActions(p => ({ ...p, [item.id]: 'remove' }))}
+                                  className="w-5 h-5 accent-[#3ca4c7]" />
+                                Remove from connections
+                              </label>
+                              <label className="flex items-center gap-2 cursor-pointer text-xl text-gray-700">
+                                <input type="radio" name={`conflict-${item.id}`}
+                                  checked={conflictActions[item.id] === 'unavailable'}
+                                  onChange={() => setConflictActions(p => ({ ...p, [item.id]: 'unavailable' }))}
+                                  className="w-5 h-5 accent-[#3ca4c7]" />
+                                Mark as Unavailable
+                              </label>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <p className="text-xl text-gray-500 italic">No connected menu items found.</p>
+              )}
+
+              {(() => {
+                const allChosen = loadingConflicts
+                  ? false
+                  : connectedItems.every(item => conflictActions[item.id] !== undefined);
+                return (
+                  <div className="flex gap-3 justify-end pt-2">
+                    <button onClick={() => { setShowHideConf(false); setHideRow(null); setConnectedItems([]); setConflictActions({}); setShowConflictList(false); }} className="px-8 py-2 rounded-full border border-gray-300 text-xl text-gray-600 hover:bg-gray-50 transition-colors">Cancel</button>
+                    <button
+                      onClick={handleConfirmHide}
+                      disabled={!allChosen}
+                      className={`px-8 py-2 rounded-full text-xl transition-colors ${allChosen ? 'bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white' : 'bg-gray-200 text-gray-400 cursor-not-allowed'}`}
+                    >
+                      Confirm and Hide
+                    </button>
+                  </div>
+                );
+              })()}
             </div>
           </div>
         </div>
@@ -616,7 +912,7 @@ export default function Inventory() {
       ══════════════════════════════════════════ */}
       {showRetMatForm && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl shadow-2xl w-[900px]">
+          <div className="bg-white rounded-2xl shadow-2xl w-[1100px]">
             <div className="flex items-center justify-between px-10 py-6 border-b border-gray-200">
               <h3 className="text-2xl font-semibold text-gray-800">Set up new quantity for Material</h3>
               <button onClick={() => setShowRetMatDisc(true)} className="text-gray-400 hover:text-gray-600 transition-colors"><X size={22} /></button>
@@ -690,7 +986,7 @@ export default function Inventory() {
       ══════════════════════════════════════════ */}
       {showRetIngForm && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl shadow-2xl w-[900px]">
+          <div className="bg-white rounded-2xl shadow-2xl w-[1100px]">
             <div className="flex items-center justify-between px-10 py-6 border-b border-gray-200">
               <h3 className="text-2xl font-semibold text-gray-800">Set up new batch for Ingredient</h3>
               <button onClick={() => setShowRetIngDisc(true)} className="text-gray-400 hover:text-gray-600 transition-colors"><X size={22} /></button>
@@ -753,6 +1049,408 @@ export default function Inventory() {
           onCancel={() => setShowRetIngDisc(false)}
           onConfirm={() => { setShowRetIngDisc(false); setShowRetIngForm(false); setRetIngRow(null); }}
         />
+      )}
+
+      {/* ══════════════════════════════════════════
+          RESUPPLY MATERIAL
+      ══════════════════════════════════════════ */}
+      {showResupMatForm && resupMatRow && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl shadow-2xl w-[900px]">
+            <div className="flex items-center justify-between px-10 py-6 border-b border-gray-200">
+              <h3 className="text-2xl font-semibold text-gray-800">Resupply Material</h3>
+              <button onClick={closeResupMat} className="text-gray-400 hover:text-gray-600 transition-colors"><X size={22} /></button>
+            </div>
+            <div className="px-10 py-8 flex flex-col gap-8">
+              <div>
+                <p className="text-xl font-semibold text-gray-700 mb-5">New Supply</p>
+                <div className="flex items-center gap-5">
+                  <label className="text-xl text-gray-600 w-32 shrink-0">Amount</label>
+                  <input type="number" min="0" value={resupMatAmount} onChange={e => setResupMatAmount(e.target.value)}
+                    className="flex-1 border border-gray-300 rounded-lg px-4 py-3 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]" />
+                  <span className="text-xl text-gray-500 shrink-0">units</span>
+                </div>
+              </div>
+              <div className="text-center px-4">
+                <p className="text-xl font-semibold text-gray-700 mb-2">Reminder</p>
+                <p className="text-xl text-gray-500">
+                  {resupMatRow.raw.maxLimit > 0
+                    ? `The current maximum limit for this material is ${resupMatRow.raw.maxLimit}. You may change it via the Edit action.`
+                    : 'No maximum limit is set for this material. You may set one via the Edit action.'}
+                </p>
+              </div>
+              <button onClick={() => setShowResupMatConf(true)} className="w-full bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white py-3.5 rounded-xl text-xl font-semibold transition-colors">Confirm</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {showResupMatConf && resupMatRow && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[60]">
+          <div className="bg-white rounded-2xl shadow-2xl w-[500px] px-8 py-6 flex flex-col gap-4">
+            <h3 className="text-2xl font-semibold text-gray-800">Confirm Resupply?</h3>
+            <div className="border border-gray-100 rounded-lg p-3 bg-gray-50 flex flex-col gap-1">
+              <p className="text-xl text-gray-700">Material: <span className="font-semibold">{resupMatRow.displayName}</span></p>
+              <p className="text-xl text-gray-700">Adding: <span className="font-semibold">{parseInt(resupMatAmount) || 0} units</span></p>
+              <p className="text-xl text-gray-700">New stock: <span className="font-semibold">{(resupMatRow.raw.stock || 0) + (parseInt(resupMatAmount) || 0)} units</span></p>
+            </div>
+            <div className="flex gap-3 justify-end mt-1">
+              <button onClick={() => setShowResupMatConf(false)} className="px-6 py-2 rounded-full border border-gray-300 text-xl text-gray-600 hover:bg-gray-50 transition-colors">Cancel</button>
+              <button onClick={handleConfirmResupMat} className="px-6 py-2 rounded-full bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white text-xl transition-colors">Confirm</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {showResupMatOk && resupMatRow && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[60]">
+          <div className="bg-white rounded-2xl shadow-2xl w-[500px] px-8 py-6 flex flex-col gap-4">
+            <h3 className="text-2xl font-semibold text-gray-800">Material Resupplied!</h3>
+            <p className="text-xl text-gray-600"><span className="font-semibold">{resupMatRow.displayName}</span> has been updated.</p>
+            <div className="flex justify-end mt-1">
+              <button onClick={() => { setShowResupMatOk(false); setShowResupMatForm(false); setResupMatRow(null); setResupMatAmount(''); }} className="px-6 py-2 rounded-full bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white text-xl transition-colors">Done</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {showResupMatDisc && (
+        <DiscardDialog onCancel={() => setShowResupMatDisc(false)} onConfirm={() => { setShowResupMatDisc(false); setShowResupMatForm(false); setResupMatRow(null); setResupMatAmount(''); }} />
+      )}
+
+      {/* ══════════════════════════════════════════
+          RESUPPLY INGREDIENT
+      ══════════════════════════════════════════ */}
+      {showResupIngForm && resupIngRow && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl shadow-2xl w-[900px]">
+            <div className="flex items-center justify-between px-10 py-6 border-b border-gray-200">
+              <h3 className="text-2xl font-semibold text-gray-800">Resupply Ingredient</h3>
+              <button onClick={closeResupIng} className="text-gray-400 hover:text-gray-600 transition-colors"><X size={22} /></button>
+            </div>
+            <div className="px-10 py-8 flex flex-col gap-8">
+              {(resupIngRow.raw.batches || []).length >= 3 ? (
+                <div className="text-center py-6">
+                  <p className="text-xl font-semibold text-red-500 mb-2">Batch limit reached</p>
+                  <p className="text-xl text-gray-500">This ingredient already has 3 batches. Remove a batch via Adjust before adding a new one.</p>
+                </div>
+              ) : (
+                <>
+                  <div>
+                    <p className="text-xl font-semibold text-gray-700 mb-5">New Batch Expiration Date</p>
+                    <div className="flex items-center gap-8">
+                      <div className="flex items-center gap-4 flex-1">
+                        <label className="text-xl text-gray-600 shrink-0">Expiration Date for current batch:</label>
+                        <input type="date" value={resupIngExpDate} onChange={e => setResupIngExpDate(e.target.value)}
+                          className="flex-1 border border-gray-300 rounded-lg px-4 py-3 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]" />
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <label className="text-xl text-gray-600 shrink-0">Batch quantity:</label>
+                        <input type="number" min="0" value={resupIngQty} onChange={e => setResupIngQty(e.target.value)}
+                          className="w-40 border border-gray-300 rounded-lg px-4 py-3 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]" />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-center px-4">
+                    <p className="text-xl font-semibold text-gray-700 mb-2">Reminder</p>
+                    <p className="text-xl text-gray-500">
+                      {`Batch ${(resupIngRow.raw.batches || []).length + 1} of 3. `}
+                      {resupIngRow.raw.maxLimit > 0
+                        ? `The current maximum limit is ${resupIngRow.raw.maxLimit} ${resupIngRow.raw.unit || 'units'}.`
+                        : 'No maximum limit is set.'}
+                    </p>
+                  </div>
+                  <button onClick={() => setShowResupIngConf(true)} className="w-full bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white py-3.5 rounded-xl text-xl font-semibold transition-colors">Confirm</button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+      {showResupIngConf && resupIngRow && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[60]">
+          <div className="bg-white rounded-2xl shadow-2xl w-[500px] px-8 py-6 flex flex-col gap-4">
+            <h3 className="text-2xl font-semibold text-gray-800">Confirm Resupply?</h3>
+            <div className="border border-gray-100 rounded-lg p-3 bg-gray-50 flex flex-col gap-1">
+              <p className="text-xl text-gray-700">Ingredient: <span className="font-semibold">{resupIngRow.displayName}</span></p>
+              <p className="text-xl text-gray-700">Batch ID: <span className="font-semibold">{resupIngExpDate ? genBatchId(resupIngExpDate, (resupIngRow.raw.batches || []).length) : '—'}</span></p>
+              <p className="text-xl text-gray-700">Expiry: <span className="font-semibold">{resupIngExpDate || '—'}</span></p>
+              <p className="text-xl text-gray-700">Quantity: <span className="font-semibold">{resupIngQty || 0} {resupIngRow.raw.unit || 'units'}</span></p>
+            </div>
+            <div className="flex gap-3 justify-end mt-1">
+              <button onClick={() => setShowResupIngConf(false)} className="px-6 py-2 rounded-full border border-gray-300 text-xl text-gray-600 hover:bg-gray-50 transition-colors">Cancel</button>
+              <button onClick={handleConfirmResupIng} className="px-6 py-2 rounded-full bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white text-xl transition-colors">Confirm</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {showResupIngOk && resupIngRow && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[60]">
+          <div className="bg-white rounded-2xl shadow-2xl w-[500px] px-8 py-6 flex flex-col gap-4">
+            <h3 className="text-2xl font-semibold text-gray-800">Ingredient Resupplied!</h3>
+            <p className="text-xl text-gray-600">New batch added to <span className="font-semibold">{resupIngRow.displayName}</span>.</p>
+            <div className="flex justify-end mt-1">
+              <button onClick={() => { setShowResupIngOk(false); setShowResupIngForm(false); setResupIngRow(null); setResupIngExpDate(''); setResupIngQty(''); }} className="px-6 py-2 rounded-full bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white text-xl transition-colors">Done</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {showResupIngDisc && (
+        <DiscardDialog onCancel={() => setShowResupIngDisc(false)} onConfirm={() => { setShowResupIngDisc(false); setShowResupIngForm(false); setResupIngRow(null); setResupIngExpDate(''); setResupIngQty(''); }} />
+      )}
+
+      {/* ══════════════════════════════════════════
+          VIEW BATCHES
+      ══════════════════════════════════════════ */}
+      {viewBatchRow && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl shadow-2xl w-[780px]">
+            <div className="flex items-center justify-between px-10 py-6 border-b border-gray-200">
+              <h3 className="text-2xl font-semibold text-gray-800">Batch List — {viewBatchRow.displayName}</h3>
+              <button onClick={() => setViewBatchRow(null)} className="text-gray-400 hover:text-gray-600 transition-colors"><X size={22} /></button>
+            </div>
+            <div className="px-10 py-8 flex flex-col gap-4">
+              {(viewBatchRow.raw.batches || []).length === 0 ? (
+                <p className="text-xl text-gray-400 text-center py-6">No batches recorded.</p>
+              ) : (
+                <>
+                  <div className="flex items-center px-3 py-2 border-b border-gray-200">
+                    <span className="w-[35%] text-xl font-semibold text-gray-700">Batch ID</span>
+                    <span className="w-[35%] text-xl font-semibold text-gray-700">Expiration Date</span>
+                    <span className="flex-1 text-xl font-semibold text-gray-700 text-right">Quantity</span>
+                  </div>
+                  {(viewBatchRow.raw.batches || []).map((b, i) => (
+                    <div key={i} className="flex items-center bg-white rounded-xl border border-gray-200 shadow-sm px-3 py-3">
+                      <span className="w-[35%] text-xl text-gray-700">{b.batchId || '—'}</span>
+                      <span className="w-[35%] text-xl text-gray-700">{fmtDate(b.expirationDate)}</span>
+                      <span className="flex-1 text-xl text-gray-700 text-right">{b.quantity ?? 0} {viewBatchRow.raw.unit || 'units'}</span>
+                    </div>
+                  ))}
+                </>
+              )}
+              <button onClick={() => setViewBatchRow(null)} className="w-full mt-2 bg-gray-100 hover:bg-gray-200 text-gray-700 py-3 rounded-xl text-xl font-semibold transition-colors">Close</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════
+          ADJUST
+      ══════════════════════════════════════════ */}
+      {showAdjForm && adjRow && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl shadow-2xl w-[1000px]">
+            <div className="flex items-center justify-between px-10 py-6 border-b border-gray-200">
+              <h3 className="text-2xl font-semibold text-gray-800">
+                Adjust {adjRow._type === 'material' ? 'Material' : 'Ingredient'} — {adjRow.displayName}
+              </h3>
+              <button onClick={closeAdj} className="text-gray-400 hover:text-gray-600 transition-colors"><X size={22} /></button>
+            </div>
+            <div className="px-10 py-8 flex flex-col gap-8">
+              {adjRow._type === 'material' ? (
+                <div className="flex flex-col gap-5">
+                  <p className="text-xl font-semibold text-gray-700">Set New Quantity</p>
+                  <div className="flex items-center gap-5">
+                    <label className="text-xl text-gray-600 w-52 shrink-0">Current stock</label>
+                    <span className="text-xl text-gray-500">{adjRow.raw.stock ?? 0} units</span>
+                  </div>
+                  <div className="flex items-center gap-5">
+                    <label className="text-xl text-gray-600 w-52 shrink-0">New quantity</label>
+                    <input type="number" min="0" value={adjMatQty} onChange={e => setAdjMatQty(e.target.value)}
+                      className="flex-1 border border-gray-300 rounded-lg px-4 py-3 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]" />
+                    <span className="text-xl text-gray-500 shrink-0">units</span>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-5">
+                  <p className="text-xl font-semibold text-gray-700">Select Batch</p>
+                  {adjIngBatches.length === 0 ? (
+                    <p className="text-xl text-gray-400">No batches found.</p>
+                  ) : (
+                    <>
+                      {/* Batch navigator */}
+                      <div className="flex items-center justify-between bg-gray-50 rounded-xl px-6 py-4">
+                        <button
+                          onClick={() => setAdjBatchIdx(i => Math.max(0, i - 1))}
+                          disabled={adjBatchIdx === 0}
+                          className="p-1 rounded-lg text-gray-400 hover:text-gray-700 disabled:opacity-30 transition-colors"
+                        >
+                          <ChevronLeft size={24} />
+                        </button>
+                        <div className="text-center">
+                          <p className="text-xl font-semibold text-gray-700">{adjIngBatches[adjBatchIdx]?.batchId || `Batch ${adjBatchIdx + 1}`}</p>
+                          <p className="text-xl text-gray-500">Exp: {fmtDate(adjIngBatches[adjBatchIdx]?.expirationDate)}</p>
+                        </div>
+                        <button
+                          onClick={() => setAdjBatchIdx(i => Math.min(adjIngBatches.length - 1, i + 1))}
+                          disabled={adjBatchIdx === adjIngBatches.length - 1}
+                          className="p-1 rounded-lg text-gray-400 hover:text-gray-700 disabled:opacity-30 transition-colors"
+                        >
+                          <ChevronRight size={24} />
+                        </button>
+                      </div>
+                      <p className="text-xl text-gray-400 text-center -mt-4">Batch {adjBatchIdx + 1} of {adjIngBatches.length}</p>
+                      {/* Qty edit */}
+                      <div className="flex items-center gap-5">
+                        <label className="text-xl text-gray-600 w-52 shrink-0">Current quantity</label>
+                        <span className="text-xl text-gray-500">{adjIngBatches[adjBatchIdx]?.quantity ?? 0} {adjRow.raw.unit || 'units'}</span>
+                      </div>
+                      <div className="flex items-center gap-5">
+                        <label className="text-xl text-gray-600 w-52 shrink-0">New quantity</label>
+                        <input
+                          type="number" min="0"
+                          value={adjIngBatches[adjBatchIdx]?.newQty ?? ''}
+                          onChange={e => setAdjIngBatches(p => p.map((x, j) => j === adjBatchIdx ? { ...x, newQty: e.target.value } : x))}
+                          className="flex-1 border border-gray-300 rounded-lg px-4 py-3 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]"
+                        />
+                        <span className="text-xl text-gray-500 shrink-0">{adjRow.raw.unit || 'units'}</span>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+              {/* Reason */}
+              <div className="flex flex-col gap-3">
+                <label className="text-xl font-semibold text-gray-700">Reason <span className="font-normal text-gray-400">(for logs)</span></label>
+                <textarea
+                  value={adjReason} onChange={e => setAdjReason(e.target.value)}
+                  rows={3} placeholder="Enter reason for adjustment..."
+                  className="w-full border border-gray-300 rounded-lg px-4 py-3 text-xl text-gray-700 outline-none focus:border-[#3ca4c7] resize-none"
+                />
+              </div>
+              <button onClick={() => setShowAdjConf(true)} className="w-full bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white py-3.5 rounded-xl text-xl font-semibold transition-colors">Confirm</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {showAdjConf && adjRow && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[60]">
+          <div className="bg-white rounded-2xl shadow-2xl w-[520px] px-8 py-6 flex flex-col gap-4">
+            <h3 className="text-2xl font-semibold text-gray-800">Confirm Adjustment?</h3>
+            <div className="border border-gray-100 rounded-lg p-3 bg-gray-50 flex flex-col gap-1">
+              <p className="text-xl text-gray-700">Item: <span className="font-semibold">{adjRow.displayName}</span></p>
+              {adjRow._type === 'ingredient' && adjIngBatches[adjBatchIdx] && (
+                <p className="text-xl text-gray-700">Batch: <span className="font-semibold">{adjIngBatches[adjBatchIdx].batchId}</span></p>
+              )}
+              {adjReason && <p className="text-xl text-gray-700">Reason: <span className="font-semibold">{adjReason}</span></p>}
+            </div>
+            <p className="text-xl text-gray-500">This will overwrite the current quantity.</p>
+            <div className="flex gap-3 justify-end mt-1">
+              <button onClick={() => setShowAdjConf(false)} className="px-6 py-2 rounded-full border border-gray-300 text-xl text-gray-600 hover:bg-gray-50 transition-colors">Cancel</button>
+              <button onClick={handleConfirmAdj} className="px-6 py-2 rounded-full bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white text-xl transition-colors">Confirm</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {showAdjOk && adjRow && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[60]">
+          <div className="bg-white rounded-2xl shadow-2xl w-[500px] px-8 py-6 flex flex-col gap-4">
+            <h3 className="text-2xl font-semibold text-gray-800">Quantity Updated!</h3>
+            <p className="text-xl text-gray-600"><span className="font-semibold">{adjRow.displayName}</span> has been adjusted.</p>
+            <div className="flex justify-end mt-1">
+              <button onClick={() => { setShowAdjOk(false); setShowAdjForm(false); setAdjRow(null); }} className="px-6 py-2 rounded-full bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white text-xl transition-colors">Done</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {showAdjDisc && (
+        <DiscardDialog onCancel={() => setShowAdjDisc(false)} onConfirm={() => { setShowAdjDisc(false); setShowAdjForm(false); setAdjRow(null); }} />
+      )}
+
+      {/* ══════════════════════════════════════════
+          EDIT
+      ══════════════════════════════════════════ */}
+      {showEditForm && editRow && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl shadow-2xl w-[1100px] max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between px-12 py-6 border-b border-gray-200">
+              <h3 className="text-2xl font-semibold text-gray-800">Edit {editRow._type === 'material' ? 'Material' : 'Ingredient'}</h3>
+              <button onClick={closeEdit} className="text-gray-400 hover:text-gray-600 transition-colors"><X size={22} /></button>
+            </div>
+            <div className="px-12 py-8 flex flex-col gap-8">
+              <div>
+                <p className="text-xl font-semibold text-gray-700 mb-5">General Information</p>
+                <div className="flex flex-col gap-5">
+                  <div className="flex items-center gap-5">
+                    <label className="text-xl text-gray-600 w-52 shrink-0">{editRow._type === 'material' ? 'Material' : 'Ingredient'} Name</label>
+                    <input type="text" value={editName} onChange={e => setEditName(e.target.value)}
+                      className="flex-1 border border-gray-300 rounded-lg px-4 py-3 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]" />
+                  </div>
+                  {editRow._type === 'ingredient' && (
+                    <>
+                      <div className="flex items-center gap-5">
+                        <label className="text-xl text-gray-600 w-52 shrink-0">Ingredient Type</label>
+                        <div className="relative flex-1">
+                          <select value={editIngType} onChange={e => setEditIngType(e.target.value)}
+                            className="w-full border border-gray-300 rounded-lg px-4 py-3 text-xl text-gray-700 outline-none appearance-none bg-white focus:border-[#3ca4c7]">
+                            {ING_TYPES.map(t => <option key={t}>{t}</option>)}
+                          </select>
+                          <span className="absolute right-4 top-3.5 text-gray-400 pointer-events-none text-xl">▾</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-5">
+                        <label className="text-xl text-gray-600 w-52 shrink-0">Maximum Limit</label>
+                        <input type="number" min="0" value={editMaxLimit} onChange={e => setEditMaxLimit(e.target.value)}
+                          className="flex-1 border border-gray-300 rounded-lg px-4 py-3 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]" />
+                        <div className="relative w-44 shrink-0">
+                          <select value={editIngUnit} onChange={e => setEditIngUnit(e.target.value)}
+                            className="w-full border border-gray-300 rounded-lg px-4 py-3 text-xl text-gray-700 outline-none appearance-none bg-white focus:border-[#3ca4c7]">
+                            {ING_UNITS.map(u => <option key={u}>{u}</option>)}
+                          </select>
+                          <span className="absolute right-4 top-3.5 text-gray-400 pointer-events-none text-xl">▾</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-5">
+                        <span className="text-xl text-gray-600 flex-1">Consider Ingredient as an Add-On?</span>
+                        <button onClick={() => setEditIngIsAddOn(v => !v)}
+                          className={`w-10 h-10 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${editIngIsAddOn ? 'bg-[#3ca4c7] border-[#3ca4c7] text-white' : 'bg-white border-gray-300'}`}>
+                          {editIngIsAddOn && <span className="font-bold text-xl">✓</span>}
+                        </button>
+                      </div>
+                    </>
+                  )}
+                  {editRow._type === 'material' && (
+                    <div className="flex items-center gap-5">
+                      <label className="text-xl text-gray-600 w-52 shrink-0">Maximum Limit</label>
+                      <input type="number" min="0" value={editMaxLimit} onChange={e => setEditMaxLimit(e.target.value)}
+                        className="flex-1 border border-gray-300 rounded-lg px-4 py-3 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]" />
+                    </div>
+                  )}
+                </div>
+              </div>
+              {editRow._type === 'material' && (
+                <div className="text-center px-4">
+                  <p className="text-xl font-semibold text-gray-700 mb-2">Note</p>
+                  <p className="text-xl text-gray-500">Changes to the name and maximum limit will apply to all sizes of this material.</p>
+                </div>
+              )}
+              <button onClick={() => setShowEditConf(true)} className="w-full bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white py-3.5 rounded-xl text-xl font-semibold transition-colors">Save Changes</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {showEditConf && editRow && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[60]">
+          <div className="bg-white rounded-2xl shadow-2xl w-[500px] px-8 py-6 flex flex-col gap-4">
+            <h3 className="text-2xl font-semibold text-gray-800">Save Changes?</h3>
+            <p className="text-xl text-gray-600">Update details for <span className="font-semibold">{editRow.displayName}</span>?</p>
+            <div className="flex gap-3 justify-end mt-1">
+              <button onClick={() => setShowEditConf(false)} className="px-6 py-2 rounded-full border border-gray-300 text-xl text-gray-600 hover:bg-gray-50 transition-colors">Cancel</button>
+              <button onClick={handleConfirmEdit} className="px-6 py-2 rounded-full bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white text-xl transition-colors">Confirm</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {showEditOk && editRow && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[60]">
+          <div className="bg-white rounded-2xl shadow-2xl w-[500px] px-8 py-6 flex flex-col gap-4">
+            <h3 className="text-2xl font-semibold text-gray-800">Changes Saved!</h3>
+            <p className="text-xl text-gray-600"><span className="font-semibold">{editName}</span> has been updated.</p>
+            <div className="flex justify-end mt-1">
+              <button onClick={() => { setShowEditOk(false); setShowEditForm(false); setEditRow(null); }} className="px-6 py-2 rounded-full bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white text-xl transition-colors">Done</button>
+            </div>
+          </div>
+        </div>
+      )}
+      {showEditDisc && (
+        <DiscardDialog onCancel={() => setShowEditDisc(false)} onConfirm={() => { setShowEditDisc(false); setShowEditForm(false); setEditRow(null); }} />
       )}
     </div>
   );

@@ -5,6 +5,22 @@ body {
   color: white;
 }
 
+/* ── Custom scrollbar: thin line with rounded edges ── */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
+
 @layer utilities {
   .no-spinner {
     -moz-appearance: textfield;
