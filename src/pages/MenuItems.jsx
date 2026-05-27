@@ -362,7 +362,7 @@ export default function MenuItems() {
             <span className="w-[14%] text-xl font-semibold text-gray-800 text-center">ID</span>
             <span className="w-[20%] text-xl font-semibold text-gray-800 pl-2">Name</span>
             <span className="w-[14%] text-xl font-semibold text-gray-800 text-center">Category</span>
-            <span className="w-[13%] text-xl font-semibold text-gray-800 text-center">
+            <span className="w-[11%] text-xl font-semibold text-gray-800 text-center">
               {showInactive ? 'Date Hidden' : 'Status'}
             </span>
             <span className="flex-1 text-xl font-semibold text-gray-800 text-center">Actions</span>

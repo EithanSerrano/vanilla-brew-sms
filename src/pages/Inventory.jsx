@@ -197,6 +197,17 @@ export default function Inventory() {
     return () => document.removeEventListener('click', close);
   }, []);
 
+  // ── Audit log ──
+  const logAudit = async (action, itemType, itemId, itemName, details = {}) => {
+    try {
+      await addDoc(collection(db, 'auditlog'), {
+        action, itemType, itemId, itemName, details, timestamp: new Date(),
+      });
+    } catch (e) {
+      console.error('Audit log error:', e);
+    }
+  };
+
   // ── Combined rows ──
   const allRows = [
     ...materials.map(m => ({
@@ -263,6 +274,9 @@ export default function Inventory() {
         category: 'Material', stock: e.qty, startingQty: e.qty,
         maxLimit: pendingMat.maxLimit, isActive: true, createdAt: now,
       });
+      await logAudit('ADD_MATERIAL', 'material', e.matId, `${pendingMat.name} (${e.size})`, {
+        size: e.size, startingQty: e.qty, maxLimit: pendingMat.maxLimit,
+      });
     }
     await loadData(); setShowMatConf(false); setShowMatOk(true);
   };
@@ -298,6 +312,10 @@ export default function Inventory() {
       isActive: true,
       batches: [{ batchId: pendingIng.batchId, expirationDate: pendingIng.expirationDate, quantity: pendingIng.quantity, createdAt: now }],
       createdAt: now,
+    });
+    await logAudit('ADD_INGREDIENT', 'ingredient', pendingIng.ingredientId, pendingIng.name, {
+      type: pendingIng.type, unit: pendingIng.unit, maxLimit: pendingIng.maxLimit,
+      batchId: pendingIng.batchId, quantity: pendingIng.quantity,
     });
     await loadData(); setShowIngConf(false); setShowIngOk(true);
   };
@@ -343,6 +361,9 @@ export default function Inventory() {
     const coll   = hideRow._type === 'material' ? 'materials' : 'ingredients';
     const update = hideRow.raw.archived !== undefined ? { archived: true, hiddenAt: new Date() } : { isActive: false, hiddenAt: new Date() };
     await updateDoc(doc(db, coll, hideRow._docId), update);
+    await logAudit('HIDE', hideRow._type, hideRow.displayId, hideRow.displayName, {
+      connectedItemsAffected: connectedItems.length,
+    });
     setShowHideConf(false); setHideRow(null);
     setConnectedItems([]); setConflictActions({}); setShowConflictList(false);
     await loadData();
@@ -368,6 +389,9 @@ export default function Inventory() {
     for (const sib of retMatSibs) {
       const qty = parseInt(retMatQtys[sib.size || 'N/A']) || 0;
       await updateDoc(doc(db, 'materials', sib.id), { stock: qty, startingQty: qty, isActive: true, hiddenAt: null });
+      await logAudit('RETRIEVE', 'material', sib.materialId || sib.id, `${sib.name}${sib.size ? ` (${sib.size})` : ''}`, {
+        newQty: qty,
+      });
     }
     await loadData(); setShowRetMatConf(false); setShowRetMatForm(false); setRetMatSibs([]); setRetMatQtys({});
   };
@@ -382,6 +406,9 @@ export default function Inventory() {
       batches: [{ batchId, expirationDate: new Date(retIngExpDate), quantity: parseInt(retIngQty) || 0, createdAt: new Date() }],
       isActive: true, hiddenAt: null,
     });
+    await logAudit('RETRIEVE', 'ingredient', retIngRow.displayId, retIngRow.displayName, {
+      batchId, expirationDate: retIngExpDate, quantity: parseInt(retIngQty) || 0,
+    });
     await loadData(); setShowRetIngConf(false); setShowRetIngForm(false); setRetIngRow(null);
   };
 
@@ -395,8 +422,13 @@ export default function Inventory() {
   const handleResupMat = row => { setResupMatRow(row); setResupMatAmount(''); setShowResupMatForm(true); };
   const closeResupMat  = () => { resupMatAmount !== '' ? setShowResupMatDisc(true) : (setShowResupMatForm(false), setResupMatRow(null)); };
   const handleConfirmResupMat = async () => {
-    const newStock = (resupMatRow.raw.stock || 0) + (parseInt(resupMatAmount) || 0);
+    const previousStock = resupMatRow.raw.stock || 0;
+    const amountAdded = parseInt(resupMatAmount) || 0;
+    const newStock = previousStock + amountAdded;
     await updateDoc(doc(db, 'materials', resupMatRow._docId), { stock: newStock, lastUpdated: new Date() });
+    await logAudit('RESUPPLY', 'material', resupMatRow.displayId, resupMatRow.displayName, {
+      previousStock, amountAdded, newStock,
+    });
     await loadData(); setShowResupMatConf(false); setShowResupMatOk(true);
   };
 
@@ -410,6 +442,9 @@ export default function Inventory() {
     const batchId  = genBatchId(resupIngExpDate, existing.length);
     const newBatch = { batchId, expirationDate: new Date(resupIngExpDate), quantity: parseInt(resupIngQty) || 0, createdAt: new Date() };
     await updateDoc(doc(db, 'ingredients', resupIngRow._docId), { batches: [...existing, newBatch], lastUpdated: new Date() });
+    await logAudit('RESUPPLY', 'ingredient', resupIngRow.displayId, resupIngRow.displayName, {
+      batchId, expirationDate: resupIngExpDate, quantity: parseInt(resupIngQty) || 0,
+    });
     await loadData(); setShowResupIngConf(false); setShowResupIngOk(true);
   };
 
@@ -437,10 +472,21 @@ export default function Inventory() {
   const handleConfirmAdj = async () => {
     if (!adjRow) return;
     if (adjRow._type === 'material') {
-      await updateDoc(doc(db, 'materials', adjRow._docId), { stock: parseInt(adjMatQty) || 0, lastUpdated: new Date() });
+      const previousQty = adjRow.raw.stock ?? 0;
+      const newQty = parseInt(adjMatQty) || 0;
+      await updateDoc(doc(db, 'materials', adjRow._docId), { stock: newQty, lastUpdated: new Date() });
+      await logAudit('ADJUST', 'material', adjRow.displayId, adjRow.displayName, {
+        previousQty, newQty, reason: adjReason || null,
+      });
     } else {
       const updated = adjIngBatches.map(b => ({ ...b, quantity: parseInt(b.newQty) || 0 }));
       await updateDoc(doc(db, 'ingredients', adjRow._docId), { batches: updated, lastUpdated: new Date() });
+      const batchChanges = adjIngBatches.map((b, i) => ({
+        batchId: b.batchId, previousQty: adjRow.raw.batches?.[i]?.quantity ?? 0, newQty: parseInt(b.newQty) || 0,
+      }));
+      await logAudit('ADJUST', 'ingredient', adjRow.displayId, adjRow.displayName, {
+        batches: batchChanges, reason: adjReason || null,
+      });
     }
     await loadData(); setShowAdjConf(false); setShowAdjOk(true);
   };
@@ -473,10 +519,21 @@ export default function Inventory() {
       for (const sib of sibs) {
         await updateDoc(doc(db, 'materials', sib.id), { name: editName.trim(), maxLimit: parseInt(editMaxLimit) || 0 });
       }
+      await logAudit('EDIT', 'material', editRow.displayId, editRow.displayName, {
+        previousName: editRow.raw.name, newName: editName.trim(),
+        previousMaxLimit: editRow.raw.maxLimit || 0, newMaxLimit: parseInt(editMaxLimit) || 0,
+      });
     } else {
       await updateDoc(doc(db, 'ingredients', editRow._docId), {
         name: editName.trim(), type: editIngType, unit: editIngUnit,
         isAddOn: editIngIsAddOn, maxLimit: parseInt(editMaxLimit) || 0,
+      });
+      await logAudit('EDIT', 'ingredient', editRow.displayId, editRow.displayName, {
+        previousName: editRow.raw.name, newName: editName.trim(),
+        previousMaxLimit: editRow.raw.maxLimit || 0, newMaxLimit: parseInt(editMaxLimit) || 0,
+        previousType: editRow.raw.type, newType: editIngType,
+        previousUnit: editRow.raw.unit, newUnit: editIngUnit,
+        previousIsAddOn: editRow.raw.isAddOn || false, newIsAddOn: editIngIsAddOn,
       });
     }
     await loadData(); setShowEditConf(false); setShowEditOk(true);
