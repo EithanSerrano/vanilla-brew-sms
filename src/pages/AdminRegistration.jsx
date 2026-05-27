@@ -1,340 +1,604 @@
-﻿import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { UserPlus, CornerUpLeft } from 'lucide-react';
-import AdminSidebar from '../layouts/AdminSidebar';
-
-
-import { collection, query, orderBy, limit, getDocs, doc, setDoc, onSnapshot } from 'firebase/firestore';
+import { useState, useEffect } from 'react';
+import { collection, query, orderBy, getDocs, doc, updateDoc, setDoc } from 'firebase/firestore';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { auth, db } from '../firebase';
+import { Search, Plus, RefreshCw, X, AlignJustify } from 'lucide-react';
+import AdminSidebar from '../layouts/AdminSidebar';
 
+function generatePassword() {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  return Array.from({ length: 8 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+}
 
-export default function AdminRegistration() {
-  const navigate = useNavigate();
+function fmtDate(ts) {
+  if (!ts) return '—';
+  const d = ts.toDate ? ts.toDate() : new Date(ts);
+  return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('en-US');
+}
 
-
-  const [currentView, setCurrentView] = useState('list');
-  const [accounts, setAccounts] = useState([]);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showSuccessModal, setShowSuccessModal] = useState(false);
-
-
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    password: '',
-    retypePassword: ''
-  });
-
-
-  useEffect(() => {
-    if (currentView === 'list') {
-      const usersRef = collection(db, 'users');
-      const q = query(usersRef, orderBy('empId', 'asc'));
-     
-      const unsubscribe = onSnapshot(q, (snapshot) => {
-        const usersList = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }));
-        setAccounts(usersList);
-      }, (error) => {
-        console.error("Error listening to accounts:", error);
-      });
-
-
-      return () => unsubscribe();
-    }
-  }, [currentView]);
-
-
-  const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
-
-
-  const generateNextEmpId = async () => {
-    try {
-      const usersRef = collection(db, 'users');
-      const q = query(usersRef, orderBy('empId', 'desc'), limit(1));
-      const querySnapshot = await getDocs(q);
-
-
-      if (querySnapshot.empty) {
-        return 'EMP001';
-      }
-
-
-      const lastDoc = querySnapshot.docs[0];
-      const lastEmpId = lastDoc.data().empId;
-
-
-      if (!lastEmpId) {
-        return 'EMP001';
-      }
-
-
-      const lastNumber = parseInt(lastEmpId.replace('EMP', ''), 10);
-      const nextNumber = lastNumber + 1;
-      return `EMP${String(nextNumber).padStart(3, '0')}`;
-
-
-    } catch (error) {
-      console.error("Error generating Employee ID:", error);
-      return `EMP${String(Math.floor(Math.random() * 1000)).padStart(3, '0')}`;
-    }
-  };
-
-
-  const handleCreateAccount = async (e) => {
-    e.preventDefault();
-
-
-    if (!formData.name || !formData.email || !formData.password) {
-      alert("Please fill out all fields.");
-      return;
-    }
-    if (formData.password !== formData.retypePassword) {
-      alert("Passwords do not match!");
-      return;
-    }
-
-
-    setIsSubmitting(true);
-
-
-    try {
-      const newEmpId = await generateNextEmpId();
-
-
-      const userCredential = await createUserWithEmailAndPassword(
-        auth,
-        formData.email,
-        formData.password
-      );
-      const user = userCredential.user;
-
-
-      await setDoc(doc(db, 'users', user.uid), {
-        empId: newEmpId,
-        name: formData.name,
-        email: formData.email,
-        role: 'staff',
-        status: 'Active',
-        isOnline: false,
-        createdAt: new Date().toISOString()
-      });
-
-
-      setShowSuccessModal(true);
-
-
-    } catch (error) {
-      console.error("Error creating account:", error);
-      if (error.code === 'auth/email-already-in-use') {
-        alert("This email is already registered!");
-      } else if (error.code === 'auth/weak-password') {
-        alert("Password should be at least 6 characters.");
-      } else {
-        alert("Failed to create account: " + error.message);
-      }
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-
-  const handleModalDone = () => {
-    setFormData({ name: '', email: '', password: '', retypePassword: '' });
-    setShowSuccessModal(false);
-    setCurrentView('list');
-  };
-
-
+function DiscardDialog({ onCancel, onConfirm }) {
   return (
-    <div className="flex w-full h-full">
-      <AdminSidebar activePage="registration" />
-     
-      <main className="flex-1 bg-[#2a2a2a] rounded-xl p-8 flex flex-col text-white relative overflow-hidden">
-       
-        {/* VIEW 1: ACCOUNTS LIST */}
-        {currentView === 'list' && (
-          <div className="flex flex-col h-full animate-in fade-in duration-300">
-            <div className="flex gap-4 mb-8">
-              <button
-                onClick={() => navigate('/admin')}
-                className="bg-[#5a5a5a] hover:bg-[#6a6a6a] p-3 rounded-lg transition-colors"
-              >
-                <CornerUpLeft size={20} />
-              </button>
-              <div className="flex-1 bg-[#5a5a5a] rounded-lg flex items-center px-4 gap-3 font-medium tracking-wide">
-                <UserPlus size={20} />
-                Registration
-              </div>
-            </div>
-
-
-            <button
-              onClick={() => setCurrentView('create')}
-              className="w-full bg-[#5a5a5a] hover:bg-[#6a6a6a] text-2xl font-medium py-6 rounded-xl mb-8 transition-colors tracking-wide"
-            >
-              Create new Account
-            </button>
-
-
-            <div className="flex-1 overflow-auto flex flex-col gap-4 pr-2">
-              {accounts.length === 0 ? (
-                <div className="text-center text-gray-400 mt-10 text-xl italic">
-                  Loading accounts or database is empty. Click above to create one.
-                </div>
-              ) : (
-                accounts.map((account) => (
-                  <div
-                    key={account.id}
-                    className="w-full bg-[#4a4a4a] rounded-xl p-6 flex items-center justify-between"
-                  >
-                    <div className="flex gap-8 items-center">
-                      <span className="text-2xl font-bold tracking-wider text-[#3ca4c7]">
-                        {account.empId || 'N/A'}
-                      </span>
-                      <span className="text-2xl font-medium">{account.name}</span>
-                    </div>
-                    {/* --- CHANGED TEXT TO ACTIVATED / DEACTIVATED --- */}
-                    <span className={`text-xl tracking-wide font-bold ${account.status === 'Active' ? 'text-green-400' : 'text-red-400'}`}>
-                      {account.status === 'Active' ? 'Activated' : 'Deactivated'}
-                    </span>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        )}
-
-
-        {/* VIEW 2: CREATE ACCOUNT FORM */}
-        {currentView === 'create' && (
-          <div className="flex flex-col h-full animate-in fade-in duration-300">
-            <div className="flex gap-4 mb-10">
-              <button
-                onClick={() => setCurrentView('list')}
-                disabled={isSubmitting}
-                className="bg-[#5a5a5a] hover:bg-[#6a6a6a] p-3 rounded-lg transition-colors disabled:opacity-50"
-              >
-                <CornerUpLeft size={20} />
-              </button>
-              <div className="flex-1 bg-[#5a5a5a] rounded-lg flex items-center px-4 gap-3 font-medium tracking-wide">
-                <UserPlus size={20} />
-                Registration &gt; Create Account
-              </div>
-            </div>
-
-
-            <h2 className="text-3xl font-semibold mb-10 tracking-wide">New Account</h2>
-
-
-            <form onSubmit={handleCreateAccount} className="w-full max-w-[1000px] flex flex-col gap-8">
-             
-              <div className="flex items-center gap-6">
-                <label className="w-32 text-xl font-medium tracking-wide">Name</label>
-                <input
-                  type="text"
-                  name="name"
-                  value={formData.name}
-                  onChange={handleChange}
-                  disabled={isSubmitting}
-                  className="flex-1 h-14 bg-[#f0f0f0] rounded-xl px-6 text-black text-xl font-medium focus:outline-none focus:ring-4 focus:ring-[#3ca4c7]/50 disabled:opacity-70"
-                  required
-                />
-              </div>
-
-
-              <div className="flex items-center gap-6">
-                <label className="w-32 text-xl font-medium tracking-wide">Email</label>
-                <input
-                  type="email"
-                  name="email"
-                  value={formData.email}
-                  onChange={handleChange}
-                  disabled={isSubmitting}
-                  className="flex-1 h-14 bg-[#f0f0f0] rounded-xl px-6 text-black text-xl font-medium focus:outline-none focus:ring-4 focus:ring-[#3ca4c7]/50 disabled:opacity-70"
-                  required
-                />
-              </div>
-
-
-              <div className="flex items-center gap-6">
-                <label className="w-32 text-xl font-medium tracking-wide">Password</label>
-                <input
-                  type="password"
-                  name="password"
-                  value={formData.password}
-                  onChange={handleChange}
-                  disabled={isSubmitting}
-                  className="flex-1 h-14 bg-[#f0f0f0] rounded-xl px-6 text-black text-xl font-medium focus:outline-none focus:ring-4 focus:ring-[#3ca4c7]/50 disabled:opacity-70"
-                  required
-                />
-              </div>
-
-
-              <div className="flex items-center gap-6">
-                <label className="w-32 text-xl font-medium leading-tight tracking-wide">Re-Type<br/>Password</label>
-                <input
-                  type="password"
-                  name="retypePassword"
-                  value={formData.retypePassword}
-                  onChange={handleChange}
-                  disabled={isSubmitting}
-                  className="flex-1 h-14 bg-[#f0f0f0] rounded-xl px-6 text-black text-xl font-medium focus:outline-none focus:ring-4 focus:ring-[#3ca4c7]/50 disabled:opacity-70"
-                  required
-                />
-              </div>
-
-
-              <div className="flex justify-center mt-6">
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="bg-[#5a5a5a] hover:bg-[#6a6a6a] px-16 py-3 rounded-xl text-xl font-medium transition-colors tracking-wide disabled:opacity-50 flex items-center gap-3"
-                >
-                  {isSubmitting ? 'Creating...' : 'Create'}
-                </button>
-              </div>
-            </form>
-          </div>
-        )}
-
-
-        {/* OVERLAY MODAL: SUCCESS */}
-        {showSuccessModal && (
-          <div className="absolute inset-0 bg-black/60 rounded-xl flex items-center justify-center z-50 animate-in fade-in duration-200">
-            <div className="bg-[#333333] p-10 rounded-2xl w-[500px] shadow-2xl flex flex-col items-center text-center">
-             
-              <h3 className="text-3xl font-semibold tracking-wide mb-8 text-[#3ca4c7]">Account Created!</h3>
-             
-              <p className="text-xl text-gray-200 mb-6 leading-relaxed">
-                The Account for <span className="font-bold text-white">{formData.name}</span> has been created and saved into the Database.
-              </p>
-             
-              <p className="text-xl text-gray-200 mb-10 leading-relaxed">
-                They can now log in using the email and password you just provided.
-              </p>
-
-
-              <button
-                onClick={handleModalDone}
-                className="bg-[#5a5a5a] hover:bg-[#6a6a6a] px-10 py-3 rounded-xl text-xl font-medium transition-colors tracking-wide"
-              >
-                Done
-              </button>
-
-
-            </div>
-          </div>
-        )}
-
-
-      </main>
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[70]">
+      <div className="bg-white rounded-2xl shadow-2xl w-[420px] px-8 py-6 flex flex-col gap-4">
+        <h3 className="text-2xl font-semibold text-gray-800">Discard Progress?</h3>
+        <p className="text-xl text-gray-500">If confirmed, the progress cannot be recovered.</p>
+        <div className="flex gap-3 justify-end mt-1">
+          <button onClick={onCancel} className="px-6 py-2 rounded-full border border-gray-300 text-xl text-gray-600 hover:bg-gray-50 transition-colors">Cancel</button>
+          <button onClick={onConfirm} className="px-6 py-2 rounded-full bg-red-400 hover:bg-red-500 text-white text-xl transition-colors">Discard</button>
+        </div>
+      </div>
     </div>
   );
 }
 
+export default function AdminRegistration() {
+  const [accounts, setAccounts] = useState([]);
+  const [showInactive, setShowInactive] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // ── New Account ──
+  const [showForm, setShowForm] = useState(false);
+  const [fullName, setFullName] = useState('');
+  const [displayName, setDisplayName] = useState('');
+  const [email, setEmail] = useState('');
+  const [pendingAccount, setPendingAccount] = useState(null);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [showDiscard, setShowDiscard] = useState(false);
+  const [generatedPassword, setGeneratedPassword] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  // ── Arrange / Sort ──
+  const [sortField, setSortField] = useState('empId');
+  const [sortDir, setSortDir]     = useState('asc');
+  const [showArrange, setShowArrange] = useState(false);
+
+  // ── Deactivate confirmation ──
+  const [deactivateTarget,    setDeactivateTarget]    = useState(null);
+  const [showDeactivateConf,  setShowDeactivateConf]  = useState(false);
+
+  // ── Edit ──
+  const [editRow, setEditRow] = useState(null);
+  const [editFullName, setEditFullName] = useState('');
+  const [editDisplayName, setEditDisplayName] = useState('');
+  const [showEditForm, setShowEditForm] = useState(false);
+  const [showEditConfirm, setShowEditConfirm] = useState(false);
+  const [showEditOk, setShowEditOk] = useState(false);
+  const [showEditDiscard, setShowEditDiscard] = useState(false);
+
+  // ── Load ──
+  const loadData = async () => {
+    try {
+      const snap = await getDocs(query(collection(db, 'users'), orderBy('empId', 'asc')));
+      setAccounts(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    } catch (e) { console.error('Load accounts error:', e); }
+  };
+  useEffect(() => { loadData(); }, []);
+  useEffect(() => {
+    const close = () => setShowArrange(false);
+    document.addEventListener('click', close);
+    return () => document.removeEventListener('click', close);
+  }, []);
+
+  const generateNextEmpId = async () => {
+    const snap = await getDocs(collection(db, 'users'));
+    const nums = snap.docs
+      .map(d => d.data().empId || '')
+      .filter(id => /^EMP\d+$/.test(id))
+      .map(id => parseInt(id.slice(3)));
+    const base = nums.length ? Math.max(...nums) : 0;
+    return `EMP${String(base + 1).padStart(3, '0')}`;
+  };
+
+  // ── New account flow ──
+  const formHasData = () => fullName.trim() !== '' || displayName.trim() !== '' || email.trim() !== '';
+  const resetForm = () => { setFullName(''); setDisplayName(''); setEmail(''); setPendingAccount(null); setGeneratedPassword(''); };
+
+  const closeForm = () => {
+    if (formHasData()) setShowDiscard(true);
+    else { setShowForm(false); resetForm(); }
+  };
+
+  const handleSaveAccount = async () => {
+    if (!fullName.trim() || !displayName.trim() || !email.trim()) return;
+    const empId = await generateNextEmpId();
+    setPendingAccount({ fullName: fullName.trim(), displayName: displayName.trim(), email: email.trim(), empId });
+    setShowConfirm(true);
+  };
+
+  const handleConfirmAccount = async () => {
+    if (!pendingAccount || submitting) return;
+    setSubmitting(true);
+    const password = generatePassword();
+    setGeneratedPassword(password);
+    try {
+      const cred = await createUserWithEmailAndPassword(auth, pendingAccount.email, password);
+      await setDoc(doc(db, 'users', cred.user.uid), {
+        empId: pendingAccount.empId,
+        fullName: pendingAccount.fullName,
+        name: pendingAccount.displayName,
+        email: pendingAccount.email,
+        role: 'staff',
+        status: 'Active',
+        isOnline: false,
+        createdAt: new Date(),
+      });
+      await loadData();
+      setShowConfirm(false);
+      setShowSuccess(true);
+    } catch (e) {
+      console.error('Create account error:', e);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // ── Deactivate / Reactivate ──
+  const handleDeactivateClick = acc => { setDeactivateTarget(acc); setShowDeactivateConf(true); };
+  const handleConfirmDeactivate = async () => {
+    if (!deactivateTarget) return;
+    await updateDoc(doc(db, 'users', deactivateTarget.id), { status: 'Inactive' });
+    await loadData();
+    setShowDeactivateConf(false);
+    setDeactivateTarget(null);
+  };
+  const [reactivateTarget,   setReactivateTarget]   = useState(null);
+  const [showReactivateConf, setShowReactivateConf] = useState(false);
+  const handleReactivateClick = acc => { setReactivateTarget(acc); setShowReactivateConf(true); };
+  const handleConfirmReactivate = async () => {
+    if (!reactivateTarget) return;
+    await updateDoc(doc(db, 'users', reactivateTarget.id), { status: 'Active' });
+    await loadData();
+    setShowReactivateConf(false);
+    setReactivateTarget(null);
+  };
+
+  // ── Edit flow ──
+  const handleEditClick = acc => {
+    setEditRow(acc);
+    setEditFullName(acc.fullName || acc.name || '');
+    setEditDisplayName(acc.name || '');
+    setShowEditForm(true);
+  };
+  const editHasChanges = () => {
+    if (!editRow) return false;
+    return editFullName !== (editRow.fullName || editRow.name || '') || editDisplayName !== (editRow.name || '');
+  };
+  const closeEditForm = () => {
+    if (editHasChanges()) setShowEditDiscard(true);
+    else { setShowEditForm(false); setEditRow(null); }
+  };
+  const handleConfirmEdit = async () => {
+    if (!editRow) return;
+    await updateDoc(doc(db, 'users', editRow.id), {
+      fullName: editFullName.trim(),
+      name: editDisplayName.trim(),
+    });
+    await loadData();
+    setShowEditConfirm(false);
+    setShowEditOk(true);
+  };
+
+  // ── Filtered + sorted list ──
+  const toDate = ts => ts ? (ts.toDate ? ts.toDate() : new Date(ts)) : new Date(0);
+  const displayed = accounts
+    .filter(a => showInactive ? a.status !== 'Active' : a.status === 'Active')
+    .filter(a => !searchQuery ||
+      (a.empId || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (a.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (a.fullName || '').toLowerCase().includes(searchQuery.toLowerCase())
+    )
+    .sort((a, b) => {
+      let av, bv;
+      if (sortField === 'name') {
+        av = (a.name || a.fullName || '').toLowerCase();
+        bv = (b.name || b.fullName || '').toLowerCase();
+      } else if (sortField === 'lastLogin') {
+        av = toDate(a.lastLogin);
+        bv = toDate(b.lastLogin);
+      } else {
+        av = a.empId || '';
+        bv = b.empId || '';
+      }
+      if (av < bv) return sortDir === 'asc' ? -1 : 1;
+      if (av > bv) return sortDir === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+  return (
+    <div className="flex w-full h-full">
+      <AdminSidebar />
+
+      <main className="flex-1 bg-white overflow-hidden flex flex-col p-8">
+
+        {/* Header */}
+        <div className="mb-5 shrink-0">
+          <h1 className="text-3xl font-bold text-gray-900 mb-3">Manage Accounts</h1>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setShowInactive(v => !v)}
+                className={`relative w-11 h-6 rounded-full transition-colors shrink-0 ${showInactive ? 'bg-red-400' : 'bg-green-400'}`}
+              >
+                <span className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-all ${showInactive ? 'left-6' : 'left-1'}`} />
+              </button>
+              <span className="text-xl text-gray-600 shrink-0">{showInactive ? 'Showing Inactive Accounts' : 'Showing Active Accounts'}</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="relative">
+                <button
+                  onClick={e => { e.stopPropagation(); setShowArrange(v => !v); }}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-full text-xl transition-colors shrink-0 ${
+                    showArrange ? 'bg-[#3ca4c7] text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
+                  }`}
+                >
+                  <AlignJustify size={16} /> Arrange
+                </button>
+                {showArrange && (
+                  <div
+                    className="absolute right-0 top-11 bg-white border border-gray-200 rounded-xl shadow-lg z-20 w-56 py-2"
+                    onClick={e => e.stopPropagation()}
+                  >
+                    <p className="px-4 pt-1 pb-2 text-lg font-semibold text-gray-500 uppercase tracking-wide border-b border-gray-100">Sort by</p>
+                    {[
+                      { field: 'empId',     labelAsc: 'ID (A → Z)',            labelDesc: 'ID (Z → A)' },
+                      { field: 'name',      labelAsc: 'Name (A → Z)',           labelDesc: 'Name (Z → A)' },
+                      { field: 'lastLogin', labelAsc: 'Last Login (Oldest)',    labelDesc: 'Last Login (Newest)' },
+                    ].map(({ field, labelAsc, labelDesc }) => (
+                      <div key={field}>
+                        {[{ dir: 'asc', label: labelAsc }, { dir: 'desc', label: labelDesc }].map(({ dir, label }) => (
+                          <button
+                            key={dir}
+                            onClick={() => { setSortField(field); setSortDir(dir); setShowArrange(false); }}
+                            className={`w-full px-4 py-2.5 text-left text-xl transition-colors ${
+                              sortField === field && sortDir === dir
+                                ? 'text-[#3ca4c7] font-semibold bg-blue-50'
+                                : 'text-gray-700 hover:bg-gray-50'
+                            }`}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              {!showInactive && (
+                <button
+                  onClick={() => setShowForm(true)}
+                  className="flex items-center gap-1.5 bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white px-4 py-2 rounded-full text-xl transition-colors shrink-0"
+                >
+                  <Plus size={16} /> New Account
+                </button>
+              )}
+              <button onClick={loadData} className="text-gray-400 hover:text-gray-600 p-1 shrink-0">
+                <RefreshCw size={20} />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Search */}
+        <div className="flex items-center gap-2 border-b border-gray-300 pb-1 mb-5 shrink-0">
+          <Search size={18} className="text-gray-400 shrink-0" />
+          <input
+            type="text"
+            placeholder="Search here"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            className="flex-1 outline-none text-xl text-gray-700 placeholder-gray-400 bg-transparent"
+          />
+        </div>
+
+        {/* Table */}
+        <div className="flex-1 rounded-xl border border-gray-200 overflow-hidden flex flex-col min-h-0 shadow-md">
+          <div className="flex items-center px-8 py-3 bg-white border-b border-gray-200 shrink-0">
+            <span className="w-[15%] text-xl font-semibold text-gray-800 text-center">ID</span>
+            <span className="w-[30%] text-xl font-semibold text-gray-800 text-center">Name</span>
+            <span className="w-[25%] text-xl font-semibold text-gray-800 text-center">Last Log In</span>
+            <span className="flex-1 text-xl font-semibold text-gray-800 text-center">Actions</span>
+          </div>
+          <div className="flex-1 overflow-y-auto min-h-0 px-4 py-3 flex flex-col gap-2" style={{ scrollbarGutter: 'stable' }}>
+            {displayed.length === 0 && (
+              <p className="py-12 text-gray-400 text-xl text-center">No accounts found.</p>
+            )}
+            {displayed.map(acc => (
+              <div key={acc.id} className="flex items-center bg-white rounded-xl border border-gray-200 shadow-sm px-5 py-3.5">
+                <span className="w-[15%] text-xl text-gray-700 text-center">{acc.empId || '—'}</span>
+                <span className="w-[30%] text-xl text-gray-700 text-center">{acc.name || acc.fullName || '—'}</span>
+                <span className="w-[25%] text-xl text-gray-500 text-center">{fmtDate(acc.lastLogin)}</span>
+                <div className="flex-1 flex items-center justify-center gap-2">
+                  {showInactive ? (
+                    <button
+                      onClick={() => handleReactivateClick(acc)}
+                      className="bg-green-400 hover:bg-green-500 text-white px-4 py-1.5 rounded-full text-xl transition-colors"
+                    >
+                      Reactivate Account
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => handleDeactivateClick(acc)}
+                      className="bg-red-300 hover:bg-red-400 text-white px-4 py-1.5 rounded-full text-xl transition-colors"
+                    >
+                      Deactivate Account
+                    </button>
+                  )}
+                  <button
+                    onClick={() => handleEditClick(acc)}
+                    className="bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white px-5 py-1.5 rounded-full text-xl transition-colors"
+                  >
+                    Edit
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </main>
+
+      {/* ══════════════════════════════════════════
+          NEW ACCOUNT FORM
+      ══════════════════════════════════════════ */}
+      {showForm && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl shadow-2xl w-[730px]">
+            <div className="flex items-center justify-between px-10 py-6 border-b border-gray-200">
+              <h3 className="text-2xl font-semibold text-gray-800">New Employee Account</h3>
+              <button onClick={closeForm} className="text-gray-400 hover:text-gray-600 transition-colors"><X size={22} /></button>
+            </div>
+            <div className="px-10 py-8 flex flex-col gap-6">
+              <p className="text-xl font-semibold text-gray-700">Employee Information</p>
+              <div className="flex items-center gap-5">
+                <label className="text-xl text-gray-600 w-44 shrink-0">Full Name</label>
+                <input
+                  type="text"
+                  value={fullName}
+                  onChange={e => setFullName(e.target.value)}
+                  className="flex-1 border border-gray-300 rounded-lg px-4 py-3 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]"
+                />
+              </div>
+              <div className="flex flex-col gap-3">
+                <div className="flex items-center gap-5">
+                  <label className="text-xl text-gray-600 w-44 shrink-0">Display Name</label>
+                  <input
+                    type="text"
+                    value={displayName}
+                    onChange={e => setDisplayName(e.target.value)}
+                    className="flex-1 border border-gray-300 rounded-lg px-4 py-3 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]"
+                  />
+                </div>
+                <div className="text-center">
+                  <p className="text-xl font-semibold text-gray-700">Reminder</p>
+                  <p className="text-xl text-gray-500">The Display Name will be the name used for<br />Sales and Audit Logs.</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-5">
+                <label className="text-xl text-gray-600 w-44 shrink-0">Email Address</label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  className="flex-1 border border-gray-300 rounded-lg px-4 py-3 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]"
+                />
+              </div>
+              <button
+                onClick={handleSaveAccount}
+                className="w-full bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white py-3.5 rounded-full text-xl font-semibold transition-colors mt-2"
+              >
+                Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════
+          CONFIRM NEW ACCOUNT
+      ══════════════════════════════════════════ */}
+      {showConfirm && pendingAccount && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[60]">
+          <div className="bg-white rounded-2xl shadow-2xl w-[730px]">
+            <div className="flex items-center justify-between px-10 py-6 border-b border-gray-200">
+              <h3 className="text-2xl font-semibold text-gray-800">New Employee Account</h3>
+              <button onClick={() => setShowConfirm(false)} className="text-gray-400 hover:text-gray-600 transition-colors"><X size={22} /></button>
+            </div>
+            <div className="px-10 py-10 flex flex-col gap-4 items-center text-center">
+              <p className="text-2xl font-semibold text-gray-800">Register new Employee?</p>
+              <p className="text-xl text-gray-600">
+                {pendingAccount.fullName} will be saved as <span className="font-bold">{pendingAccount.empId}</span>.
+              </p>
+              <div className="mt-2 flex flex-col gap-1">
+                <p className="text-xl font-semibold text-gray-700">Reminder</p>
+                <p className="text-xl text-gray-500">
+                  After confirming, a randomly generated password will be assigned<br />
+                  to the account. The employee can change it by themselves after.
+                </p>
+              </div>
+              <button
+                onClick={handleConfirmAccount}
+                disabled={submitting}
+                className="mt-4 px-16 py-3 rounded-full bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white text-xl font-semibold transition-colors disabled:opacity-50"
+              >
+                {submitting ? 'Saving…' : 'Confirm'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════
+          SUCCESS
+      ══════════════════════════════════════════ */}
+      {showSuccess && pendingAccount && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[60]">
+          <div className="bg-white rounded-2xl shadow-2xl w-[730px]">
+            <div className="px-10 py-6 border-b border-gray-200">
+              <h3 className="text-2xl font-semibold text-gray-800">New Employee Account</h3>
+            </div>
+            <div className="px-10 py-10 flex flex-col gap-5 items-center text-center">
+              <p className="text-2xl font-semibold text-gray-800">Success!</p>
+              <p className="text-xl text-gray-600">
+                {pendingAccount.fullName} has been saved as <span className="font-bold">{pendingAccount.empId}</span>.
+              </p>
+              <div className="flex items-center gap-6 mt-3">
+                <span className="text-xl text-gray-700">Initial Password</span>
+                <div className="border-2 border-gray-300 rounded-xl px-8 py-3 text-xl font-mono text-gray-800 tracking-widest">
+                  {generatedPassword}
+                </div>
+              </div>
+              <button
+                onClick={() => { setShowSuccess(false); setShowForm(false); resetForm(); }}
+                className="mt-4 px-10 py-2 rounded-full bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white text-xl transition-colors"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════
+          DISCARD
+      ══════════════════════════════════════════ */}
+      {showDiscard && (
+        <DiscardDialog
+          onCancel={() => setShowDiscard(false)}
+          onConfirm={() => { setShowDiscard(false); setShowForm(false); resetForm(); }}
+        />
+      )}
+
+      {/* ══════════════════════════════════════════
+          EDIT ACCOUNT MODAL
+      ══════════════════════════════════════════ */}
+      {showEditForm && editRow && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl shadow-2xl w-[730px]">
+            <div className="flex items-center justify-between px-10 py-6 border-b border-gray-200">
+              <h3 className="text-2xl font-semibold text-gray-800">Edit Account — {editRow.empId}</h3>
+              <button onClick={closeEditForm} className="text-gray-400 hover:text-gray-600 transition-colors"><X size={22} /></button>
+            </div>
+            <div className="px-10 py-8 flex flex-col gap-6">
+              <div className="flex items-center gap-5">
+                <label className="text-xl text-gray-600 w-44 shrink-0">Full Name</label>
+                <input
+                  type="text"
+                  value={editFullName}
+                  onChange={e => setEditFullName(e.target.value)}
+                  className="flex-1 border border-gray-300 rounded-lg px-4 py-3 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]"
+                />
+              </div>
+              <div className="flex items-center gap-5">
+                <label className="text-xl text-gray-600 w-44 shrink-0">Display Name</label>
+                <input
+                  type="text"
+                  value={editDisplayName}
+                  onChange={e => setEditDisplayName(e.target.value)}
+                  className="flex-1 border border-gray-300 rounded-lg px-4 py-3 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]"
+                />
+              </div>
+              <button
+                onClick={() => setShowEditConfirm(true)}
+                className="w-full bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white py-3.5 rounded-full text-xl font-semibold transition-colors"
+              >
+                Save Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showEditConfirm && editRow && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[60]">
+          <div className="bg-white rounded-2xl shadow-2xl w-[500px] px-8 py-6 flex flex-col gap-4">
+            <h3 className="text-2xl font-semibold text-gray-800">Save Changes?</h3>
+            <p className="text-xl text-gray-600">Update details for <span className="font-semibold">{editRow.empId}</span>?</p>
+            <div className="flex gap-3 justify-end mt-1">
+              <button onClick={() => setShowEditConfirm(false)} className="px-6 py-2 rounded-full border border-gray-300 text-xl text-gray-600 hover:bg-gray-50 transition-colors">Cancel</button>
+              <button onClick={handleConfirmEdit} className="px-6 py-2 rounded-full bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white text-xl transition-colors">Confirm</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showEditOk && editRow && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[60]">
+          <div className="bg-white rounded-2xl shadow-2xl w-[500px] px-8 py-6 flex flex-col gap-4">
+            <h3 className="text-2xl font-semibold text-gray-800">Changes Saved!</h3>
+            <p className="text-xl text-gray-600"><span className="font-semibold">{editDisplayName}</span> has been updated.</p>
+            <div className="flex justify-end mt-1">
+              <button onClick={() => { setShowEditOk(false); setShowEditForm(false); setEditRow(null); }} className="px-6 py-2 rounded-full bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white text-xl transition-colors">Done</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showEditDiscard && (
+        <DiscardDialog
+          onCancel={() => setShowEditDiscard(false)}
+          onConfirm={() => { setShowEditDiscard(false); setShowEditForm(false); setEditRow(null); }}
+        />
+      )}
+
+      {/* ══════════════════════════════════════════
+          REACTIVATE CONFIRMATION
+      ══════════════════════════════════════════ */}
+      {showReactivateConf && reactivateTarget && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[60]">
+          <div className="bg-white rounded-2xl shadow-2xl w-[500px] px-8 py-6 flex flex-col gap-4">
+            <h3 className="text-2xl font-semibold text-gray-800">Reactivate Account?</h3>
+            <p className="text-xl text-gray-600">
+              <span className="font-semibold">{reactivateTarget.name || reactivateTarget.fullName}</span>
+              {' '}({reactivateTarget.empId}) will be moved back to the active list.
+            </p>
+            <p className="text-xl text-gray-400 italic">The employee will be able to log in again.</p>
+            <div className="flex gap-3 justify-end mt-1">
+              <button
+                onClick={() => { setShowReactivateConf(false); setReactivateTarget(null); }}
+                className="px-6 py-2 rounded-full border border-gray-300 text-xl text-gray-600 hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmReactivate}
+                className="px-6 py-2 rounded-full bg-green-400 hover:bg-green-500 text-white text-xl transition-colors"
+              >
+                Reactivate
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════
+          DEACTIVATE CONFIRMATION
+      ══════════════════════════════════════════ */}
+      {showDeactivateConf && deactivateTarget && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[60]">
+          <div className="bg-white rounded-2xl shadow-2xl w-[500px] px-8 py-6 flex flex-col gap-4">
+            <h3 className="text-2xl font-semibold text-gray-800">Deactivate Account?</h3>
+            <p className="text-xl text-gray-600">
+              <span className="font-semibold">{deactivateTarget.name || deactivateTarget.fullName}</span>
+              {' '}({deactivateTarget.empId}) will be moved to the inactive list.
+            </p>
+            <p className="text-xl text-gray-400 italic">The employee will no longer be able to log in.</p>
+            <div className="flex gap-3 justify-end mt-1">
+              <button
+                onClick={() => { setShowDeactivateConf(false); setDeactivateTarget(null); }}
+                className="px-6 py-2 rounded-full border border-gray-300 text-xl text-gray-600 hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmDeactivate}
+                className="px-6 py-2 rounded-full bg-red-400 hover:bg-red-500 text-white text-xl transition-colors"
+              >
+                Deactivate
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
