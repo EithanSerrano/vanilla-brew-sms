@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { collection, query, orderBy, getDocs, doc, updateDoc, setDoc } from 'firebase/firestore';
+import { collection, query, orderBy, getDocs, doc, updateDoc, setDoc, addDoc, getDoc } from 'firebase/firestore';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { auth, db } from '../firebase';
 import { Search, Plus, RefreshCw, X, AlignJustify } from 'lucide-react';
@@ -80,6 +80,20 @@ export default function AdminRegistration() {
     return () => document.removeEventListener('click', close);
   }, []);
 
+  const logAudit = async (action, itemId, itemName, details = {}) => {
+    try {
+      let performedBy = 'Unknown';
+      const currentUser = auth.currentUser;
+      if (currentUser) {
+        const snap = await getDoc(doc(db, 'users', currentUser.uid));
+        if (snap.exists()) performedBy = snap.data().name || 'Unknown';
+      }
+      await addDoc(collection(db, 'auditlog'), {
+        action, itemType: 'account', itemId, itemName, details, performedBy, timestamp: new Date(),
+      });
+    } catch (e) { console.error('Audit log error:', e); }
+  };
+
   const generateNextEmpId = async () => {
     const snap = await getDocs(collection(db, 'users'));
     const nums = snap.docs
@@ -123,6 +137,10 @@ export default function AdminRegistration() {
         isOnline: false,
         createdAt: new Date(),
       });
+      await logAudit('CREATE_ACCOUNT', pendingAccount.empId, pendingAccount.displayName, {
+        fullName: pendingAccount.fullName,
+        email: pendingAccount.email,
+      });
       await loadData();
       setShowConfirm(false);
       setShowSuccess(true);
@@ -138,6 +156,10 @@ export default function AdminRegistration() {
   const handleConfirmDeactivate = async () => {
     if (!deactivateTarget) return;
     await updateDoc(doc(db, 'users', deactivateTarget.id), { status: 'Inactive' });
+    await logAudit('DEACTIVATE_ACCOUNT', deactivateTarget.empId, deactivateTarget.name || deactivateTarget.fullName, {
+      fullName: deactivateTarget.fullName || deactivateTarget.name,
+      email: deactivateTarget.email,
+    });
     await loadData();
     setShowDeactivateConf(false);
     setDeactivateTarget(null);
@@ -148,6 +170,10 @@ export default function AdminRegistration() {
   const handleConfirmReactivate = async () => {
     if (!reactivateTarget) return;
     await updateDoc(doc(db, 'users', reactivateTarget.id), { status: 'Active' });
+    await logAudit('REACTIVATE_ACCOUNT', reactivateTarget.empId, reactivateTarget.name || reactivateTarget.fullName, {
+      fullName: reactivateTarget.fullName || reactivateTarget.name,
+      email: reactivateTarget.email,
+    });
     await loadData();
     setShowReactivateConf(false);
     setReactivateTarget(null);
@@ -173,6 +199,12 @@ export default function AdminRegistration() {
     await updateDoc(doc(db, 'users', editRow.id), {
       fullName: editFullName.trim(),
       name: editDisplayName.trim(),
+    });
+    await logAudit('EDIT_ACCOUNT', editRow.empId, editDisplayName.trim(), {
+      previousFullName: editRow.fullName || editRow.name,
+      newFullName: editFullName.trim(),
+      previousDisplayName: editRow.name,
+      newDisplayName: editDisplayName.trim(),
     });
     await loadData();
     setShowEditConfirm(false);

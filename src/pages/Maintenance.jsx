@@ -1,923 +1,448 @@
-﻿import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { 
-  WrenchIcon, 
-  CornerUpLeft, 
-  ChevronDown, 
-  ChevronUp, 
-  Box, 
-  Edit3, 
-  Archive, 
-  FilePlus, 
-  Users,
-  Lock,    
-  Unlock,  
-  Plus,
-  MinusCircle,
-  Check,
-  Info,
-  RotateCcw,
-  RotateCw,
-  UserRoundPlus,
-  UserRoundMinus,
-  Trash2,
-  } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { collection, query, orderBy, getDocs } from 'firebase/firestore';
+import { db } from '../firebase';
+import { Search, AlignJustify, Filter, RefreshCw, X, ChevronDown } from 'lucide-react';
 import AdminSidebar from '../layouts/AdminSidebar';
-import MaintenanceCreate from './maintenance/MaintenanceCreate';
-import MaintenanceEdit from './maintenance/MaintenanceEdit';
-import MaintenanceArchive from './maintenance/MaintenanceArchive';
-import MaintenanceRetrieve from './maintenance/MaintenanceRetrieve';
-import MaintenanceAccounts from './maintenance/MaintenanceAccounts';
-import { collection, addDoc, updateDoc, doc, getDocs, setDoc } from "firebase/firestore"; 
-import { db } from "../firebase";
-import { saveTransaction, formatTransactionDate } from '../utils/transactionHelpers';
 
-export default function Maintenance({ role }) {
-  const navigate = useNavigate();
-  const [currentView, setCurrentView] = useState('main'); 
-  const [activeDropdown, setActiveDropdown] = useState(null);
-  const [activeAccordion, setActiveAccordion] = useState('general');
-  const [currentFormType, setCurrentFormType] = useState(null); // Track which form is being saved
-  
-  // --- STATE FOR FORMS & FLOWS ---
-  const [showSavePrompt, setShowSavePrompt] = useState(false);
-  const [showItemSavedSuccess, setShowItemSavedSuccess] = useState(false);
-  const [showDiscardPrompt, setShowDiscardPrompt] = useState(false);
+const ACTION_LABELS = {
+  ADD_MATERIAL:      'Add Material in Inventory',
+  ADD_INGREDIENT:    'Add Ingredient in Inventory',
+  HIDE:              'Hide Item in Inventory',
+  RETRIEVE:          'Retrieve Item in Inventory',
+  RESUPPLY:          'Resupply in Inventory',
+  ADJUST:            'Adjust Stock in Inventory',
+  EDIT:              'Edit Item in Inventory',
+  CREATE_ACCOUNT:    'Create Employee Account',
+  DEACTIVATE_ACCOUNT:'Deactivate Employee Account',
+  REACTIVATE_ACCOUNT:'Reactivate Employee Account',
+  EDIT_ACCOUNT:      'Edit Employee Account',
+};
 
-  const [menuItemName, setMenuItemName] = useState('');
-  const [sizes, setSizes] = useState({
-    Small: { enabled: true, price: '' },
-    Medium: { enabled: true, price: '' },
-    Large: { enabled: false, price: '' },
-  });
-  const [selectedMenuItemSize, setSelectedMenuItemSize] = useState('Small');
-  const [addOns, setAddOns] = useState([{ ingredientId: '', name: '', price: '', unit: '' }]);
-  const [itemSizes, setItemSizes] = useState({
-    Small: { enabled: true, qty: '50' },
-    Medium: { enabled: true, qty: '50' },
-    Large: { enabled: true, qty: '50' },
-  });
-  const [selectedItemSize, setSelectedItemSize] = useState('Small');
-  const [itemStartingQty, setItemStartingQty] = useState('');
-
-  const toggleItemSize = (size) => {
-  setItemSizes(prev => ({
-    ...prev,
-    [size]: { ...prev[size], enabled: !prev[size].enabled }
-  }));
+function splitTimestamp(ts) {
+  if (!ts) return { date: '—', time: '—' };
+  const d = ts.toDate ? ts.toDate() : new Date(ts);
+  if (isNaN(d.getTime())) return { date: '—', time: '—' };
+  return {
+    date: d.toLocaleDateString('en-US'),
+    time: d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
+    raw: d,
   };
+}
 
-  const [selectedEditItem, setSelectedEditItem] = useState(null);
-
-  useEffect(() => {
-    if (currentView === 'edit-menu-item' || currentView === 'edit-item' || currentView === 'edit-ingredient') {
-      setSelectedEditItem(null);
-    }
-  }, [currentView]);
-
-  const handleAddRow = () => {
-    setAddOns([...addOns, { ingredientId: '', name: '', price: '', unit: '' }]);
-  };
-
-  const handleRemoveRow = (index) => {
-    if (addOns.length > 0) {
-      setAddOns(addOns.filter((_, i) => i !== index));
-    } else {
-      setAddOns([{ ingredientId: '', name: '', price: '', unit: '' }]);
-    }
-  };
-
-  const [connections, setConnections] = useState([]);
-
-  const addConnection = (type) => {
-    setConnections([...connections, { type, code: '', units: '' }]);
-  };
-
-  const removeConnection = (index) => {
-    setConnections(connections.filter((_, i) => i !== index));
-  };
-
-  const getSequenceNumber = (index, type) => {
-    return connections.slice(0, index + 1).filter(c => c.type === type).length;
-  };
-
-
-
-  // --- ACTIVE & ARCHIVED DATA STATES --- 
-
-  const [activeIngredients, setActiveIngredients] = useState([
-    
-  ]);
-
-  const [activeMenuItems, setActiveMenuItems] = useState([
-    
-  ]);
-
-  const [activeItems, setActiveItems] = useState([
-    
-  ]);
-
-  useEffect(() => {
-    const loadActiveData = async () => {
-      try {
-        const ingredientSnapshot = await getDocs(collection(db, 'ingredients'));
-        const itemSnapshot = await getDocs(collection(db, 'items'));
-        const menuItemSnapshot = await getDocs(collection(db, 'menuItems'));
-
-        const ingredients = ingredientSnapshot.docs.map((doc) => ({ docId: doc.id, id: doc.data().id ?? doc.id, ...doc.data() }));
-        const items = itemSnapshot.docs.map((doc) => ({ docId: doc.id, id: doc.data().id ?? doc.id, ...doc.data() }));
-        const menuItems = menuItemSnapshot.docs.map((doc) => ({ docId: doc.id, id: doc.data().id ?? doc.id, ...doc.data() }));
-
-        setActiveIngredients(ingredients.filter((item) => !item.archived));
-        setArchivedIngredients(ingredients.filter((item) => item.archived));
-        setActiveItems(items.filter((item) => !item.archived));
-        setArchivedItems(items.filter((item) => item.archived));
-        setActiveMenuItems(menuItems.filter((item) => !item.archived));
-        setArchivedMenuItems(menuItems.filter((item) => item.archived));
-      } catch (error) {
-        console.error('Failed to load active maintenance data:', error);
+function renderDetails(log) {
+  const d = log.details || {};
+  switch (log.action) {
+    case 'ADD_MATERIAL':
+      return [
+        { label: 'Size',          value: d.size || '—' },
+        { label: 'Starting Qty',  value: d.startingQty != null ? `${d.startingQty} units` : '—' },
+        { label: 'Max Limit',     value: d.maxLimit ? `${d.maxLimit} units` : '—' },
+      ];
+    case 'ADD_INGREDIENT':
+      return [
+        { label: 'Type',          value: d.type || '—' },
+        { label: 'Unit',          value: d.unit || '—' },
+        { label: 'Max Limit',     value: d.maxLimit ? `${d.maxLimit} ${d.unit || 'units'}` : '—' },
+        { label: 'Batch ID',      value: d.batchId || '—' },
+        { label: 'Quantity',      value: d.quantity != null ? `${d.quantity} ${d.unit || 'units'}` : '—' },
+      ];
+    case 'HIDE':
+      return [
+        { label: 'Connected Items Affected', value: d.connectedItemsAffected ?? 0 },
+      ];
+    case 'RETRIEVE':
+      if (log.itemType === 'material') {
+        return [{ label: 'New Quantity', value: `${d.newQty ?? 0} units` }];
       }
-    };
+      return [
+        { label: 'Batch ID',         value: d.batchId || '—' },
+        { label: 'Expiration Date',  value: d.expirationDate || '—' },
+        { label: 'Quantity',         value: d.quantity != null ? String(d.quantity) : '—' },
+      ];
+    case 'RESUPPLY':
+      if (log.itemType === 'material') {
+        return [
+          { label: 'Previous Stock', value: `${d.previousStock ?? 0} units` },
+          { label: 'Amount Added',   value: `${d.amountAdded ?? 0} units` },
+          { label: 'New Stock',      value: `${d.newStock ?? 0} units` },
+        ];
+      }
+      return [
+        { label: 'Batch ID',        value: d.batchId || '—' },
+        { label: 'Expiration Date', value: d.expirationDate || '—' },
+        { label: 'Quantity Added',  value: d.quantity != null ? String(d.quantity) : '—' },
+      ];
+    case 'ADJUST':
+      if (log.itemType === 'material') {
+        return [
+          { label: 'Previous Qty', value: `${d.previousQty ?? 0} units` },
+          { label: 'New Qty',      value: `${d.newQty ?? 0} units` },
+          { label: 'Reason',       value: d.reason || '—' },
+        ];
+      }
+      return [
+        ...(d.batches || []).map((b, i) => ({
+          label: `Batch ${i + 1}${b.batchId ? ` (${b.batchId})` : ''}`,
+          value: `${b.previousQty ?? 0} → ${b.newQty ?? 0}`,
+        })),
+        { label: 'Reason', value: d.reason || '—' },
+      ];
+    case 'EDIT':
+      return [
+        d.previousName !== d.newName
+          ? { label: 'Name',      value: `${d.previousName} → ${d.newName}` }
+          : { label: 'Name',      value: d.newName || '—' },
+        { label: 'Max Limit',     value: `${d.previousMaxLimit ?? 0} → ${d.newMaxLimit ?? 0}` },
+        ...(d.previousType != null ? [{ label: 'Type', value: `${d.previousType} → ${d.newType}` }] : []),
+        ...(d.previousUnit != null ? [{ label: 'Unit', value: `${d.previousUnit} → ${d.newUnit}` }] : []),
+        ...(d.previousIsAddOn != null ? [{ label: 'Is Add-On', value: `${d.previousIsAddOn} → ${d.newIsAddOn}` }] : []),
+      ];
+    case 'CREATE_ACCOUNT':
+      return [
+        { label: 'Full Name', value: d.fullName || '—' },
+        { label: 'Email',     value: d.email    || '—' },
+      ];
+    case 'DEACTIVATE_ACCOUNT':
+    case 'REACTIVATE_ACCOUNT':
+      return [
+        { label: 'Full Name', value: d.fullName || '—' },
+        { label: 'Email',     value: d.email    || '—' },
+      ];
+    case 'EDIT_ACCOUNT':
+      return [
+        { label: 'Full Name',     value: `${d.previousFullName || '—'} → ${d.newFullName || '—'}` },
+        { label: 'Display Name',  value: `${d.previousDisplayName || '—'} → ${d.newDisplayName || '—'}` },
+      ];
+    default:
+      return Object.entries(d).map(([k, v]) => ({ label: k, value: String(v) }));
+  }
+}
 
-    loadActiveData();
+export default function Maintenance() {
+  const [logs,        setLogs]        = useState([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [viewLog,     setViewLog]     = useState(null);
+
+  // ── Arrange ──
+  const [sortField,   setSortField]   = useState('timestamp');
+  const [sortDir,     setSortDir]     = useState('desc');
+  const [showArrange, setShowArrange] = useState(false);
+
+  // ── Filter ──
+  const [showFilter,     setShowFilter]     = useState(false);
+  const [filterDate,     setFilterDate]     = useState('');
+  const [filterRangeEnd, setFilterRangeEnd] = useState('');
+  const [filterIsRange,  setFilterIsRange]  = useState(false);
+  const [filterAction,   setFilterAction]   = useState('');
+  const [filterPerformer,setFilterPerformer]= useState('');
+
+  const loadData = async () => {
+    try {
+      const snap = await getDocs(query(collection(db, 'auditlog'), orderBy('timestamp', 'desc')));
+      setLogs(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    } catch (e) { console.error('Audit log load error:', e); }
+  };
+  useEffect(() => { loadData(); }, []);
+
+  useEffect(() => {
+    const close = () => setShowArrange(false);
+    document.addEventListener('click', close);
+    return () => document.removeEventListener('click', close);
   }, []);
 
-  const [selectedArchiveIngredient, setSelectedArchiveIngredient] = useState(null);
-  const [showIngConfirm, setShowIngConfirm] = useState(false);
-  const [showIngSuccess, setShowIngSuccess] = useState(false);
+  // ── Derived values ──
+  const actionTypes = [...new Set(logs.map(l => l.action).filter(Boolean))].sort();
+  const performers  = [...new Set(logs.map(l => l.performedBy).filter(Boolean))].sort();
 
-  const [selectedArchiveMenuItem, setSelectedArchiveMenuItem] = useState(null);
-  const [showMenuConfirm, setShowMenuConfirm] = useState(false);
-  const [showMenuSuccess, setShowMenuSuccess] = useState(false);
+  const isFiltered = !!(filterDate || filterAction || filterPerformer);
 
-  const [selectedArchiveItem, setSelectedArchiveItem] = useState(null);
-  const [showItemConfirm, setShowItemConfirm] = useState(false);
-  const [showItemSuccess, setShowItemSuccess] = useState(false);
+  const isSameDay = (d1, d2) =>
+    d1.getFullYear() === d2.getFullYear() &&
+    d1.getMonth() === d2.getMonth() &&
+    d1.getDate() === d2.getDate();
 
-  const [archivedIngredients, setArchivedIngredients] = useState([
-    
-  ]);
-  const [archivedMenuItems, setArchivedMenuItems] = useState([
-    
-  ]);
-  const [archivedItems, setArchivedItems] = useState([
-    
-  ]);
-
-  const [selectedRetrieveIng, setSelectedRetrieveIng] = useState(null);
-  const [showRetrieveIngConfirm, setShowRetrieveIngConfirm] = useState(false);
-  const [showRetrieveIngSuccess, setShowRetrieveIngSuccess] = useState(false);
-
-  const [selectedRetrieveMenu, setSelectedRetrieveMenu] = useState(null);
-  const [showRetrieveMenuConfirm, setShowRetrieveMenuConfirm] = useState(false);
-  const [showRetrieveMenuSuccess, setShowRetrieveMenuSuccess] = useState(false);
-
-  const [selectedRetrieveItem, setSelectedRetrieveItem] = useState(null);
-  const [showRetrieveItemConfirm, setShowRetrieveItemConfirm] = useState(false);
-  const [showRetrieveItemSuccess, setShowRetrieveItemSuccess] = useState(false);
-
-  // --- ACCOUNT MANAGEMENT STATES ---
-  const [accounts, setAccounts] = useState([
-    { id: 'EMP001', name: 'Carl Nueva', status: 'Active' },
-    { id: 'EMP002', name: 'Joaquin Sarmiento', status: 'Inactive' },
-    { id: 'EMP003', name: 'Renz Alcanzo', status: 'Active' },
-  ]);
-
-  const [selectedAccount, setSelectedAccount] = useState(null);
-  const [showStatusConfirm, setShowStatusConfirm] = useState(false);
-  const [showStatusSuccess, setShowStatusSuccess] = useState(false);
-
-  const toggleSizeLock = (size) => {
-    setSizes(prev => ({
-      ...prev,
-      [size]: { ...prev[size], enabled: !prev[size].enabled }
-    }));
-  };
-
-  const handleArchiveConfirm = () => {
-    if (!selectedArchiveItem) return;
-
-    // Logic to remove from current active state
-    if (currentView === 'archive-ingredient') {
-      setActiveIngredients(prev => prev.filter(i => i.id !== selectedArchiveItem.id));
-    } else if (currentView === 'archive-menu-item') {
-      setActiveMenuItems(prev => prev.filter(i => i.id !== selectedArchiveItem.id));
-    } else if (currentView === 'archive-item') {
-      setActiveItems(prev => prev.filter(i => i.id !== selectedArchiveItem.id));
-    }
-
-    // Clear state and close modal
-    setShowArchiveConfirm(false);
-    setSelectedArchiveItem(null);
-  };
-
-  // --- FORM DATA STATE ---
-  const [ingredientName, setIngredientName] = useState('');
-  const [ingredientType, setIngredientType] = useState('Dry');
-  const [startingQty, setStartingQty] = useState('');
-  const [ingredientIsAddOn, setIngredientIsAddOn] = useState(false);
-  const [itemName, setItemName] = useState('');
-  
-  // Updated initial category alignment state to default to Coffee
-  const [itemCategory, setItemCategory] = useState('Coffee');
-
-  // --- SAVED UNIQUE KEY STATE (for modal display) ---
-  const [lastSavedKey, setLastSavedKey] = useState('');
-  const [lastSavedName, setLastSavedName] = useState('');
-  
-  // --- HELPERS ---
-  const isFormFilled = () => {
-    return ingredientName.trim().length > 0;
-  };
-
-  const closeAllModals = () => {
-    setShowSavePrompt(false);
-    setShowItemSavedSuccess(false);
-    setShowDiscardPrompt(false);
-  };
-
-  const handleBack = () => {
-    if (showSavePrompt || showItemSavedSuccess || showDiscardPrompt) {
-      setShowSavePrompt(false);
-      setShowItemSavedSuccess(false);
-      setShowDiscardPrompt(false);
-      return;
-    }
-    if (currentView !== 'main') {
-      setCurrentView('main');
-    } else {
-      navigate(-1);
-    }
-  };
-
-  const recordMaintenanceTransaction = async ({ action, entityType, entityId, entityName, summary, extra = {} }) => {
-    try {
-      await saveTransaction('MTN', {
-        type: 'Maintenance',
-        action,
-        entityType,
-        entityId,
-        entityName,
-        summary,
-        date: formatTransactionDate(),
-        ...extra,
-      });
-    } catch (error) {
-      console.error('Failed to record maintenance transaction:', error);
-    }
-  };
-
-  // --- FIRESTORE SAVE FUNCTIONS ---
-  const generateNextId = (prefix, itemsArray) => {
-    const existingIds = itemsArray.map(item => {
-      const match = item.id.match(new RegExp(`^${prefix}(\\d+)$`));
-      return match ? parseInt(match[1], 10) : 0;
+  const displayed = logs
+    .filter(l => {
+      const label = ACTION_LABELS[l.action] || l.action || '';
+      const q = searchQuery.toLowerCase();
+      if (searchQuery && !(
+        label.toLowerCase().includes(q) ||
+        (l.itemName || '').toLowerCase().includes(q) ||
+        (l.performedBy || '').toLowerCase().includes(q)
+      )) return false;
+      if (filterAction && l.action !== filterAction) return false;
+      if (filterPerformer && l.performedBy !== filterPerformer) return false;
+      if (filterDate) {
+        const ts = splitTimestamp(l.timestamp);
+        if (!ts.raw) return false;
+        if (filterIsRange && filterRangeEnd) {
+          const start = new Date(filterDate); start.setHours(0, 0, 0, 0);
+          const end   = new Date(filterRangeEnd); end.setHours(23, 59, 59, 999);
+          if (ts.raw < start || ts.raw > end) return false;
+        } else {
+          if (!isSameDay(ts.raw, new Date(filterDate))) return false;
+        }
+      }
+      return true;
+    })
+    .sort((a, b) => {
+      let av, bv;
+      if (sortField === 'action') {
+        av = (ACTION_LABELS[a.action] || a.action || '').toLowerCase();
+        bv = (ACTION_LABELS[b.action] || b.action || '').toLowerCase();
+      } else if (sortField === 'performedBy') {
+        av = (a.performedBy || '').toLowerCase();
+        bv = (b.performedBy || '').toLowerCase();
+      } else {
+        const ta = splitTimestamp(a.timestamp).raw || new Date(0);
+        const tb = splitTimestamp(b.timestamp).raw || new Date(0);
+        av = ta; bv = tb;
+      }
+      if (av < bv) return sortDir === 'asc' ? -1 : 1;
+      if (av > bv) return sortDir === 'asc' ? 1 : -1;
+      return 0;
     });
-    const maxId = existingIds.length > 0 ? Math.max(...existingIds) : 0;
-    return `${prefix}${String(maxId + 1).padStart(3, '0')}`;
+
+  const clearFilters = () => {
+    setFilterDate(''); setFilterRangeEnd(''); setFilterIsRange(false);
+    setFilterAction(''); setFilterPerformer('');
   };
 
-  const stripTrailingSizeSuffix = (name) => {
-    if (!name) return '';
-    return name.replace(/\s*\((Small|Medium|Large)\)$/, '');
-  };
-
-  const saveMenuItemToFirestore = async () => {
-    try {
-      const filteredAddOns = addOns
-        .filter(addon => addon.ingredientId && addon.price)
-        .map(addon => ({
-          ingredientId: addon.ingredientId,
-          name: addon.name,
-          price: addon.price,
-        }));
-
-      const validConnections = connections.filter(conn => conn.code && conn.units);
-      const selectedSize = selectedMenuItemSize || 'Small';
-      const selectedPrice = sizes[selectedSize]?.price || '';
-      const baseMenuItemName = stripTrailingSizeSuffix(menuItemName);
-      const savedMenuItemName = baseMenuItemName ? `${baseMenuItemName} (${selectedSize})` : '';
-      const newMenuItemId = generateNextId('MNTM', activeMenuItems);
-
-      const menuItemData = {
-        id: newMenuItemId,
-        name: savedMenuItemName,
-        category: itemCategory,
-        selectedSize,
-        price: selectedPrice,
-        sizes,
-        addOns: filteredAddOns,
-        connections: validConnections,
-        archived: false,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-      
-      const docRef = await addDoc(collection(db, 'menuItems'), menuItemData);
-      console.log('Menu Item saved with ID:', newMenuItemId);
-
-      setLastSavedKey(newMenuItemId);
-      setLastSavedName(savedMenuItemName);
-
-      setActiveMenuItems(prev => ([
-        ...prev,
-        {
-          id: newMenuItemId,
-          docId: docRef.id,
-          name: savedMenuItemName,
-          category: itemCategory,
-          selectedSize,
-          price: selectedPrice,
-          sizes,
-          addOns: filteredAddOns,
-          connections: validConnections,
-          archived: false,
-        },
-      ]));
-
-      await recordMaintenanceTransaction({
-        action: 'Created',
-        entityType: 'Menu Item',
-        entityId: newMenuItemId,
-        entityName: savedMenuItemName,
-        summary: `Created Menu Item ${savedMenuItemName} (${newMenuItemId})`,
-      });
-
-      return true;
-    } catch (error) {
-      console.error('Error saving menu item:', error);
-      alert('Error saving menu item to database');
-      return false;
-    }
-  };
-
-  const saveItemToFirestore = async () => {
-    try {
-      const itemSize = selectedItemSize || 'Small';
-      const baseItemName = stripTrailingSizeSuffix(itemName);
-      const savedItemName = baseItemName ? `${baseItemName} (${itemSize})` : '';
-      const newItemId = generateNextId('ITEM', activeItems);
-      const itemData = {
-        id: newItemId,
-        name: savedItemName,
-        size: itemSize,
-        startingQty: parseFloat(itemStartingQty) || 0,
-        archived: false,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-      
-      const docRef = await addDoc(collection(db, 'items'), itemData);
-      console.log('Item saved with ID:', newItemId);
-
-      setLastSavedKey(newItemId);
-      setLastSavedName(savedItemName);
-
-      setActiveItems(prev => ([
-        ...prev,
-        {
-          id: newItemId,
-          docId: docRef.id,
-          name: savedItemName,
-          size: itemSize,
-          startingQty: parseFloat(itemStartingQty) || 0,
-          archived: false,
-        },
-      ]));
-
-      await recordMaintenanceTransaction({
-        action: 'Created',
-        entityType: 'Item',
-        entityId: newItemId,
-        entityName: savedItemName,
-        summary: `Created Item ${savedItemName} (${newItemId})`,
-      });
-
-      return true;
-    } catch (error) {
-      console.error('Error saving item:', error);
-      alert('Error saving item to database');
-      return false;
-    }
-  };
-
-  const saveIngredientToFirestore = async () => {
-    try {
-      const newIngredientId = generateNextId('INGR', activeIngredients);
-      const ingredientData = {
-        id: newIngredientId,
-        name: ingredientName,
-        type: ingredientType,
-        startingQty: parseFloat(startingQty) || 0,
-        isAddOn: ingredientIsAddOn,
-        archived: false,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      };
-      
-      const docRef = await addDoc(collection(db, 'ingredients'), ingredientData);
-      console.log('Ingredient saved with ID:', newIngredientId);
-
-      setLastSavedKey(newIngredientId);
-      setLastSavedName(ingredientName);
-
-      setActiveIngredients(prev => ([
-        ...prev,
-        {
-          id: newIngredientId,
-          docId: docRef.id,
-          name: ingredientName,
-          type: ingredientType,
-          startingQty: parseFloat(startingQty) || 0,
-          isAddOn: ingredientIsAddOn,
-          archived: false,
-        },
-      ]));
-
-      await recordMaintenanceTransaction({
-        action: 'Created',
-        entityType: 'Ingredient',
-        entityId: newIngredientId,
-        entityName: ingredientName,
-        summary: `Created Ingredient ${ingredientName} (${newIngredientId})`,
-      });
-
-      return true;
-    } catch (error) {
-      console.error('Error saving ingredient:', error);
-      alert('Error saving ingredient to database');
-      return false;
-    }
-  };
-
-  const updateMenuItemInFirestore = async () => {
-    if (!selectedEditItem) return false;
-
-    try {
-      const filteredAddOns = addOns
-        .filter(addon => addon.ingredientId && addon.price)
-        .map(addon => ({
-          ingredientId: addon.ingredientId,
-          name: addon.name,
-          price: addon.price,
-        }));
-
-      const validConnections = connections.filter(conn => conn.code && conn.units);
-      const selectedSize = selectedMenuItemSize || 'Small';
-      const selectedPrice = sizes[selectedSize]?.price || '';
-      const baseMenuItemName = stripTrailingSizeSuffix(menuItemName);
-      const savedMenuItemName = baseMenuItemName ? `${baseMenuItemName} (${selectedSize})` : '';
-      const menuItemData = {
-        name: savedMenuItemName,
-        category: itemCategory,
-        selectedSize,
-        price: selectedPrice,
-        sizes,
-        addOns: filteredAddOns,
-        connections: validConnections,
-        updatedAt: new Date(),
-      };
-
-      const documentId = selectedEditItem.docId || selectedEditItem.id;
-      await updateDoc(doc(db, 'menuItems', documentId), menuItemData);
-
-      setActiveMenuItems(prev => prev.map((item) => item.id === selectedEditItem.id ? {
-        ...item,
-        ...menuItemData,
-        id: selectedEditItem.id,
-        docId: selectedEditItem.docId || selectedEditItem.id,
-      } : item));
-
-      setLastSavedKey(selectedEditItem.id);
-      setLastSavedName(savedMenuItemName);
-
-      await recordMaintenanceTransaction({
-        action: 'Updated',
-        entityType: 'Menu Item',
-        entityId: selectedEditItem.id,
-        entityName: savedMenuItemName,
-        summary: `Updated Menu Item ${savedMenuItemName} (${selectedEditItem.id})`,
-      });
-
-      return true;
-    } catch (error) {
-      console.error('Error updating menu item:', error);
-      alert('Error updating menu item in database');
-      return false;
-    }
-  };
-
-  const updateItemInFirestore = async () => {
-    if (!selectedEditItem) return false;
-
-    try {
-      const itemSize = selectedItemSize || 'Small';
-      const baseItemName = stripTrailingSizeSuffix(itemName);
-      const savedItemName = baseItemName ? `${baseItemName} (${itemSize})` : '';
-      const itemData = {
-        name: savedItemName,
-        size: itemSize,
-        startingQty: parseFloat(itemStartingQty) || 0,
-        updatedAt: new Date(),
-      };
-
-      const documentId = selectedEditItem.docId || selectedEditItem.id;
-      await updateDoc(doc(db, 'items', documentId), itemData);
-
-      setActiveItems(prev => prev.map((item) => item.id === selectedEditItem.id ? {
-        ...item,
-        ...itemData,
-        id: selectedEditItem.id,
-        docId: selectedEditItem.docId || selectedEditItem.id,
-      } : item));
-
-      setLastSavedKey(selectedEditItem.id);
-      setLastSavedName(savedItemName);
-
-      await recordMaintenanceTransaction({
-        action: 'Updated',
-        entityType: 'Item',
-        entityId: selectedEditItem.id,
-        entityName: savedItemName,
-        summary: `Updated Item ${savedItemName} (${selectedEditItem.id})`,
-      });
-
-      return true;
-    } catch (error) {
-      console.error('Error updating item:', error);
-      alert('Error updating item in database');
-      return false;
-    }
-  };
-
-  const updateIngredientInFirestore = async () => {
-    if (!selectedEditItem) return false;
-
-    try {
-      const ingredientData = {
-        name: ingredientName,
-        type: ingredientType,
-        startingQty: parseFloat(startingQty) || 0,
-        isAddOn: ingredientIsAddOn,
-        updatedAt: new Date(),
-      };
-
-      const documentId = selectedEditItem.docId || selectedEditItem.id;
-      await updateDoc(doc(db, 'ingredients', documentId), ingredientData);
-
-      setActiveIngredients(prev => prev.map((item) => item.id === selectedEditItem.id ? {
-        ...item,
-        ...ingredientData,
-        id: selectedEditItem.id,
-        docId: selectedEditItem.docId || selectedEditItem.id,
-      } : item));
-
-      setLastSavedKey(selectedEditItem.id);
-      setLastSavedName(ingredientName);
-
-      await recordMaintenanceTransaction({
-        action: 'Updated',
-        entityType: 'Ingredient',
-        entityId: selectedEditItem.id,
-        entityName: ingredientName,
-        summary: `Updated Ingredient ${ingredientName} (${selectedEditItem.id})`,
-      });
-
-      return true;
-    } catch (error) {
-      console.error('Error updating ingredient:', error);
-      alert('Error updating ingredient in database');
-      return false;
-    }
-  };
-
-  const finalizeSaveFlow = async () => {
-    let saveSuccess = false;
-
-    // Determine which form is being saved based on currentView
-    if (currentView === 'create-menu-item') {
-      saveSuccess = await saveMenuItemToFirestore();
-    } else if (currentView === 'edit-menu-item') {
-      saveSuccess = await updateMenuItemInFirestore();
-    } else if (currentView === 'create-item') {
-      saveSuccess = await saveItemToFirestore();
-    } else if (currentView === 'edit-item') {
-      saveSuccess = await updateItemInFirestore();
-    } else if (currentView === 'create-ingredient') {
-      saveSuccess = await saveIngredientToFirestore();
-    } else if (currentView === 'edit-ingredient') {
-      saveSuccess = await updateIngredientInFirestore();
-    }
-
-    if (saveSuccess) {
-      setShowSavePrompt(false);
-      setShowItemSavedSuccess(true);
-    } else {
-      alert('Error saving data. Please try again.');
-    }
-  };
-
-  const resetCreateStates = () => {
-    setActiveAccordion('general');
-    setMenuItemName('');
-    setItemCategory('Coffee');
-    setSizes({
-      Small: { enabled: true, price: '' },
-      Medium: { enabled: true, price: '' },
-      Large: { enabled: false, price: '' },
-    });
-    setAddOns([{ ingredientId: '', name: '', price: '', unit: '' }]);
-    setConnections([]);
-    setItemName('');
-    setIngredientName('');
-    setIngredientType('Dry');
-    setStartingQty('');
-    setIngredientIsAddOn(false);
-    setSelectedMenuItemSize('Small');
-    setSelectedItemSize('Small');
-    setItemStartingQty('');
-    setItemSizes({
-      Small: { enabled: true, qty: '50' },
-      Medium: { enabled: true, qty: '50' },
-      Large: { enabled: true, qty: '50' },
-    });
-    setLastSavedKey('');
-    setLastSavedName('');
-  };
-
-  const finalizeDiscardFlow = () => {
-    resetCreateStates();
-    closeAllModals();
-    setCurrentView('main');
-  };
-
-  const menuItems = [
-    { id: 'create', label: 'Create', icon: <Box size={24} />, subOptions: ['Menu Item', 'Item', 'Ingredient'] },
-    { id: 'edit', label: 'Edit', icon: <Edit3 size={24} />, subOptions: ['Menu Item', 'Item', 'Ingredient'] },
-    { id: 'archive', label: 'Archive', icon: <Archive size={24} />, subOptions: ['Menu Item', 'Item', 'Ingredient'] },
-    { id: 'retrieve', label: 'Retrieve', icon: <FilePlus size={24} />, subOptions: ['Menu Item', 'Item', 'Ingredient'] },
-  ];
-
-  if (currentView.startsWith('create-')) {
-    return (
-      <MaintenanceCreate
-        currentView={currentView}
-        handleBack={handleBack}
-        activeAccordion={activeAccordion}
-        setActiveAccordion={setActiveAccordion}
-        menuItemName={menuItemName}
-        setMenuItemName={setMenuItemName}
-        itemCategory={itemCategory}
-        setItemCategory={setItemCategory}
-        sizes={sizes}
-        setSizes={setSizes}
-        selectedMenuItemSize={selectedMenuItemSize}
-        setSelectedMenuItemSize={setSelectedMenuItemSize}
-        itemSizes={itemSizes}
-        setItemSizes={setItemSizes}
-        selectedItemSize={selectedItemSize}
-        setSelectedItemSize={setSelectedItemSize}
-        itemStartingQty={itemStartingQty}
-        setItemStartingQty={setItemStartingQty}
-        addOns={addOns}
-        setAddOns={setAddOns}
-        handleAddRow={handleAddRow}
-        handleRemoveRow={handleRemoveRow}
-        connections={connections}
-        setConnections={setConnections}
-        addConnection={addConnection}
-        removeConnection={removeConnection}
-        getSequenceNumber={getSequenceNumber}
-        showSavePrompt={showSavePrompt}
-        setShowSavePrompt={setShowSavePrompt}
-        showItemSavedSuccess={showItemSavedSuccess}
-        setShowItemSavedSuccess={setShowItemSavedSuccess}
-        showDiscardPrompt={showDiscardPrompt}
-        setShowDiscardPrompt={setShowDiscardPrompt}
-        finalizeSaveFlow={finalizeSaveFlow}
-        setCurrentView={setCurrentView}
-        resetCreateStates={resetCreateStates}
-        activeItems={activeItems}
-        activeIngredients={activeIngredients}
-        itemName={itemName}
-        setItemName={setItemName}
-        ingredientName={ingredientName}
-        setIngredientName={setIngredientName}
-        ingredientType={ingredientType}
-        setIngredientType={setIngredientType}
-        ingredientIsAddOn={ingredientIsAddOn}
-        setIngredientIsAddOn={setIngredientIsAddOn}
-        startingQty={startingQty}
-        setStartingQty={setStartingQty}
-        lastSavedKey={lastSavedKey}
-        lastSavedName={lastSavedName}
-      />
-    );
-  }
-
-  if (currentView.startsWith('edit-')) {
-    return (
-      <MaintenanceEdit
-        currentView={currentView}
-        handleBack={handleBack}
-        activeAccordion={activeAccordion}
-        setActiveAccordion={setActiveAccordion}
-        selectedEditItem={selectedEditItem}
-        setSelectedEditItem={setSelectedEditItem}
-        menuItemName={menuItemName}
-        setMenuItemName={setMenuItemName}
-        itemCategory={itemCategory}
-        setItemCategory={setItemCategory}
-        itemSizes={itemSizes}
-        setItemSizes={setItemSizes}
-        addOns={addOns}
-        setAddOns={setAddOns}
-        handleAddRow={handleAddRow}
-        handleRemoveRow={handleRemoveRow}
-        connections={connections}
-        setConnections={setConnections}
-        addConnection={addConnection}
-        removeConnection={removeConnection}
-        getSequenceNumber={getSequenceNumber}
-        showSavePrompt={showSavePrompt}
-        setShowSavePrompt={setShowSavePrompt}
-        showItemSavedSuccess={showItemSavedSuccess}
-        setShowItemSavedSuccess={setShowItemSavedSuccess}
-        showDiscardPrompt={showDiscardPrompt}
-        setShowDiscardPrompt={setShowDiscardPrompt}
-        finalizeSaveFlow={finalizeSaveFlow}
-        setCurrentView={setCurrentView}
-        activeMenuItems={activeMenuItems}
-        activeItems={activeItems}
-        activeIngredients={activeIngredients}
-        itemName={itemName}
-        setItemName={setItemName}
-        ingredientName={ingredientName}
-        setIngredientName={setIngredientName}
-        ingredientType={ingredientType}
-        setIngredientType={setIngredientType}
-        ingredientIsAddOn={ingredientIsAddOn}
-        setIngredientIsAddOn={setIngredientIsAddOn}
-        startingQty={startingQty}
-        setStartingQty={setStartingQty}
-        selectedMenuItemSize={selectedMenuItemSize}
-        setSelectedMenuItemSize={setSelectedMenuItemSize}
-        selectedItemSize={selectedItemSize}
-        setSelectedItemSize={setSelectedItemSize}
-        itemStartingQty={itemStartingQty}
-        setItemStartingQty={setItemStartingQty}
-        sizes={sizes}
-        setSizes={setSizes}
-      />
-    );
-  }
-
-  if (currentView.startsWith('archive-')) {
-    return (
-      <MaintenanceArchive
-        currentView={currentView}
-        handleBack={handleBack}
-        activeMenuItems={activeMenuItems}
-        activeItems={activeItems}
-        activeIngredients={activeIngredients}
-        selectedArchiveMenuItem={selectedArchiveMenuItem}
-        setSelectedArchiveMenuItem={setSelectedArchiveMenuItem}
-        showMenuConfirm={showMenuConfirm}
-        setShowMenuConfirm={setShowMenuConfirm}
-        showMenuSuccess={showMenuSuccess}
-        setShowMenuSuccess={setShowMenuSuccess}
-        selectedArchiveItem={selectedArchiveItem}
-        setSelectedArchiveItem={setSelectedArchiveItem}
-        showItemConfirm={showItemConfirm}
-        setShowItemConfirm={setShowItemConfirm}
-        showItemSuccess={showItemSuccess}
-        setShowItemSuccess={setShowItemSuccess}
-        selectedArchiveIngredient={selectedArchiveIngredient}
-        setSelectedArchiveIngredient={setSelectedArchiveIngredient}
-        showIngConfirm={showIngConfirm}
-        setShowIngConfirm={setShowIngConfirm}
-        showIngSuccess={showIngSuccess}
-        setShowIngSuccess={setShowIngSuccess}
-        setActiveMenuItems={setActiveMenuItems}
-        setActiveItems={setActiveItems}
-        setActiveIngredients={setActiveIngredients}
-        setArchivedMenuItems={setArchivedMenuItems}
-        setArchivedItems={setArchivedItems}
-        setArchivedIngredients={setArchivedIngredients}
-        onRecordTransaction={recordMaintenanceTransaction}
-      />
-    );
-  }
-
-  if (currentView.startsWith('retrieve-')) {
-    return (
-      <MaintenanceRetrieve
-        currentView={currentView}
-        handleBack={handleBack}
-        archivedMenuItems={archivedMenuItems}
-        archivedItems={archivedItems}
-        archivedIngredients={archivedIngredients}
-        selectedRetrieveMenu={selectedRetrieveMenu}
-        setSelectedRetrieveMenu={setSelectedRetrieveMenu}
-        showRetrieveMenuConfirm={showRetrieveMenuConfirm}
-        setShowRetrieveMenuConfirm={setShowRetrieveMenuConfirm}
-        showRetrieveMenuSuccess={showRetrieveMenuSuccess}
-        setShowRetrieveMenuSuccess={setShowRetrieveMenuSuccess}
-        selectedRetrieveItem={selectedRetrieveItem}
-        setSelectedRetrieveItem={setSelectedRetrieveItem}
-        showRetrieveItemConfirm={showRetrieveItemConfirm}
-        setShowRetrieveItemConfirm={setShowRetrieveItemConfirm}
-        showRetrieveItemSuccess={showRetrieveItemSuccess}
-        setShowRetrieveItemSuccess={setShowRetrieveItemSuccess}
-        selectedRetrieveIng={selectedRetrieveIng}
-        setSelectedRetrieveIng={setSelectedRetrieveIng}
-        showRetrieveIngConfirm={showRetrieveIngConfirm}
-        setShowRetrieveIngConfirm={setShowRetrieveIngConfirm}
-        showRetrieveIngSuccess={showRetrieveIngSuccess}
-        setShowRetrieveIngSuccess={setShowRetrieveIngSuccess}
-        setArchivedMenuItems={setArchivedMenuItems}
-        setArchivedItems={setArchivedItems}
-        setArchivedIngredients={setArchivedIngredients}
-        setActiveMenuItems={setActiveMenuItems}
-        setActiveItems={setActiveItems}
-        setActiveIngredients={setActiveIngredients}
-        onRecordTransaction={recordMaintenanceTransaction}
-      />
-    );
-  }
-
-  if (currentView === 'manage-accounts') {
-    return (
-      <MaintenanceAccounts
-        currentView={currentView}
-        handleBack={handleBack}
-        accounts={accounts}
-        selectedAccount={selectedAccount}
-        setSelectedAccount={setSelectedAccount}
-        showStatusConfirm={showStatusConfirm}
-        setShowStatusConfirm={setShowStatusConfirm}
-        showStatusSuccess={showStatusSuccess}
-        setShowStatusSuccess={setShowStatusSuccess}
-        setAccounts={setAccounts}
-      />
-    );
-  }
-
-  // --- MAIN VIEW ---
   return (
     <div className="flex w-full h-full">
-      <AdminSidebar activePage="maintenance" />
-      <main className="flex-1 bg-[#2a2a2a] rounded-xl p-8 flex flex-col text-white">
-        <div className="flex gap-4 mb-10">
-          <button onClick={handleBack} className="bg-[#5a5a5a] p-3 rounded-lg"><CornerUpLeft size={20} /></button>
-          <div className="flex-1 bg-[#5a5a5a] rounded-lg flex items-center px-4 gap-3 font-medium tracking-wide">
-            <WrenchIcon size={20} />
-            <span>{activeDropdown ? `Maintenance > ${menuItems.find(item => item.id === activeDropdown)?.label || activeDropdown}` : 'Maintenance'}</span>
-          </div>
-        </div>
+      <AdminSidebar />
 
-        <div className="flex flex-col flex-1 animate-in fade-in duration-300">
-          <h1 className="text-3xl font-semibold mb-8">Maintenance</h1>
+      <main className="flex-1 bg-white overflow-hidden flex flex-col p-8">
 
-          <div className="flex flex-col gap-4 w-full"> 
-            {menuItems.map((item) => (
-              <div key={item.id} className="w-full bg-[#4a4a4a] rounded-xl overflow-hidden">
+        {/* Header */}
+        <div className="mb-5 shrink-0">
+          <h1 className="text-3xl font-bold text-gray-900 mb-3">Audit Logs</h1>
+          <div className="flex items-center justify-between">
+            {/* Search */}
+            <div className="flex items-center gap-2 border-b border-gray-300 pb-1 flex-1 mr-6">
+              <Search size={18} className="text-gray-400 shrink-0" />
+              <input
+                type="text"
+                placeholder="Search here"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                className="flex-1 outline-none text-xl text-gray-700 placeholder-gray-400 bg-transparent"
+              />
+            </div>
+            <div className="flex items-center gap-3 shrink-0">
+              {/* Arrange */}
+              <div className="relative">
                 <button
-                  onClick={() => setActiveDropdown(activeDropdown === item.id ? null : item.id)}
-                  className="w-full flex items-center justify-center px-8 py-5 text-xl font-medium transition-colors relative min-h-[70px] hover:bg-[#5a5a5a]"
+                  onClick={e => { e.stopPropagation(); setShowArrange(v => !v); }}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-full text-xl transition-colors ${
+                    showArrange ? 'bg-[#3ca4c7] text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
+                  }`}
                 >
-                  <div className="flex items-center gap-4">{item.icon}<span>{item.label}</span></div>
-                  <div className="absolute right-8 text-gray-300">
-                    {activeDropdown === item.id ? <ChevronUp size={24} /> : <ChevronDown size={24} />}
-                  </div>
+                  <AlignJustify size={16} /> Arrange
                 </button>
-
-                {activeDropdown === item.id && (
-                  <div className="pb-6 px-8 flex justify-center gap-6 animate-in slide-in-from-top-2">
-                    {item.subOptions.map((opt) => (
-                      <button
-                        key={opt}
-                        onClick={() => setCurrentView(`${item.id}-${opt.toLowerCase().replace(' ', '-')}`)}
-                        className="bg-[#56a2d1] hover:bg-[#66b2e1] text-white px-10 py-3 rounded-lg transition-colors text-xl font-medium min-w-[160px]"
-                      >
-                        {opt}
-                      </button>
+                {showArrange && (
+                  <div
+                    className="absolute right-0 top-11 bg-white border border-gray-200 rounded-xl shadow-lg z-20 w-60 py-2"
+                    onClick={e => e.stopPropagation()}
+                  >
+                    <p className="px-4 pt-1 pb-2 text-lg font-semibold text-gray-500 uppercase tracking-wide border-b border-gray-100">Sort by</p>
+                    {[
+                      { field: 'timestamp',   labelAsc: 'Date (Oldest)',   labelDesc: 'Date (Newest)' },
+                      { field: 'action',      labelAsc: 'Type (A → Z)',    labelDesc: 'Type (Z → A)' },
+                      { field: 'performedBy', labelAsc: 'Done by (A → Z)', labelDesc: 'Done by (Z → A)' },
+                    ].map(({ field, labelAsc, labelDesc }) => (
+                      <div key={field}>
+                        {[{ dir: 'asc', label: labelAsc }, { dir: 'desc', label: labelDesc }].map(({ dir, label }) => (
+                          <button
+                            key={dir}
+                            onClick={() => { setSortField(field); setSortDir(dir); setShowArrange(false); }}
+                            className={`w-full px-4 py-2.5 text-left text-xl transition-colors ${
+                              sortField === field && sortDir === dir
+                                ? 'text-[#3ca4c7] font-semibold bg-blue-50'
+                                : 'text-gray-700 hover:bg-gray-50'
+                            }`}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
                     ))}
                   </div>
                 )}
               </div>
-            ))}
 
-            <button
-              onClick={() => setCurrentView('manage-accounts')}
-              className="w-full flex items-center justify-center bg-[#4a4a4a] hover:bg-[#5a5a5a] px-8 py-5 rounded-xl text-xl font-medium min-h-[70px]"
-            >
-              <div className="flex items-center gap-4"><Users size={24} /><span>Manage Accounts</span></div>
-            </button>
+              {/* Filter */}
+              <button
+                onClick={() => setShowFilter(v => !v)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-full text-xl transition-colors ${
+                  isFiltered || showFilter
+                    ? 'bg-[#3ca4c7] text-white hover:bg-[#2b8aa8]'
+                    : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
+                }`}
+              >
+                <Filter size={16} /> Filter List
+              </button>
+
+              <button onClick={loadData} className="text-gray-400 hover:text-gray-600 p-1">
+                <RefreshCw size={20} />
+              </button>
+            </div>
+          </div>
+
+          {/* Filter panel */}
+          {showFilter && (
+            <div className="mt-4 p-5 bg-gray-50 rounded-xl border border-gray-200 flex flex-wrap gap-5 items-end">
+              {/* Date */}
+              <div className="flex flex-col gap-1.5 min-w-[160px]">
+                <label className="text-xl font-medium text-gray-600">{filterIsRange ? 'Start Date' : 'Date'}</label>
+                <input type="date" value={filterDate} onChange={e => setFilterDate(e.target.value)}
+                  className="border border-gray-300 rounded-lg px-3 py-2 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]" />
+              </div>
+              <div className="flex items-center gap-2 pb-2">
+                <input type="checkbox" id="filterRange" checked={filterIsRange} onChange={e => setFilterIsRange(e.target.checked)}
+                  className="w-4 h-4 accent-[#3ca4c7]" />
+                <label htmlFor="filterRange" className="text-xl text-gray-600 select-none cursor-pointer">Date range</label>
+              </div>
+              {filterIsRange && (
+                <div className="flex flex-col gap-1.5 min-w-[160px]">
+                  <label className="text-xl font-medium text-gray-600">End Date</label>
+                  <input type="date" value={filterRangeEnd} onChange={e => setFilterRangeEnd(e.target.value)}
+                    className="border border-gray-300 rounded-lg px-3 py-2 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]" />
+                </div>
+              )}
+
+              {/* Action type */}
+              <div className="flex flex-col gap-1.5 min-w-[220px]">
+                <label className="text-xl font-medium text-gray-600">Action Type</label>
+                <div className="relative">
+                  <select value={filterAction} onChange={e => setFilterAction(e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-xl text-gray-700 outline-none appearance-none bg-white focus:border-[#3ca4c7]">
+                    <option value="">All types</option>
+                    {actionTypes.map(a => <option key={a} value={a}>{ACTION_LABELS[a] || a}</option>)}
+                  </select>
+                  <ChevronDown size={16} className="absolute right-3 top-3 text-gray-400 pointer-events-none" />
+                </div>
+              </div>
+
+              {/* Done by */}
+              <div className="flex flex-col gap-1.5 min-w-[180px]">
+                <label className="text-xl font-medium text-gray-600">Done by</label>
+                <div className="relative">
+                  <select value={filterPerformer} onChange={e => setFilterPerformer(e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-xl text-gray-700 outline-none appearance-none bg-white focus:border-[#3ca4c7]">
+                    <option value="">All</option>
+                    {performers.map(p => <option key={p} value={p}>{p}</option>)}
+                  </select>
+                  <ChevronDown size={16} className="absolute right-3 top-3 text-gray-400 pointer-events-none" />
+                </div>
+              </div>
+
+              {isFiltered && (
+                <button onClick={clearFilters}
+                  className="pb-2 text-xl text-gray-500 hover:text-gray-700 underline transition-colors">
+                  Clear
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Table */}
+        <div className="flex-1 rounded-xl border border-gray-200 overflow-hidden flex flex-col min-h-0 shadow-md">
+          <div className="flex items-center px-8 py-3 bg-white border-b border-gray-200 shrink-0">
+            <span className="w-[14%] text-xl font-semibold text-gray-800 text-center">Date</span>
+            <span className="w-[12%] text-xl font-semibold text-gray-800 text-center">Time</span>
+            <span className="w-[32%] text-xl font-semibold text-gray-800 text-center">Type</span>
+            <span className="w-[24%] text-xl font-semibold text-gray-800 text-center">Done by</span>
+            <span className="flex-1  text-xl font-semibold text-gray-800 text-center">Actions</span>
+          </div>
+          <div className="flex-1 overflow-y-auto min-h-0 px-4 py-3 flex flex-col gap-2" style={{ scrollbarGutter: 'stable' }}>
+            {displayed.length === 0 && (
+              <p className="py-12 text-gray-400 text-xl text-center">No audit logs found.</p>
+            )}
+            {displayed.map(log => {
+              const { date, time } = splitTimestamp(log.timestamp);
+              const label = ACTION_LABELS[log.action] || log.action || '—';
+              return (
+                <div key={log.id} className="flex items-center bg-white rounded-xl border border-gray-200 shadow-sm px-5 py-3.5">
+                  <span className="w-[14%] text-xl text-gray-700 text-center">{date}</span>
+                  <span className="w-[12%] text-xl text-gray-500 text-center">{time}</span>
+                  <span className="w-[32%] text-xl text-gray-700 text-center">{label}</span>
+                  <span className="w-[24%] text-xl text-gray-700 text-center">{log.performedBy || '—'}</span>
+                  <div className="flex-1 flex justify-center">
+                    <button
+                      onClick={() => setViewLog(log)}
+                      className="bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white px-6 py-1.5 rounded-full text-xl transition-colors"
+                    >
+                      View
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       </main>
+
+      {/* ══════════════════════════════════════════
+          VIEW LOG MODAL
+      ══════════════════════════════════════════ */}
+      {viewLog && (() => {
+        const { date, time } = splitTimestamp(viewLog.timestamp);
+        const label = ACTION_LABELS[viewLog.action] || viewLog.action || '—';
+        const details = renderDetails(viewLog);
+        return (
+          <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+            <div className="bg-white rounded-2xl shadow-2xl w-[700px] max-h-[90vh] overflow-y-auto">
+              <div className="flex items-center justify-between px-10 py-6 border-b border-gray-200">
+                <h3 className="text-2xl font-semibold text-gray-800">Audit Log Details</h3>
+                <button onClick={() => setViewLog(null)} className="text-gray-400 hover:text-gray-600 transition-colors"><X size={22} /></button>
+              </div>
+              <div className="px-10 py-8 flex flex-col gap-5">
+
+                {/* General info */}
+                <div className="bg-gray-50 rounded-xl border border-gray-100 divide-y divide-gray-100">
+                  {[
+                    { label: 'Date & Time',   value: `${date} ${time}` },
+                    { label: 'Action',        value: label },
+                    { label: 'Item Type',     value: viewLog.itemType ? (viewLog.itemType.charAt(0).toUpperCase() + viewLog.itemType.slice(1)) : '—' },
+                    { label: 'Item ID',       value: viewLog.itemId   || '—' },
+                    { label: 'Item Name',     value: viewLog.itemName || '—' },
+                    { label: 'Performed by',  value: viewLog.performedBy || '—' },
+                  ].map(({ label, value }) => (
+                    <div key={label} className="flex items-start px-5 py-3 gap-4">
+                      <span className="w-36 text-xl font-medium text-gray-500 shrink-0">{label}</span>
+                      <span className="flex-1 text-xl text-gray-800">{value}</span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Action-specific details */}
+                {details.length > 0 && (
+                  <>
+                    <p className="text-xl font-semibold text-gray-700">Action Details</p>
+                    <div className="bg-gray-50 rounded-xl border border-gray-100 divide-y divide-gray-100">
+                      {details.map(({ label, value }) => (
+                        <div key={label} className="flex items-start px-5 py-3 gap-4">
+                          <span className="w-36 text-xl font-medium text-gray-500 shrink-0">{label}</span>
+                          <span className="flex-1 text-xl text-gray-800">{String(value)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+
+                <button
+                  onClick={() => setViewLog(null)}
+                  className="w-full mt-2 bg-gray-100 hover:bg-gray-200 text-gray-700 py-3 rounded-xl text-xl font-semibold transition-colors"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
-

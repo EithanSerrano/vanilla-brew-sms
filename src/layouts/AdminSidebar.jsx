@@ -5,7 +5,7 @@ import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 import {
   LayoutGrid, Package, FolderCog, Coffee, Users,
-  FileText, ScrollText, FileDown, Settings, Info,
+  FileText, ScrollText, Settings, Info,
   HelpCircle, LogOut, ChevronDown, ChevronUp
 } from 'lucide-react';
 
@@ -119,7 +119,7 @@ export default function AdminSidebar() {
         {maintenanceOpen && (
           <div className="flex flex-col gap-0.5">
             <SubNavItem to="/admin-maintenance" icon={<ScrollText size={15} />} label="Audit Logs" />
-            <SubNavItem to="/export-reports" icon={<FileDown size={15} />} label="Export Reports" />
+            <SubNavItem to="/documents" icon={<FileText size={15} />} label="Documents" />
           </div>
         )}
 

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { collection, getDocs, doc, addDoc, updateDoc } from 'firebase/firestore';
-import { db } from '../firebase';
+import { collection, getDocs, doc, addDoc, updateDoc, getDoc } from 'firebase/firestore';
+import { db, auth } from '../firebase';
 import { Search, Filter, Plus, Lock, X, RefreshCw, ChevronLeft, ChevronRight, AlertTriangle, MoreVertical } from 'lucide-react';
 import AdminSidebar from '../layouts/AdminSidebar';
 
@@ -200,8 +200,14 @@ export default function Inventory() {
   // ── Audit log ──
   const logAudit = async (action, itemType, itemId, itemName, details = {}) => {
     try {
+      let performedBy = 'Unknown';
+      const currentUser = auth.currentUser;
+      if (currentUser) {
+        const snap = await getDoc(doc(db, 'users', currentUser.uid));
+        if (snap.exists()) performedBy = snap.data().name || 'Unknown';
+      }
       await addDoc(collection(db, 'auditlog'), {
-        action, itemType, itemId, itemName, details, timestamp: new Date(),
+        action, itemType, itemId, itemName, details, performedBy, timestamp: new Date(),
       });
     } catch (e) {
       console.error('Audit log error:', e);

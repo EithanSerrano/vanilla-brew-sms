@@ -23,6 +23,7 @@ import StaffHelp from "./pages/StaffHelp";
 
 // Placeholder Pages
 import Maintenance from "./pages/Maintenance";
+import Documents from "./pages/Documents";
 import About from "./pages/About";
 import Settings from "./pages/Settings";
 
@@ -51,6 +52,7 @@ function App() {
             
             {/* Admin Dedicated Placeholders */}
             <Route path="/admin-maintenance" element={<Maintenance role="admin" />} />
+            <Route path="/documents" element={<Documents />} />
             <Route path="/admin-help" element={<AdminHelp />} />
             <Route path="/admin-about" element={<About role="admin" />} />
             <Route path="/admin-settings" element={<Settings role="admin" />} />
