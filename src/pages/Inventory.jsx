@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { collection, getDocs, doc, addDoc, updateDoc, getDoc } from 'firebase/firestore';
 import { db, auth } from '../firebase';
 import { Search, Filter, Plus, Lock, X, RefreshCw, ChevronLeft, ChevronRight, AlertTriangle, MoreVertical } from 'lucide-react';
@@ -98,6 +98,8 @@ export default function Inventory() {
   const [showMatConf,  setShowMatConf]  = useState(false);
   const [showMatOk,    setShowMatOk]    = useState(false);
   const [showMatDisc,  setShowMatDisc]  = useState(false);
+  const [matSaving,    setMatSaving]    = useState(false);
+  const matSavingRef = useRef(false);
 
   // ── New Ingredient ──
   const [showNewIng,   setShowNewIng]   = useState(false);
@@ -112,6 +114,8 @@ export default function Inventory() {
   const [showIngConf,  setShowIngConf]  = useState(false);
   const [showIngOk,    setShowIngOk]    = useState(false);
   const [showIngDisc,  setShowIngDisc]  = useState(false);
+  const [ingSaving,    setIsSaving]     = useState(false);
+  const ingSavingRef = useRef(false);
 
   // ── Hide confirmation ──
   const [hideRow,      setHideRow]      = useState(null);
@@ -282,19 +286,26 @@ export default function Inventory() {
   };
 
   const handleConfirmMat = async () => {
-    if (!pendingMat) return;
-    const now = new Date();
-    for (const e of pendingMat.entries) {
-      await addDoc(collection(db, 'materials'), {
-        materialId: e.matId, name: pendingMat.name, size: e.size,
-        category: 'Material', stock: e.qty, startingQty: e.qty,
-        maxLimit: pendingMat.maxLimit, isActive: true, createdAt: now,
-      });
-      await logAudit('ADD_MATERIAL', 'material', e.matId, `${pendingMat.name} (${e.size})`, {
-        size: e.size, startingQty: e.qty, maxLimit: pendingMat.maxLimit,
-      });
+    if (!pendingMat || matSavingRef.current) return;
+    matSavingRef.current = true;
+    setMatSaving(true);
+    try {
+      const now = new Date();
+      for (const e of pendingMat.entries) {
+        await addDoc(collection(db, 'materials'), {
+          materialId: e.matId, name: pendingMat.name, size: e.size,
+          category: 'Material', stock: e.qty, startingQty: e.qty,
+          maxLimit: pendingMat.maxLimit, isActive: true, createdAt: now,
+        });
+        await logAudit('ADD_MATERIAL', 'material', e.matId, `${pendingMat.name} (${e.size})`, {
+          size: e.size, startingQty: e.qty, maxLimit: pendingMat.maxLimit,
+        });
+      }
+      await loadData(); setShowMatConf(false); setShowMatOk(true);
+    } finally {
+      matSavingRef.current = false;
+      setMatSaving(false);
     }
-    await loadData(); setShowMatConf(false); setShowMatOk(true);
   };
 
   // ════════════════════════════════════
@@ -320,20 +331,27 @@ export default function Inventory() {
   };
 
   const handleConfirmIng = async () => {
-    if (!pendingIng) return;
-    const now = new Date();
-    await addDoc(collection(db, 'ingredients'), {
-      ingredientId: pendingIng.ingredientId, name: pendingIng.name, type: pendingIng.type,
-      unit: pendingIng.unit, isAddOn: pendingIng.isAddOn, maxLimit: pendingIng.maxLimit,
-      isActive: true,
-      batches: [{ batchId: pendingIng.batchId, expirationDate: pendingIng.expirationDate, quantity: pendingIng.quantity, createdAt: now }],
-      createdAt: now,
-    });
-    await logAudit('ADD_INGREDIENT', 'ingredient', pendingIng.ingredientId, pendingIng.name, {
-      type: pendingIng.type, unit: pendingIng.unit, maxLimit: pendingIng.maxLimit,
-      batchId: pendingIng.batchId, quantity: pendingIng.quantity,
-    });
-    await loadData(); setShowIngConf(false); setShowIngOk(true);
+    if (!pendingIng || ingSavingRef.current) return;
+    ingSavingRef.current = true;
+    setIsSaving(true);
+    try {
+      const now = new Date();
+      await addDoc(collection(db, 'ingredients'), {
+        ingredientId: pendingIng.ingredientId, name: pendingIng.name, type: pendingIng.type,
+        unit: pendingIng.unit, isAddOn: pendingIng.isAddOn, maxLimit: pendingIng.maxLimit,
+        isActive: true,
+        batches: [{ batchId: pendingIng.batchId, expirationDate: pendingIng.expirationDate, quantity: pendingIng.quantity, createdAt: now }],
+        createdAt: now,
+      });
+      await logAudit('ADD_INGREDIENT', 'ingredient', pendingIng.ingredientId, pendingIng.name, {
+        type: pendingIng.type, unit: pendingIng.unit, maxLimit: pendingIng.maxLimit,
+        batchId: pendingIng.batchId, quantity: pendingIng.quantity,
+      });
+      await loadData(); setShowIngConf(false); setShowIngOk(true);
+    } finally {
+      ingSavingRef.current = false;
+      setIsSaving(false);
+    }
   };
 
   // ════════════════════════════════════
@@ -911,8 +929,8 @@ export default function Inventory() {
             </div>
             <p className="text-xl text-gray-400 italic">Each size will be saved as a separate entry in the database.</p>
             <div className="flex gap-3 justify-end mt-1">
-              <button onClick={() => setShowMatConf(false)} className="px-6 py-2 rounded-full border border-gray-300 text-xl text-gray-600 hover:bg-gray-50 transition-colors">Cancel</button>
-              <button onClick={handleConfirmMat} className="px-6 py-2 rounded-full bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white text-xl transition-colors">Confirm</button>
+              <button onClick={() => setShowMatConf(false)} disabled={matSaving} className="px-6 py-2 rounded-full border border-gray-300 text-xl text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50">Cancel</button>
+              <button onClick={handleConfirmMat} disabled={matSaving} className={`px-6 py-2 rounded-full text-xl transition-colors ${matSaving ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white'}`}>{matSaving ? 'Saving...' : 'Confirm'}</button>
             </div>
           </div>
         </div>
@@ -946,8 +964,8 @@ export default function Inventory() {
               <p className="text-xl text-gray-700">Batch: {pendingIng.batchId} — Qty: {pendingIng.quantity} {pendingIng.unit}</p>
             </div>
             <div className="flex gap-3 justify-end mt-1">
-              <button onClick={() => setShowIngConf(false)} className="px-6 py-2 rounded-full border border-gray-300 text-xl text-gray-600 hover:bg-gray-50 transition-colors">Cancel</button>
-              <button onClick={handleConfirmIng} className="px-6 py-2 rounded-full bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white text-xl transition-colors">Confirm</button>
+              <button onClick={() => setShowIngConf(false)} disabled={ingSaving} className="px-6 py-2 rounded-full border border-gray-300 text-xl text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50">Cancel</button>
+              <button onClick={handleConfirmIng} disabled={ingSaving} className={`px-6 py-2 rounded-full text-xl transition-colors ${ingSaving ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white'}`}>{ingSaving ? 'Saving...' : 'Confirm'}</button>
             </div>
           </div>
         </div>

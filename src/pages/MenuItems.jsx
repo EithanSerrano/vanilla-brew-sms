@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { collection, getDocs, doc, addDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import {
   Search, Filter, Plus, X, RefreshCw,
-  ChevronLeft, ChevronRight, ChevronsLeft, Trash2,
+  ChevronLeft, ChevronRight, ChevronsLeft, Trash2, Loader,
 } from 'lucide-react';
 import AdminSidebar from '../layouts/AdminSidebar';
 
@@ -69,9 +69,10 @@ const STATUS_STYLES = {
 };
 
 function DiscardDialog({ onCancel, onConfirm }) {
+  const anim = localStorage.getItem('pref_animations') !== 'false';
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[70]">
-      <div className="bg-white rounded-2xl shadow-2xl w-[420px] px-8 py-6 flex flex-col gap-4">
+    <div className={`fixed inset-0 bg-black/40 flex items-center justify-center z-[70] ${anim ? 'animate-modal-backdrop' : ''}`}>
+      <div className={`bg-white rounded-2xl shadow-2xl w-[420px] px-8 py-6 flex flex-col gap-4 ${anim ? 'animate-modal-panel' : ''}`}>
         <h3 className="text-2xl font-semibold text-gray-800">Discard Progress?</h3>
         <p className="text-xl text-gray-500">If confirmed, the progress cannot be recovered.</p>
         <div className="flex gap-3 justify-end mt-1">
@@ -327,33 +328,45 @@ export default function MenuItems() {
     setShowMenuConf(true);
   };
 
+  const menuSavingRef = useRef(false);
+  const [menuSaving, setMenuSaving] = useState(false);
+  const [hideSaving, setHideSaving] = useState(false);
+  const [retrieveSaving, setRetrieveSaving] = useState(false);
+
   const handleConfirmSave = async () => {
-    if (!pendingMenu) return;
-    if (editingItem) {
-      await updateDoc(doc(db, 'menuItems', editingItem.id), {
-        name:      pendingMenu.name,
-        category:  pendingMenu.category,
-        addOns:    pendingMenu.addOns,
-        sizes:     pendingMenu.sizes,
-        updatedAt: new Date(),
-      });
-    } else {
-      await addDoc(collection(db, 'menuItems'), {
-        menuItemId:  pendingMenu.menuItemId,
-        name:        pendingMenu.name,
-        category:    pendingMenu.category,
-        isActive:    true,
-        isAvailable: true,
-        addOns:      pendingMenu.addOns,
-        sizes:       pendingMenu.sizes,
-        createdAt:   new Date(),
-        hiddenAt:    null,
-      });
+    if (!pendingMenu || menuSavingRef.current) return;
+    menuSavingRef.current = true;
+    setMenuSaving(true);
+    try {
+      if (editingItem) {
+        await updateDoc(doc(db, 'menuItems', editingItem.id), {
+          name:      pendingMenu.name,
+          category:  pendingMenu.category,
+          addOns:    pendingMenu.addOns,
+          sizes:     pendingMenu.sizes,
+          updatedAt: new Date(),
+        });
+      } else {
+        await addDoc(collection(db, 'menuItems'), {
+          menuItemId:  pendingMenu.menuItemId,
+          name:        pendingMenu.name,
+          category:    pendingMenu.category,
+          isActive:    true,
+          isAvailable: true,
+          addOns:      pendingMenu.addOns,
+          sizes:       pendingMenu.sizes,
+          createdAt:   new Date(),
+          hiddenAt:    null,
+        });
+      }
+      await loadData();
+      setShowMenuConf(false);
+      setShowStep2(false);
+      setShowMenuOk(true);
+    } finally {
+      menuSavingRef.current = false;
+      setMenuSaving(false);
     }
-    await loadData();
-    setShowMenuConf(false);
-    setShowStep2(false);
-    setShowMenuOk(true);
   };
 
   // ════════════════════════════════════
@@ -368,24 +381,35 @@ export default function MenuItems() {
   // HIDE
   // ════════════════════════════════════
   const handleConfirmHide = async () => {
-    if (!hideRow) return;
-    await updateDoc(doc(db, 'menuItems', hideRow.id), { isActive: false, hiddenAt: new Date() });
-    setShowHideConf(false); setHideRow(null); await loadData();
+    if (!hideRow || hideSaving) return;
+    setHideSaving(true);
+    try {
+      await updateDoc(doc(db, 'menuItems', hideRow.id), { isActive: false, hiddenAt: new Date() });
+      setShowHideConf(false); setHideRow(null); await loadData();
+    } finally {
+      setHideSaving(false);
+    }
   };
 
   // ════════════════════════════════════
   // RETRIEVE
   // ════════════════════════════════════
   const handleConfirmRetrieve = async () => {
-    if (!retrieveRow) return;
-    await updateDoc(doc(db, 'menuItems', retrieveRow.id), { isActive: true, hiddenAt: null });
-    setShowRetrieveConf(false); setRetrieveRow(null); await loadData();
+    if (!retrieveRow || retrieveSaving) return;
+    setRetrieveSaving(true);
+    try {
+      await updateDoc(doc(db, 'menuItems', retrieveRow.id), { isActive: true, hiddenAt: null });
+      setShowRetrieveConf(false); setRetrieveRow(null); await loadData();
+    } finally {
+      setRetrieveSaving(false);
+    }
   };
 
   // ════════════════════════════════════════════════════════════
   //  RENDER
   // ════════════════════════════════════════════════════════════
   const isEditMode = !!editingItem;
+  const anim = localStorage.getItem('pref_animations') !== 'false';
 
   return (
     <div className="flex w-full h-full">
@@ -593,8 +617,8 @@ export default function MenuItems() {
           STEP 1 — GENERAL INFO + ADD-ONS
       ══════════════════════════════════════════ */}
       {showStep1 && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl shadow-2xl w-[95vw] max-h-[92vh] overflow-y-auto">
+        <div className={`fixed inset-0 bg-black/40 flex items-center justify-center z-50 ${anim ? 'animate-modal-backdrop' : ''}`}>
+          <div className={`bg-white rounded-2xl shadow-2xl w-[95vw] max-h-[92vh] overflow-y-auto ${anim ? 'animate-modal-panel' : ''}`}>
             <div className="flex items-center justify-between px-12 py-6 border-b border-gray-200">
               <h3 className="text-2xl font-semibold text-gray-800">
                 {isEditMode ? `Editing: ${editingItem.name}` : 'Creating a new Menu Item'}
@@ -736,8 +760,8 @@ export default function MenuItems() {
           STEP 2 — CONNECTIONS
       ══════════════════════════════════════════ */}
       {showStep2 && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl shadow-2xl w-[95vw] max-h-[92vh] flex flex-col overflow-hidden">
+        <div className={`fixed inset-0 bg-black/40 flex items-center justify-center z-50 ${anim ? 'animate-modal-backdrop' : ''}`}>
+          <div className={`bg-white rounded-2xl shadow-2xl w-[95vw] max-h-[92vh] flex flex-col overflow-hidden ${anim ? 'animate-modal-panel' : ''}`}>
             <div className="flex items-center justify-between px-12 py-6 border-b border-gray-200 shrink-0">
               <h3 className="text-2xl font-semibold text-gray-800">
                 {isEditMode ? `Editing: ${editingItem.name}` : 'Creating a new Menu Item'}
@@ -850,8 +874,8 @@ export default function MenuItems() {
           SAVE CONFIRMATION
       ══════════════════════════════════════════ */}
       {showMenuConf && pendingMenu && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[60]">
-          <div className="bg-white rounded-2xl shadow-2xl w-[520px] px-8 py-6 flex flex-col gap-4">
+        <div className={`fixed inset-0 bg-black/40 flex items-center justify-center z-[60] ${anim ? 'animate-modal-backdrop' : ''}`}>
+          <div className={`bg-white rounded-2xl shadow-2xl w-[520px] px-8 py-6 flex flex-col gap-4 ${anim ? 'animate-modal-panel' : ''}`}>
             <h3 className="text-2xl font-semibold text-gray-800">
               {isEditMode ? 'Save Changes?' : 'Save New Menu Item?'}
             </h3>
@@ -873,12 +897,16 @@ export default function MenuItems() {
             <div className="flex gap-3 justify-end mt-1">
               <button
                 onClick={() => setShowMenuConf(false)}
-                className="px-6 py-2 rounded-full border border-gray-300 text-xl text-gray-600 hover:bg-gray-50 transition-colors"
+                disabled={menuSaving}
+                className="px-6 py-2 rounded-full border border-gray-300 text-xl text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50"
               >Cancel</button>
               <button
                 onClick={handleConfirmSave}
-                className="px-6 py-2 rounded-full bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white text-xl transition-colors"
-              >Confirm</button>
+                disabled={menuSaving}
+                className={`flex items-center gap-2 px-6 py-2 rounded-full text-xl transition-colors ${menuSaving ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white'}`}
+              >
+                {menuSaving ? <><Loader size={18} className="animate-spin" /> Saving...</> : 'Confirm'}
+              </button>
             </div>
           </div>
         </div>
@@ -888,8 +916,8 @@ export default function MenuItems() {
           SUCCESS DIALOG
       ══════════════════════════════════════════ */}
       {showMenuOk && pendingMenu && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[60]">
-          <div className="bg-white rounded-2xl shadow-2xl w-[480px] px-8 py-6 flex flex-col gap-4">
+        <div className={`fixed inset-0 bg-black/40 flex items-center justify-center z-[60] ${anim ? 'animate-modal-backdrop' : ''}`}>
+          <div className={`bg-white rounded-2xl shadow-2xl w-[480px] px-8 py-6 flex flex-col gap-4 ${anim ? 'animate-modal-panel' : ''}`}>
             <h3 className="text-2xl font-semibold text-gray-800">
               {isEditMode ? 'Menu Item Updated!' : 'New Menu Item Saved!'}
             </h3>
@@ -921,8 +949,8 @@ export default function MenuItems() {
           HIDE CONFIRMATION
       ══════════════════════════════════════════ */}
       {showHideConf && hideRow && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[60]">
-          <div className="bg-white rounded-2xl shadow-2xl w-[460px] px-8 py-6 flex flex-col gap-4">
+        <div className={`fixed inset-0 bg-black/40 flex items-center justify-center z-[60] ${anim ? 'animate-modal-backdrop' : ''}`}>
+          <div className={`bg-white rounded-2xl shadow-2xl w-[460px] px-8 py-6 flex flex-col gap-4 ${anim ? 'animate-modal-panel' : ''}`}>
             <h3 className="text-2xl font-semibold text-gray-800">Hide this item?</h3>
             <p className="text-xl text-gray-600">
               <span className="font-semibold">{hideRow.name}</span> will be moved to the inactive list.
@@ -930,12 +958,16 @@ export default function MenuItems() {
             <div className="flex gap-3 justify-end mt-1">
               <button
                 onClick={() => { setShowHideConf(false); setHideRow(null); }}
-                className="px-6 py-2 rounded-full border border-gray-300 text-xl text-gray-600 hover:bg-gray-50 transition-colors"
+                disabled={hideSaving}
+                className="px-6 py-2 rounded-full border border-gray-300 text-xl text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50"
               >Cancel</button>
               <button
                 onClick={handleConfirmHide}
-                className="px-6 py-2 rounded-full bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white text-xl transition-colors"
-              >Confirm</button>
+                disabled={hideSaving}
+                className={`flex items-center gap-2 px-6 py-2 rounded-full text-xl transition-colors ${hideSaving ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white'}`}
+              >
+                {hideSaving ? <><Loader size={18} className="animate-spin" /> Saving...</> : 'Confirm'}
+              </button>
             </div>
           </div>
         </div>
@@ -945,8 +977,8 @@ export default function MenuItems() {
           RETRIEVE CONFIRMATION
       ══════════════════════════════════════════ */}
       {showRetrieveConf && retrieveRow && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[60]">
-          <div className="bg-white rounded-2xl shadow-2xl w-[460px] px-8 py-6 flex flex-col gap-4">
+        <div className={`fixed inset-0 bg-black/40 flex items-center justify-center z-[60] ${anim ? 'animate-modal-backdrop' : ''}`}>
+          <div className={`bg-white rounded-2xl shadow-2xl w-[460px] px-8 py-6 flex flex-col gap-4 ${anim ? 'animate-modal-panel' : ''}`}>
             <h3 className="text-2xl font-semibold text-gray-800">Retrieve Menu Item?</h3>
             <p className="text-xl text-gray-600">
               <span className="font-semibold">{retrieveRow.name}</span> will be moved back to the active list.
@@ -954,12 +986,16 @@ export default function MenuItems() {
             <div className="flex gap-3 justify-end mt-1">
               <button
                 onClick={() => { setShowRetrieveConf(false); setRetrieveRow(null); }}
-                className="px-6 py-2 rounded-full border border-gray-300 text-xl text-gray-600 hover:bg-gray-50 transition-colors"
+                disabled={retrieveSaving}
+                className="px-6 py-2 rounded-full border border-gray-300 text-xl text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50"
               >Cancel</button>
               <button
                 onClick={handleConfirmRetrieve}
-                className="px-6 py-2 rounded-full bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white text-xl transition-colors"
-              >Confirm</button>
+                disabled={retrieveSaving}
+                className={`flex items-center gap-2 px-6 py-2 rounded-full text-xl transition-colors ${retrieveSaving ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white'}`}
+              >
+                {retrieveSaving ? <><Loader size={18} className="animate-spin" /> Saving...</> : 'Confirm'}
+              </button>
             </div>
           </div>
         </div>
@@ -974,8 +1010,8 @@ export default function MenuItems() {
           VIEW MODAL
       ══════════════════════════════════════════ */}
       {viewingItem && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[60]">
-          <div className="bg-white rounded-2xl shadow-2xl w-[580px] max-h-[80vh] overflow-y-auto">
+        <div className={`fixed inset-0 bg-black/40 flex items-center justify-center z-[60] ${anim ? 'animate-modal-backdrop' : ''}`}>
+          <div className={`bg-white rounded-2xl shadow-2xl w-[580px] max-h-[80vh] overflow-y-auto ${anim ? 'animate-modal-panel' : ''}`}>
             <div className="flex items-center justify-between px-8 py-5 border-b border-gray-200">
               <h3 className="text-2xl font-semibold text-gray-800">Menu Item Details</h3>
               <button onClick={() => setViewingItem(null)} className="text-gray-400 hover:text-gray-600 transition-colors">

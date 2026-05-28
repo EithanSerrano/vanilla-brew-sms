@@ -66,6 +66,16 @@ html.dark textarea::placeholder {
   background: #9ca3af;
 }
 
+@keyframes modal-backdrop-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes modal-panel-in {
+  from { opacity: 0; transform: scale(0.95) translateY(-10px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
 @layer utilities {
   .no-spinner {
     -moz-appearance: textfield;
@@ -76,6 +86,14 @@ html.dark textarea::placeholder {
   .no-spinner::-webkit-inner-spin-button {
     -webkit-appearance: none;
     margin: 0;
+  }
+
+  .animate-modal-backdrop {
+    animation: modal-backdrop-in 0.2s ease-out;
+  }
+
+  .animate-modal-panel {
+    animation: modal-panel-in 0.22s ease-out;
   }
 }
 
