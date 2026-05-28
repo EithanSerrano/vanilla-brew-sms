@@ -358,10 +358,10 @@ export default function Dashboard({ role }) {
             )}
             {/* Column headers */}
             <div className="flex items-center px-5 py-3 border-b border-gray-200 bg-white shrink-0">
-              <span className="w-[32%] pl-10 text-xl font-semibold text-gray-800">Sales ID</span>
-              <span className="w-[23%] text-xl font-semibold text-gray-800 text-center">Date</span>
-              <span className="w-[18%] text-xl font-semibold text-gray-800 text-center">Time</span>
-              <span className="flex-1 text-xl font-semibold text-gray-800 text-center">Action</span>
+              <span className="w-[18%] pl-10 text-xl font-semibold text-gray-800 text-center">Sales ID</span>
+              <span className="w-[40%] text-xl font-semibold text-gray-800 text-center">Date</span>
+              <span className="w-[16%] text-xl font-semibold text-gray-800 text-center">Time</span>
+              <span className="w-[25%] text-xl font-semibold text-gray-800 text-center">Action</span>
             </div>
             <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-2" style={{ scrollbarGutter: 'stable' }}>
               {loading && <p className="py-12 text-gray-400 text-xl text-center">Loading…</p>}
@@ -372,8 +372,8 @@ export default function Dashboard({ role }) {
                 const { date, time } = splitDateTime(sale.dateAndTimeStr);
                 return (
                   <div key={sale.id} className="flex items-center bg-white rounded-xl border border-gray-200 shadow-sm px-5 py-3.5">
-                    <span className="w-[32%] pl-10 text-xl text-gray-700">{sale.transactionNumber || sale.id}</span>
-                    <span className="w-[23%] text-xl text-gray-700 text-center">{date}</span>
+                    <span className="w-[18%] pl-10 text-xl text-gray-700">{sale.transactionNumber || sale.id}</span>
+                    <span className="w-[40%] text-xl text-gray-700 text-center">{date}</span>
                     <span className="w-[18%] text-xl text-gray-700 text-center">{time}</span>
                     <div className="flex-1 flex justify-center">
                       <button

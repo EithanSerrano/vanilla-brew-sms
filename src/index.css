@@ -1,8 +1,53 @@
 @import "tailwindcss";
 
+/* Enable class-based dark mode for Tailwind v4 */
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root,
 body {
   color: white;
+}
+
+/* ── Dark mode global overrides ── */
+html.dark {
+  color-scheme: dark;
+}
+
+html.dark [class~="bg-white"] {
+  background-color: #1e293b !important;
+}
+html.dark [class~="bg-gray-50"] {
+  background-color: #0f172a !important;
+}
+html.dark [class~="bg-gray-100"] {
+  background-color: #1e293b !important;
+}
+html.dark [class~="bg-gray-200"] {
+  background-color: #334155 !important;
+}
+
+html.dark [class~="text-gray-900"] { color: #f1f5f9 !important; }
+html.dark [class~="text-gray-800"] { color: #e2e8f0 !important; }
+html.dark [class~="text-gray-700"] { color: #cbd5e1 !important; }
+html.dark [class~="text-gray-600"] { color: #94a3b8 !important; }
+html.dark [class~="text-gray-500"] { color: #64748b !important; }
+html.dark [class~="text-gray-400"] { color: #475569 !important; }
+
+html.dark [class~="border-gray-200"] { border-color: #334155 !important; }
+html.dark [class~="border-gray-300"] { border-color: #475569 !important; }
+html.dark [class~="border-gray-100"] { border-color: #1e293b !important; }
+
+html.dark input,
+html.dark select,
+html.dark textarea {
+  background-color: #1e293b !important;
+  color: #f1f5f9 !important;
+  border-color: #334155 !important;
+}
+
+html.dark input::placeholder,
+html.dark textarea::placeholder {
+  color: #475569 !important;
 }
 
 /* ── Custom scrollbar: thin line with rounded edges ── */

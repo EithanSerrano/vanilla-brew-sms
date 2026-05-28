@@ -1,4 +1,6 @@
-﻿import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+﻿import { useEffect } from "react";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { startSalesInventoryListener } from "./utils/inventoryDeduction";
 
 // Pages
 import Login from "./pages/Login";
@@ -26,8 +28,15 @@ import Maintenance from "./pages/Maintenance";
 import Documents from "./pages/Documents";
 import About from "./pages/About";
 import Settings from "./pages/Settings";
+import Account from "./pages/Account";
+import PaymentQR from "./pages/PaymentQR";
 
 function App() {
+  useEffect(() => {
+    const unsubscribe = startSalesInventoryListener();
+    return () => unsubscribe();
+  }, []);
+
   return (
     <BrowserRouter>
       <div className="h-screen font-sans flex flex-col">
@@ -56,6 +65,8 @@ function App() {
             <Route path="/admin-help" element={<AdminHelp />} />
             <Route path="/admin-about" element={<About role="admin" />} />
             <Route path="/admin-settings" element={<Settings role="admin" />} />
+            <Route path="/admin-account" element={<Account role="admin" />} />
+            <Route path="/payment-qr" element={<PaymentQR />} />
             
             {/* --- STAFF ROUTES --- */}
             <Route path="/staff" element={<StaffHome />} />
@@ -66,6 +77,7 @@ function App() {
             <Route path="/staff-help" element={<StaffHelp />} />
             <Route path="/staff-about" element={<About role="staff" />} />
             <Route path="/staff-settings" element={<Settings role="staff" />} />
+            <Route path="/staff-account" element={<Account role="staff" />} />
             
             {/* Catch-all: Must be at the bottom */}
             <Route path="*" element={<Navigate to="/login" replace />} />

@@ -1,7 +1,7 @@
 ﻿import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { signInWithEmailAndPassword, sendPasswordResetEmail, signOut } from 'firebase/auth';
-import { doc, getDoc, collection, query, where, getDocs, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs, updateDoc, addDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 import { Eye, EyeOff } from 'lucide-react';
 
@@ -18,6 +18,7 @@ export default function Login() {
  
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successMessage, setSuccessMessage] = useState(false);
+  const [loginSuccess, setLoginSuccess] = useState(false);
 
 
   // Global Session Lockout State
@@ -142,14 +143,24 @@ export default function Login() {
         await updateDoc(userDocRef, { isOnline: true });
         setAttempts(0);
 
+        await addDoc(collection(db, 'auditlog'), {
+          action: 'Login',
+          performedBy: user.email,
+          userId: user.uid,
+          userName: userData.name || '',
+          role: userData.role || '',
+          details: `${userData.name || user.email} logged in successfully.`,
+          timestamp: serverTimestamp(),
+        });
 
-        if (userData.role === 'admin') {
-          navigate('/admin');
-        } else if (userData.role === 'staff') {
-          navigate('/staff');
-        } else {
+        setLoginSuccess(true);
+        const destination = userData.role === 'admin' ? '/admin' : userData.role === 'staff' ? '/staff' : null;
+        if (!destination) {
           setUsernameError("Unauthorized role");
+          setLoginSuccess(false);
+          return;
         }
+        setTimeout(() => navigate(destination), 1500);
       } else {
         throw new Error("Document not found");
       }
@@ -313,12 +324,14 @@ export default function Login() {
 
         {currentView === 'login' && (
           <div className="w-full flex flex-col items-center animate-in fade-in duration-300">
-            {bannerMessage ? (
+            {loginSuccess ? (
+              <p className="text-green-600 text-xl font-semibold mb-4 text-center tracking-wide">Login successful! Redirecting...</p>
+            ) : bannerMessage ? (
               <p className="text-red-500 text-xl font-medium mb-4 text-center tracking-wide">{bannerMessage}</p>
             ) : (
               <p className="text-gray-500 text-xl mb-6 tracking-wide">Please enter your credentials</p>
             )}
-            <form onSubmit={handleLogin} className="w-full flex flex-col gap-5 px-8">
+            <form onSubmit={handleLogin} className="w-full flex flex-col gap-5 px-8" style={{ pointerEvents: loginSuccess ? 'none' : 'auto', opacity: loginSuccess ? 0.6 : 1 }}>
               <div className="flex flex-col gap-1.5">
                 <label className="text-gray-800 text-xl font-medium tracking-wide">Email</label>
                 <input

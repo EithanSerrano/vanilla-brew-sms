@@ -81,8 +81,13 @@ export default function Inventory() {
   // ── Data ──
   const [materials,    setMaterials]    = useState([]);
   const [ingredients,  setIngredients]  = useState([]);
-  const [showInactive, setShowInactive] = useState(false);
-  const [searchQuery,  setSearchQuery]  = useState('');
+  const [showInactive,    setShowInactive]    = useState(false);
+  const [searchQuery,     setSearchQuery]     = useState('');
+
+  // ── Filters ──
+  const [showFilterPanel, setShowFilterPanel] = useState(false);
+  const [filterType,      setFilterType]      = useState('');
+  const [filterStatus,    setFilterStatus]    = useState('');
 
   // ── New Material ──
   const [showNewMat,   setShowNewMat]   = useState(false);
@@ -242,12 +247,17 @@ export default function Inventory() {
     })),
   ];
 
+  const isFiltered = !!(filterType || filterStatus);
+  const clearFilters = () => { setFilterType(''); setFilterStatus(''); };
+
   const displayed = allRows
     .filter(r => showInactive ? !r.active : r.active)
     .filter(r => !searchQuery ||
       r.displayId.toLowerCase().includes(searchQuery.toLowerCase()) ||
       r.displayName.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    )
+    .filter(r => !filterType   || r._type  === filterType)
+    .filter(r => !filterStatus || r.status === filterStatus);
 
   // ════════════════════════════════════
   // NEW MATERIAL
@@ -568,9 +578,70 @@ export default function Inventory() {
               <span className="text-xl text-gray-600 shrink-0">{showInactive ? 'Showing Inactive List' : 'Showing Active List'}</span>
             </div>
             <div className="flex items-center gap-3">
-              <button className="flex items-center gap-2 bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-full text-xl transition-colors shrink-0">
-                <Filter size={16} /> Filter List
-              </button>
+              <div className="relative shrink-0">
+                <button
+                  onClick={() => setShowFilterPanel(v => !v)}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-full text-xl transition-colors ${
+                    isFiltered || showFilterPanel
+                      ? 'bg-[#3ca4c7] text-white hover:bg-[#2b8aa8]'
+                      : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
+                  }`}
+                >
+                  <Filter size={16} /> Filter List
+                </button>
+
+                {showFilterPanel && (
+                  <div className="absolute right-0 top-full mt-2 bg-white border border-gray-200 rounded-xl shadow-xl z-30 w-64 overflow-hidden">
+                    <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+                      <span className="text-xl font-semibold text-gray-700">Filter</span>
+                      {isFiltered && (
+                        <button
+                          onClick={() => { clearFilters(); setShowFilterPanel(false); }}
+                          className="text-xl text-red-400 hover:text-red-600 transition-colors"
+                        >Clear all</button>
+                      )}
+                    </div>
+
+                    {/* Type filter */}
+                    <div className="px-4 pt-3 pb-1">
+                      <p className="text-lg font-medium text-gray-500 mb-1.5">Type</p>
+                      <div className="flex flex-col">
+                        {[{ key: 'material', label: 'Material' }, { key: 'ingredient', label: 'Ingredient' }].map(({ key, label }) => (
+                          <button
+                            key={key}
+                            onClick={() => setFilterType(filterType === key ? '' : key)}
+                            className={`w-full text-left px-3 py-2 text-xl rounded-lg transition-colors ${
+                              filterType === key
+                                ? 'bg-[#3ca4c7]/10 text-[#3ca4c7] font-medium'
+                                : 'text-gray-700 hover:bg-gray-50'
+                            }`}
+                          >{label}</button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Status filter — only meaningful on active list */}
+                    {!showInactive && (
+                      <div className="px-4 pt-2 pb-3 border-t border-gray-100 mt-1">
+                        <p className="text-lg font-medium text-gray-500 mb-1.5">Status</p>
+                        <div className="flex flex-col">
+                          {Object.entries(STATUS_STYLES).map(([key, { label }]) => (
+                            <button
+                              key={key}
+                              onClick={() => setFilterStatus(filterStatus === key ? '' : key)}
+                              className={`w-full text-left px-3 py-2 text-xl rounded-lg transition-colors ${
+                                filterStatus === key
+                                  ? 'bg-[#3ca4c7]/10 text-[#3ca4c7] font-medium'
+                                  : 'text-gray-700 hover:bg-gray-50'
+                              }`}
+                            >{label}</button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
               {!showInactive && (<>
                 <button onClick={() => setShowNewMat(true)} className="flex items-center gap-1.5 bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white px-4 py-2 rounded-full text-xl transition-colors shrink-0"><Plus size={16} /> New Material</button>
                 <button onClick={() => setShowNewIng(true)} className="flex items-center gap-1.5 bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white px-4 py-2 rounded-full text-xl transition-colors shrink-0"><Plus size={16} /> New Ingredient</button>
@@ -579,6 +650,29 @@ export default function Inventory() {
             </div>
           </div>
         </div>
+
+        {/* Active filter chips */}
+        {isFiltered && (
+          <div className="flex items-center gap-2 mb-3 shrink-0 flex-wrap">
+            <span className="text-xl text-gray-500">Filtered by:</span>
+            {filterType && (
+              <span className="flex items-center gap-1.5 bg-[#3ca4c7]/10 text-[#3ca4c7] text-xl font-medium px-3 py-1 rounded-full">
+                {filterType === 'material' ? 'Material' : 'Ingredient'}
+                <button onClick={() => setFilterType('')} className="hover:text-[#2b8aa8] transition-colors ml-1">
+                  <X size={13} />
+                </button>
+              </span>
+            )}
+            {filterStatus && (
+              <span className="flex items-center gap-1.5 bg-[#3ca4c7]/10 text-[#3ca4c7] text-xl font-medium px-3 py-1 rounded-full">
+                {STATUS_STYLES[filterStatus]?.label}
+                <button onClick={() => setFilterStatus('')} className="hover:text-[#2b8aa8] transition-colors ml-1">
+                  <X size={13} />
+                </button>
+              </span>
+            )}
+          </div>
+        )}
 
         {/* Search */}
         <div className="flex items-center gap-2 border-b border-gray-300 pb-1 mb-5 shrink-0">
@@ -1514,6 +1608,11 @@ export default function Inventory() {
       )}
       {showEditDisc && (
         <DiscardDialog onCancel={() => setShowEditDisc(false)} onConfirm={() => { setShowEditDisc(false); setShowEditForm(false); setEditRow(null); }} />
+      )}
+
+      {/* Click-away to close filter panel */}
+      {showFilterPanel && (
+        <div className="fixed inset-0 z-20" onClick={() => setShowFilterPanel(false)} />
       )}
     </div>
   );

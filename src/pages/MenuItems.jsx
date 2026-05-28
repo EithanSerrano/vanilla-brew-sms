@@ -88,17 +88,23 @@ export default function MenuItems() {
   const [menuItems,   setMenuItems]   = useState([]);
   const [ingredients, setIngredients] = useState([]);
   const [materials,   setMaterials]   = useState([]);
-  const [showInactive, setShowInactive] = useState(false);
-  const [searchQuery,  setSearchQuery]  = useState('');
+  const [showInactive,  setShowInactive]  = useState(false);
+  const [searchQuery,   setSearchQuery]   = useState('');
 
-  // ── New Menu — Step 1 ──
+  // ── Filters ──
+  const [showFilterPanel, setShowFilterPanel] = useState(false);
+  const [filterCategory,  setFilterCategory]  = useState('');
+  const [filterStatus,    setFilterStatus]    = useState('');
+
+  // ── New / Edit — Step 1 ──
   const [showStep1,    setShowStep1]    = useState(false);
+  const [editingItem,  setEditingItem]  = useState(null); // null = create mode
   const [menuName,     setMenuName]     = useState('');
   const [menuCategory, setMenuCategory] = useState('Frappe');
   const [menuSizes,    setMenuSizes]    = useState(EMPTY_SIZES);
   const [addOns,       setAddOns]       = useState([]);
 
-  // ── New Menu — Step 2 ──
+  // ── New / Edit — Step 2 ──
   const [showStep2,      setShowStep2]      = useState(false);
   const [currentSizeIdx, setCurrentSizeIdx] = useState(0);
   const [connections,    setConnections]    = useState({ Small: [], Medium: [], Large: [] });
@@ -132,9 +138,11 @@ export default function MenuItems() {
   useEffect(() => { loadData(); }, []);
 
   // ── Derived ──
-  const activeIngredients  = ingredients.filter(i => i.isActive !== false && i.archived !== true);
-  const addOnIngredients   = activeIngredients.filter(i => i.isAddOn === true);
-  const activeMaterials    = materials.filter(m => m.isActive !== false);
+  const activeIngredients = ingredients.filter(i => i.isActive !== false && i.archived !== true);
+  const addOnIngredients  = activeIngredients.filter(i => i.isAddOn === true);
+  const activeMaterials   = materials.filter(m => m.isActive !== false);
+
+  const isFiltered = !!(filterCategory || filterStatus);
 
   const displayed = menuItems
     .filter(m => showInactive ? m.isActive === false : m.isActive !== false)
@@ -142,10 +150,17 @@ export default function MenuItems() {
       !searchQuery ||
       (m.menuItemId || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
       (m.name || '').toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    )
+    .filter(m => !filterCategory || m.category === filterCategory)
+    .filter(m => {
+      if (!filterStatus) return true;
+      return computeMenuStatus(m, ingredients, materials) === filterStatus;
+    });
+
+  const clearFilters = () => { setFilterCategory(''); setFilterStatus(''); };
 
   // ════════════════════════════════════
-  // NEW MENU — HELPERS
+  // FORM HELPERS
   // ════════════════════════════════════
   const enabledSizes = MENU_SIZES.filter(s => menuSizes[s].enabled);
 
@@ -157,17 +172,67 @@ export default function MenuItems() {
   const resetAll = () => {
     setMenuName(''); setMenuCategory('Frappe'); setMenuSizes(EMPTY_SIZES);
     setAddOns([]); setConnections({ Small: [], Medium: [], Large: [] });
-    setCurrentSizeIdx(0); setPendingMenu(null);
+    setCurrentSizeIdx(0); setPendingMenu(null); setEditingItem(null);
   };
 
   const handleCloseStep1 = () => {
-    step1HasData() ? setShowDiscard(true) : (setShowStep1(false), resetAll());
+    // In edit mode always confirm discard; in create mode only if form has data
+    (editingItem || step1HasData()) ? setShowDiscard(true) : (setShowStep1(false), resetAll());
   };
 
   const toggleMenuSize = s =>
     setMenuSizes(p => ({ ...p, [s]: { enabled: !p[s].enabled, price: p[s].enabled ? '' : p[s].price } }));
 
-  // Add-On row management
+  // ════════════════════════════════════
+  // OPEN EDIT
+  // ════════════════════════════════════
+  const handleOpenEdit = (item) => {
+    setEditingItem(item);
+    setMenuName(item.name || '');
+    setMenuCategory(item.category || 'Frappe');
+
+    // Reconstruct sizes
+    const newSizes = {
+      Small:  { enabled: false, price: '' },
+      Medium: { enabled: false, price: '' },
+      Large:  { enabled: false, price: '' },
+    };
+    for (const sz of (item.sizes || [])) {
+      if (newSizes[sz.size] !== undefined) {
+        newSizes[sz.size] = { enabled: true, price: String(sz.price ?? '') };
+      }
+    }
+    setMenuSizes(newSizes);
+
+    // Reconstruct add-ons
+    setAddOns((item.addOns || []).map(a => ({
+      ingredientId: a.ingredientId || '',
+      name:         a.name || '',
+      amount:       String(a.amount ?? ''),
+      price:        String(a.price ?? ''),
+    })));
+
+    // Reconstruct connections per size
+    const newConns = { Small: [], Medium: [], Large: [] };
+    for (const sz of (item.sizes || [])) {
+      if (newConns[sz.size] !== undefined) {
+        newConns[sz.size] = (sz.connections || []).map(c => ({
+          type:   c.type,
+          refId:  c.refId || '',
+          name:   c.name || '',
+          amount: String(c.amount ?? ''),
+          unit:   c.unit || '',
+        }));
+      }
+    }
+    setConnections(newConns);
+
+    setShowStep1(true);
+  };
+
+  // ════════════════════════════════════
+  // ADD-ONS
+  // ════════════════════════════════════
   const addAddOn = () => setAddOns(p => [...p, { ingredientId: '', name: '', amount: '', price: '' }]);
   const removeAddOn = i => setAddOns(p => p.filter((_, idx) => idx !== i));
   const updateAddOn = (i, field, val) => setAddOns(p => p.map((a, idx) => idx === i ? { ...a, [field]: val } : a));
@@ -217,25 +282,31 @@ export default function MenuItems() {
   const handleGoBackToStep1 = () => { setShowStep2(false); setShowStep1(true); };
 
   // ════════════════════════════════════
-  // SAVE
+  // SAVE (create or update)
   // ════════════════════════════════════
   const handlePrepareConfirm = async () => {
-    const snap = await getDocs(collection(db, 'menuItems'));
-    const nums = snap.docs
-      .map(d => d.data().menuItemId || '')
-      .filter(id => /^MNT\d+$/.test(id))
-      .map(id => parseInt(id.slice(3)));
-    const base  = nums.length ? Math.max(...nums) : 0;
-    const newId = `MNT${String(base + 1).padStart(3, '0')}`;
+    let menuItemId;
+    if (editingItem) {
+      menuItemId = editingItem.menuItemId;
+    } else {
+      const snap = await getDocs(collection(db, 'menuItems'));
+      const nums = snap.docs
+        .map(d => d.data().menuItemId || '')
+        .filter(id => /^MNT\d+$/.test(id))
+        .map(id => parseInt(id.slice(3)));
+      const base = nums.length ? Math.max(...nums) : 0;
+      menuItemId = `MNT${String(base + 1).padStart(3, '0')}`;
+    }
+
     setPendingMenu({
-      menuItemId: newId,
-      name:       menuName.trim(),
-      category:   menuCategory,
+      menuItemId,
+      name:     menuName.trim(),
+      category: menuCategory,
       addOns: addOns
         .filter(a => a.ingredientId)
         .map(a => ({
           ingredientId: a.ingredientId,
-          name:  a.name,
+          name:   a.name,
           amount: parseFloat(a.amount) || 0,
           price:  parseFloat(a.price)  || 0,
         })),
@@ -256,20 +327,29 @@ export default function MenuItems() {
     setShowMenuConf(true);
   };
 
-  const handleConfirmNew = async () => {
+  const handleConfirmSave = async () => {
     if (!pendingMenu) return;
-    const now = new Date();
-    await addDoc(collection(db, 'menuItems'), {
-      menuItemId:  pendingMenu.menuItemId,
-      name:        pendingMenu.name,
-      category:    pendingMenu.category,
-      isActive:    true,
-      isAvailable: true,
-      addOns:      pendingMenu.addOns,
-      sizes:       pendingMenu.sizes,
-      createdAt:   now,
-      hiddenAt:    null,
-    });
+    if (editingItem) {
+      await updateDoc(doc(db, 'menuItems', editingItem.id), {
+        name:      pendingMenu.name,
+        category:  pendingMenu.category,
+        addOns:    pendingMenu.addOns,
+        sizes:     pendingMenu.sizes,
+        updatedAt: new Date(),
+      });
+    } else {
+      await addDoc(collection(db, 'menuItems'), {
+        menuItemId:  pendingMenu.menuItemId,
+        name:        pendingMenu.name,
+        category:    pendingMenu.category,
+        isActive:    true,
+        isAvailable: true,
+        addOns:      pendingMenu.addOns,
+        sizes:       pendingMenu.sizes,
+        createdAt:   new Date(),
+        hiddenAt:    null,
+      });
+    }
     await loadData();
     setShowMenuConf(false);
     setShowStep2(false);
@@ -305,6 +385,8 @@ export default function MenuItems() {
   // ════════════════════════════════════════════════════════════
   //  RENDER
   // ════════════════════════════════════════════════════════════
+  const isEditMode = !!editingItem;
+
   return (
     <div className="flex w-full h-full">
       <AdminSidebar />
@@ -327,12 +409,69 @@ export default function MenuItems() {
               </span>
             </div>
             <div className="flex items-center gap-3">
-              <button className="flex items-center gap-2 bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-full text-xl transition-colors shrink-0">
-                <Filter size={16} /> Filter List
-              </button>
+              <div className="relative shrink-0">
+                <button
+                  onClick={() => setShowFilterPanel(v => !v)}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-full text-xl transition-colors ${
+                    isFiltered || showFilterPanel
+                      ? 'bg-[#3ca4c7] text-white hover:bg-[#2b8aa8]'
+                      : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
+                  }`}
+                >
+                  <Filter size={16} /> Filter List
+                </button>
+
+                {showFilterPanel && (
+                  <div className="absolute right-0 top-full mt-2 bg-white border border-gray-200 rounded-xl shadow-xl z-30 w-64 overflow-hidden">
+                    <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+                      <span className="text-xl font-semibold text-gray-700">Filter</span>
+                      {isFiltered && (
+                        <button
+                          onClick={() => { clearFilters(); setShowFilterPanel(false); }}
+                          className="text-xl text-red-400 hover:text-red-600 transition-colors"
+                        >Clear all</button>
+                      )}
+                    </div>
+                    <div className="px-4 pt-3 pb-1">
+                      <p className="text-lg font-medium text-gray-500 mb-1.5">Category</p>
+                      <div className="flex flex-col">
+                        {MENU_CATEGORIES.map(cat => (
+                          <button
+                            key={cat}
+                            onClick={() => setFilterCategory(filterCategory === cat ? '' : cat)}
+                            className={`w-full text-left px-3 py-2 text-xl rounded-lg transition-colors ${
+                              filterCategory === cat
+                                ? 'bg-[#3ca4c7]/10 text-[#3ca4c7] font-medium'
+                                : 'text-gray-700 hover:bg-gray-50'
+                            }`}
+                          >{cat}</button>
+                        ))}
+                      </div>
+                    </div>
+                    {!showInactive && (
+                      <div className="px-4 pt-2 pb-3 border-t border-gray-100 mt-1">
+                        <p className="text-lg font-medium text-gray-500 mb-1.5">Status</p>
+                        <div className="flex flex-col">
+                          {Object.entries(STATUS_STYLES).map(([key, { label }]) => (
+                            <button
+                              key={key}
+                              onClick={() => setFilterStatus(filterStatus === key ? '' : key)}
+                              className={`w-full text-left px-3 py-2 text-xl rounded-lg transition-colors ${
+                                filterStatus === key
+                                  ? 'bg-[#3ca4c7]/10 text-[#3ca4c7] font-medium'
+                                  : 'text-gray-700 hover:bg-gray-50'
+                              }`}
+                            >{label}</button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
               {!showInactive && (
                 <button
-                  onClick={() => setShowStep1(true)}
+                  onClick={() => { resetAll(); setShowStep1(true); }}
                   className="flex items-center gap-1.5 bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white px-4 py-2 rounded-full text-xl transition-colors shrink-0"
                 >
                   <Plus size={16} /> New Menu
@@ -344,6 +483,25 @@ export default function MenuItems() {
             </div>
           </div>
         </div>
+
+        {/* Active filter chips */}
+        {isFiltered && (
+          <div className="flex items-center gap-2 mb-3 shrink-0 flex-wrap">
+            <span className="text-xl text-gray-500">Filtered by:</span>
+            {filterCategory && (
+              <span className="flex items-center gap-1.5 bg-[#3ca4c7]/10 text-[#3ca4c7] text-xl font-medium px-3 py-1 rounded-full">
+                {filterCategory}
+                <button onClick={() => setFilterCategory('')} className="hover:text-[#2b8aa8] transition-colors ml-1"><X size={13} /></button>
+              </span>
+            )}
+            {filterStatus && (
+              <span className="flex items-center gap-1.5 bg-[#3ca4c7]/10 text-[#3ca4c7] text-xl font-medium px-3 py-1 rounded-full">
+                {STATUS_STYLES[filterStatus]?.label}
+                <button onClick={() => setFilterStatus('')} className="hover:text-[#2b8aa8] transition-colors ml-1"><X size={13} /></button>
+              </span>
+            )}
+          </div>
+        )}
 
         {/* Search */}
         <div className="flex items-center gap-2 border-b border-gray-300 pb-1 mb-5 shrink-0">
@@ -357,17 +515,15 @@ export default function MenuItems() {
 
         {/* List */}
         <div className="flex-1 rounded-xl border border-gray-200 overflow-hidden flex flex-col min-h-0">
-          {/* Column headers */}
           <div className="flex items-center px-5 py-3 bg-white border-b border-gray-200 shrink-0">
-            <span className="w-[14%] text-xl font-semibold text-gray-800 text-center">ID</span>
-            <span className="w-[20%] text-xl font-semibold text-gray-800 pl-2">Name</span>
-            <span className="w-[14%] text-xl font-semibold text-gray-800 text-center">Category</span>
+            <span className="w-[16%] text-xl font-semibold text-gray-800 text-center">ID</span>
+            <span className="w-[17%] text-xl font-semibold text-gray-800 text-center">Name</span>
+            <span className="w-[15%] text-xl font-semibold text-gray-800 text-center">Category</span>
             <span className="w-[11%] text-xl font-semibold text-gray-800 text-center">
               {showInactive ? 'Date Hidden' : 'Status'}
             </span>
             <span className="flex-1 text-xl font-semibold text-gray-800 text-center">Actions</span>
           </div>
-          {/* Scrollable cards */}
           <div className="flex-1 overflow-y-auto min-h-0 px-4 py-3 flex flex-col gap-2" style={{ scrollbarGutter: 'stable' }}>
             {displayed.length === 0 && (
               <p className="py-12 text-gray-400 text-xl text-center">No items found.</p>
@@ -381,11 +537,12 @@ export default function MenuItems() {
                   className="flex items-center bg-white rounded-xl border border-gray-200 shadow-sm px-5 py-3.5"
                 >
                   <span className="w-[14%] text-xl text-gray-700 text-center">{item.menuItemId}</span>
-                  <span className="w-[20%] text-xl text-gray-700 pl-2">{item.name}</span>
+                  <span className="w-[20%] text-xl text-gray-700 text-center">{item.name}</span>
                   <span className="w-[13%] text-xl text-gray-700 text-center">{item.category}</span>
                   {showInactive
                     ? <span className="w-[14%] text-xl text-gray-700 text-center">{fmtDate(item.hiddenAt)}</span>
-                    : <span className={`w-[14%] text-xl font-medium text-center ${s.className}`}>{s.label}</span>}
+                    : <span className={`w-[14%] text-xl font-medium text-center ${s.className}`}>{s.label}</span>
+                  }
                   <div className="flex-1 flex items-center justify-center gap-2">
                     {showInactive ? (
                       <>
@@ -415,6 +572,7 @@ export default function MenuItems() {
                           className="bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white px-3 py-1.5 rounded-full text-xl transition-colors"
                         >View</button>
                         <button
+                          onClick={() => handleOpenEdit(item)}
                           className="bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white px-3 py-1.5 rounded-full text-xl transition-colors"
                         >Edit</button>
                         <button
@@ -438,7 +596,9 @@ export default function MenuItems() {
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
           <div className="bg-white rounded-2xl shadow-2xl w-[95vw] max-h-[92vh] overflow-y-auto">
             <div className="flex items-center justify-between px-12 py-6 border-b border-gray-200">
-              <h3 className="text-2xl font-semibold text-gray-800">Creating a new Menu Item</h3>
+              <h3 className="text-2xl font-semibold text-gray-800">
+                {isEditMode ? `Editing: ${editingItem.name}` : 'Creating a new Menu Item'}
+              </h3>
               <button onClick={handleCloseStep1} className="text-gray-400 hover:text-gray-600 transition-colors">
                 <X size={22} />
               </button>
@@ -578,9 +738,10 @@ export default function MenuItems() {
       {showStep2 && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
           <div className="bg-white rounded-2xl shadow-2xl w-[95vw] max-h-[92vh] flex flex-col overflow-hidden">
-            {/* Modal header */}
             <div className="flex items-center justify-between px-12 py-6 border-b border-gray-200 shrink-0">
-              <h3 className="text-2xl font-semibold text-gray-800">Creating a new Menu Item</h3>
+              <h3 className="text-2xl font-semibold text-gray-800">
+                {isEditMode ? `Editing: ${editingItem.name}` : 'Creating a new Menu Item'}
+              </h3>
               <button
                 onClick={handleGoBackToStep1}
                 title="Back to form"
@@ -590,9 +751,7 @@ export default function MenuItems() {
               </button>
             </div>
 
-            {/* Scrollable body */}
             <div className="flex-1 px-12 py-8 overflow-y-auto flex flex-col gap-6">
-              {/* Size navigation title */}
               <div className="flex items-center justify-center gap-5">
                 <button
                   onClick={() => setCurrentSizeIdx(idx => Math.max(0, idx - 1))}
@@ -613,7 +772,6 @@ export default function MenuItems() {
                 </button>
               </div>
 
-              {/* Connections inner panel */}
               <div className="border border-gray-200 rounded-xl px-6 pt-5 pb-5 flex flex-col gap-5 min-h-[320px] max-h-[460px] overflow-y-auto">
                 {currentConns.map((conn, idx) => (
                   <div key={idx} className="flex items-center gap-5">
@@ -659,7 +817,6 @@ export default function MenuItems() {
                   </div>
                 ))}
 
-                {/* Add buttons */}
                 <div className="flex gap-5 mt-3">
                   <button
                     onClick={() => addConn('ingredient')}
@@ -677,13 +834,12 @@ export default function MenuItems() {
               </div>
             </div>
 
-            {/* Confirm button */}
             <div className="px-12 pb-10 shrink-0 flex justify-center">
               <button
                 onClick={handlePrepareConfirm}
                 className="bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white px-20 py-3.5 rounded-full text-xl font-semibold transition-colors"
               >
-                Confirm
+                {isEditMode ? 'Save Changes' : 'Confirm'}
               </button>
             </div>
           </div>
@@ -696,7 +852,9 @@ export default function MenuItems() {
       {showMenuConf && pendingMenu && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[60]">
           <div className="bg-white rounded-2xl shadow-2xl w-[520px] px-8 py-6 flex flex-col gap-4">
-            <h3 className="text-2xl font-semibold text-gray-800">Save New Menu Item?</h3>
+            <h3 className="text-2xl font-semibold text-gray-800">
+              {isEditMode ? 'Save Changes?' : 'Save New Menu Item?'}
+            </h3>
             <div className="border border-gray-100 rounded-lg p-4 bg-gray-50 flex flex-col gap-2">
               <p className="text-xl text-gray-700">ID: <span className="font-semibold">{pendingMenu.menuItemId}</span></p>
               <p className="text-xl text-gray-700">Name: <span className="font-semibold">{pendingMenu.name}</span></p>
@@ -718,7 +876,7 @@ export default function MenuItems() {
                 className="px-6 py-2 rounded-full border border-gray-300 text-xl text-gray-600 hover:bg-gray-50 transition-colors"
               >Cancel</button>
               <button
-                onClick={handleConfirmNew}
+                onClick={handleConfirmSave}
                 className="px-6 py-2 rounded-full bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white text-xl transition-colors"
               >Confirm</button>
             </div>
@@ -732,7 +890,9 @@ export default function MenuItems() {
       {showMenuOk && pendingMenu && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[60]">
           <div className="bg-white rounded-2xl shadow-2xl w-[480px] px-8 py-6 flex flex-col gap-4">
-            <h3 className="text-2xl font-semibold text-gray-800">New Menu Item Saved!</h3>
+            <h3 className="text-2xl font-semibold text-gray-800">
+              {isEditMode ? 'Menu Item Updated!' : 'New Menu Item Saved!'}
+            </h3>
             <div className="border border-gray-100 rounded-lg p-4 bg-gray-50">
               <p className="text-xl text-gray-700">{pendingMenu.menuItemId} — {pendingMenu.name}</p>
               <p className="text-xl text-gray-500">{pendingMenu.category}</p>
@@ -753,7 +913,7 @@ export default function MenuItems() {
       {showDiscard && (
         <DiscardDialog
           onCancel={() => setShowDiscard(false)}
-          onConfirm={() => { setShowDiscard(false); setShowStep1(false); resetAll(); }}
+          onConfirm={() => { setShowDiscard(false); setShowStep1(false); setShowStep2(false); resetAll(); }}
         />
       )}
 
@@ -805,6 +965,11 @@ export default function MenuItems() {
         </div>
       )}
 
+      {/* Click-away to close filter panel */}
+      {showFilterPanel && (
+        <div className="fixed inset-0 z-20" onClick={() => setShowFilterPanel(false)} />
+      )}
+
       {/* ══════════════════════════════════════════
           VIEW MODAL
       ══════════════════════════════════════════ */}
@@ -813,10 +978,9 @@ export default function MenuItems() {
           <div className="bg-white rounded-2xl shadow-2xl w-[580px] max-h-[80vh] overflow-y-auto">
             <div className="flex items-center justify-between px-8 py-5 border-b border-gray-200">
               <h3 className="text-2xl font-semibold text-gray-800">Menu Item Details</h3>
-              <button
-                onClick={() => setViewingItem(null)}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
-              ><X size={22} /></button>
+              <button onClick={() => setViewingItem(null)} className="text-gray-400 hover:text-gray-600 transition-colors">
+                <X size={22} />
+              </button>
             </div>
             <div className="px-8 py-6 flex flex-col gap-4 text-xl text-gray-700">
               <div className="flex justify-between border-b border-gray-100 pb-3">
