@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { collection, getDocs, doc, addDoc, updateDoc, getDoc } from 'firebase/firestore';
 import { db, auth } from '../firebase';
-import { Search, Filter, Plus, Lock, X, RefreshCw, ChevronLeft, ChevronRight, AlertTriangle, MoreVertical } from 'lucide-react';
+import { Search, Filter, Plus, Lock, X, RefreshCw, ChevronLeft, ChevronRight, AlertTriangle, MoreVertical, AlignJustify } from 'lucide-react';
 import AdminSidebar from '../layouts/AdminSidebar';
 
 const STATUS_STYLES = {
@@ -83,6 +83,9 @@ export default function Inventory() {
   const [ingredients,  setIngredients]  = useState([]);
   const [showInactive,    setShowInactive]    = useState(false);
   const [searchQuery,     setSearchQuery]     = useState('');
+  const [sortField,       setSortField]       = useState('displayId');
+  const [sortDir,         setSortDir]         = useState('asc');
+  const [showArrange,     setShowArrange]     = useState(false);
 
   // ── Filters ──
   const [showFilterPanel, setShowFilterPanel] = useState(false);
@@ -205,6 +208,11 @@ export default function Inventory() {
     document.addEventListener('click', close);
     return () => document.removeEventListener('click', close);
   }, []);
+  useEffect(() => {
+    const close = () => setShowArrange(false);
+    document.addEventListener('click', close);
+    return () => document.removeEventListener('click', close);
+  }, []);
 
   // ── Audit log ──
   const logAudit = async (action, itemType, itemId, itemName, details = {}) => {
@@ -254,6 +262,7 @@ export default function Inventory() {
   const isFiltered = !!(filterType || filterStatus);
   const clearFilters = () => { setFilterType(''); setFilterStatus(''); };
 
+  const toDate = ts => ts ? (ts.toDate ? ts.toDate() : new Date(ts)) : new Date(0);
   const displayed = allRows
     .filter(r => showInactive ? !r.active : r.active)
     .filter(r => !searchQuery ||
@@ -261,7 +270,26 @@ export default function Inventory() {
       r.displayName.toLowerCase().includes(searchQuery.toLowerCase())
     )
     .filter(r => !filterType   || r._type  === filterType)
-    .filter(r => !filterStatus || r.status === filterStatus);
+    .filter(r => !filterStatus || r.status === filterStatus)
+    .sort((a, b) => {
+      let av, bv;
+      if (sortField === 'displayName') {
+        av = a.displayName.toLowerCase();
+        bv = b.displayName.toLowerCase();
+      } else if (sortField === 'displayCat') {
+        av = a.displayCat.toLowerCase();
+        bv = b.displayCat.toLowerCase();
+      } else if (sortField === 'lastUpdated') {
+        av = toDate(a.raw.lastUpdated);
+        bv = toDate(b.raw.lastUpdated);
+      } else {
+        av = a.displayId;
+        bv = b.displayId;
+      }
+      if (av < bv) return sortDir === 'asc' ? -1 : 1;
+      if (av > bv) return sortDir === 'asc' ? 1 : -1;
+      return 0;
+    });
 
   // ════════════════════════════════════
   // NEW MATERIAL
@@ -657,6 +685,46 @@ export default function Inventory() {
                         </div>
                       </div>
                     )}
+                  </div>
+                )}
+              </div>
+              <div className="relative shrink-0">
+                <button
+                  onClick={e => { e.stopPropagation(); setShowArrange(v => !v); }}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-full text-xl transition-colors shrink-0 ${
+                    showArrange ? 'bg-[#3ca4c7] text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
+                  }`}
+                >
+                  <AlignJustify size={16} /> Arrange
+                </button>
+                {showArrange && (
+                  <div
+                    className="absolute right-0 top-11 bg-white border border-gray-200 rounded-xl shadow-lg z-30 w-56 py-2"
+                    onClick={e => e.stopPropagation()}
+                  >
+                    <p className="px-4 pt-1 pb-2 text-lg font-semibold text-gray-500 uppercase tracking-wide border-b border-gray-100">Sort by</p>
+                    {[
+                      { field: 'displayId',   labelAsc: 'ID (A → Z)',              labelDesc: 'ID (Z → A)' },
+                      { field: 'displayName', labelAsc: 'Name (A → Z)',             labelDesc: 'Name (Z → A)' },
+                      { field: 'displayCat',  labelAsc: 'Category (A → Z)',         labelDesc: 'Category (Z → A)' },
+                      { field: 'lastUpdated', labelAsc: 'Last Updated (Oldest)',    labelDesc: 'Last Updated (Newest)' },
+                    ].map(({ field, labelAsc, labelDesc }) => (
+                      <div key={field}>
+                        {[{ dir: 'asc', label: labelAsc }, { dir: 'desc', label: labelDesc }].map(({ dir, label }) => (
+                          <button
+                            key={dir}
+                            onClick={() => { setSortField(field); setSortDir(dir); setShowArrange(false); }}
+                            className={`w-full px-4 py-2.5 text-left text-xl transition-colors ${
+                              sortField === field && sortDir === dir
+                                ? 'text-[#3ca4c7] font-semibold bg-blue-50'
+                                : 'text-gray-700 hover:bg-gray-50'
+                            }`}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>

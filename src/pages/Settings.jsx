@@ -24,14 +24,11 @@ function Toggle({ checked, onChange }) {
 export default function Settings({ role }) {
   const Sidebar = role === 'admin' ? AdminSidebar : StaffSidebar;
   const [open, setOpen] = useState(true);
-  const [animations, setAnimations] = useState(true);
   const [darkMode, setDarkMode] = useState(false);
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    const a = localStorage.getItem('pref_animations');
     const d = localStorage.getItem('pref_darkMode');
-    if (a !== null) setAnimations(a === 'true');
     if (d !== null) setDarkMode(d === 'true');
   }, []);
 
@@ -40,7 +37,6 @@ export default function Settings({ role }) {
   }, [darkMode]);
 
   const handleSave = () => {
-    localStorage.setItem('pref_animations', String(animations));
     localStorage.setItem('pref_darkMode', String(darkMode));
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
@@ -67,18 +63,6 @@ export default function Settings({ role }) {
 
           {open && (
             <div className="border-t border-gray-200 p-6 bg-gray-50 flex flex-col gap-5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-semibold text-gray-700">Enable Animations</p>
-                  <p className="text-sm text-gray-500 mt-0.5">
-                    Show transitions and motion effects throughout the system.
-                  </p>
-                </div>
-                <Toggle checked={animations} onChange={setAnimations} />
-              </div>
-
-              <div className="border-t border-gray-200" />
-
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-semibold text-gray-700">Dark Mode</p>

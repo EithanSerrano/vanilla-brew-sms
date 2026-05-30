@@ -4,7 +4,7 @@ import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { doc, getDoc, updateDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 import {
-  LayoutGrid, Package, FolderCog, Coffee, Users,
+  LayoutGrid, Package, FolderCog, Coffee, Users, Tag,
   FileText, ScrollText, Settings, Info,
   HelpCircle, LogOut, ChevronDown, ChevronUp,
   QrCode, UserCircle
@@ -49,7 +49,6 @@ export default function AdminSidebar() {
   const [adminOpen, setAdminOpen] = useState(true);
   const [maintenanceOpen, setMaintenanceOpen] = useState(true);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [animations, setAnimations] = useState(true);
   const [darkMode, setDarkMode] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -65,18 +64,10 @@ export default function AdminSidebar() {
   }, []);
 
   useEffect(() => {
-    const a = localStorage.getItem('pref_animations');
     const d = localStorage.getItem('pref_darkMode');
-    if (a !== null) setAnimations(a === 'true');
     if (d !== null) setDarkMode(d === 'true');
     document.documentElement.classList.toggle('dark', d === 'true');
   }, []);
-
-  const toggleAnimations = () => {
-    const next = !animations;
-    setAnimations(next);
-    localStorage.setItem('pref_animations', String(next));
-  };
 
   const toggleDarkMode = () => {
     const next = !darkMode;
@@ -113,7 +104,7 @@ export default function AdminSidebar() {
 
   return (
     <aside
-      className="w-[15%] flex flex-col shrink-0 h-full rounded-r-2xl"
+      className="w-[20%] flex flex-col shrink-0 h-full rounded-r-2xl"
       style={{ backgroundColor: '#614033' }}
     >
       {/* Welcome header */}
@@ -143,6 +134,7 @@ export default function AdminSidebar() {
         {adminOpen && (
           <div className="flex flex-col gap-0.5">
             <SubNavItem to="/menu-items" icon={<Coffee size={15} />} label="Menu Items" />
+            <SubNavItem to="/menu-categories" icon={<Tag size={15} />} label="Menu Categories" />
             <SubNavItem to="/registration" icon={<Users size={15} />} label="Manage Accounts" />
           </div>
         )}
@@ -179,20 +171,6 @@ export default function AdminSidebar() {
         </button>
         {settingsOpen && (
           <div className="flex flex-col gap-0.5 pl-10 pr-4 pb-1">
-            <div className="flex items-center justify-between py-2">
-              <span className="text-white/80 text-xl">Animations</span>
-              <button
-                type="button"
-                onClick={toggleAnimations}
-                className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${
-                  animations ? 'bg-teal-400' : 'bg-white/20'
-                }`}
-              >
-                <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${
-                  animations ? 'translate-x-4' : 'translate-x-1'
-                }`} />
-              </button>
-            </div>
             <div className="flex items-center justify-between py-2">
               <span className="text-white/80 text-xl">Dark Mode</span>
               <button

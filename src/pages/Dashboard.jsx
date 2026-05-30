@@ -84,6 +84,40 @@ export default function Dashboard({ role }) {
   const [filterIsRange,    setFilterIsRange]    = useState(false);
   const [filterOrderMode,  setFilterOrderMode]  = useState('');
 
+  const [analyticsRefreshing, setAnalyticsRefreshing] = useState(false);
+
+  const loadSales = async () => {
+    setAnalyticsRefreshing(true);
+    try {
+      const transSnap = await getDocs(collection(db, 'salestransaction'));
+      const data = transSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const getTime = s => {
+        if (s.createdAt?.toDate) return s.createdAt.toDate().getTime();
+        if (s.dateAndTimeStr) return new Date(s.dateAndTimeStr).getTime() || 0;
+        return 0;
+      };
+      data.sort((a, b) => getTime(b) - getTime(a));
+      setSales(data);
+    } catch (err) {
+      console.error('Sales load error:', err);
+    } finally {
+      setAnalyticsRefreshing(false);
+    }
+  };
+
+  const loadStock = async () => {
+    try {
+      const [ingSnap, matSnap] = await Promise.all([
+        getDocs(collection(db, 'ingredients')),
+        getDocs(collection(db, 'materials')),
+      ]);
+      setIngredients(ingSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setMaterials(matSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+    } catch (err) {
+      console.error('Stock load error:', err);
+    }
+  };
+
   const loadData = async () => {
     setLoading(true);
     try {
@@ -168,8 +202,8 @@ export default function Dashboard({ role }) {
         };
       }),
   ];
-  const sortedStock    = quickSort(stockItems, x => x.stock / x.maxLimit);
-  const displayedStock = sortedStock.slice(0, 5);
+  const sortedStock   = quickSort(stockItems, x => x.stock / x.maxLimit);
+  const criticalStock = sortedStock.filter(x => x.stock / x.maxLimit < 0.1);
 
   // ── Sales Analytics panel (weekly tally, top 5) ──
   const oneWeekAgo = new Date(Date.now() - 7 * 86400000);
@@ -403,7 +437,7 @@ export default function Dashboard({ role }) {
                   <button onClick={() => setShowAnalyticsModal(true)} title="Expand">
                     <Maximize2 size={18} className="cursor-pointer hover:text-gray-600 transition-colors" />
                   </button>
-                  <RefreshCw size={18} className="cursor-pointer hover:text-gray-600 transition-colors" onClick={loadData} />
+                  <RefreshCw size={18} className="cursor-pointer hover:text-gray-600 transition-colors" onClick={loadSales} />
                 </div>
               </div>
               <div className="flex items-center px-5 py-2.5 border-b border-gray-100 bg-gray-50 shrink-0">
@@ -412,7 +446,15 @@ export default function Dashboard({ role }) {
                 <span className="w-20 text-base font-semibold text-gray-600 text-right">Orders</span>
               </div>
               <div className="flex-1 overflow-y-auto flex flex-col" style={{ scrollbarGutter: 'stable' }}>
-                {ranked.length === 0
+                {analyticsRefreshing
+                  ? [...Array(4)].map((_, i) => (
+                    <div key={i} className="flex items-center px-5 py-3 border-b border-gray-100 animate-pulse">
+                      <div className="w-14 flex justify-center"><div className="h-4 w-6 bg-gray-200 rounded" /></div>
+                      <div className="flex-1 pl-2"><div className="h-4 bg-gray-200 rounded w-3/4" /></div>
+                      <div className="w-20 flex justify-end"><div className="h-4 w-8 bg-gray-200 rounded" /></div>
+                    </div>
+                  ))
+                  : ranked.length === 0
                   ? <p className="text-xl text-gray-400 text-center py-8">No sales this week.</p>
                   : ranked.slice(0, 5).map((item, idx) => (
                     <div
@@ -436,7 +478,7 @@ export default function Dashboard({ role }) {
                   <button onClick={() => setShowStockModal(true)} title="Expand">
                     <Maximize2 size={18} className="cursor-pointer hover:text-gray-600 transition-colors" />
                   </button>
-                  <RefreshCw size={18} className="cursor-pointer hover:text-gray-600 transition-colors" onClick={loadData} />
+                  <RefreshCw size={18} className="cursor-pointer hover:text-gray-600 transition-colors" onClick={loadStock} />
                 </div>
               </div>
               <div className="flex items-center px-5 py-2.5 border-b border-gray-100 bg-gray-50 shrink-0">
@@ -444,22 +486,19 @@ export default function Dashboard({ role }) {
                 <span className="w-32 text-base font-semibold text-gray-600 text-right">Stock</span>
               </div>
               <div className="flex-1 overflow-y-auto flex flex-col" style={{ scrollbarGutter: 'stable' }}>
-                {displayedStock.length === 0
-                  ? <p className="text-xl text-gray-400 text-center py-8">All items well-stocked.</p>
-                  : displayedStock.map((item, idx) => {
-                    const isLow = item.stock / item.maxLimit < 0.1;
-                    return (
-                      <div
-                        key={item.id}
-                        className={`flex items-center px-5 py-3 ${idx < displayedStock.length - 1 ? 'border-b border-gray-100' : ''}`}
-                      >
-                        <span className="flex-1 text-xl text-gray-700 truncate">{item.name}</span>
-                        <span className={`w-32 text-xl font-bold text-right ${isLow ? 'text-[#DF0C0C]' : 'text-[#06BC2E]'}`}>
-                          {item.stock} {item.unit}
-                        </span>
-                      </div>
-                    );
-                  })
+                {criticalStock.length === 0
+                  ? <p className="text-xl text-gray-400 text-center py-8">No materials / ingredients low in supply.</p>
+                  : criticalStock.map((item, idx) => (
+                    <div
+                      key={item.id}
+                      className={`flex items-center px-5 py-3 ${idx < criticalStock.length - 1 ? 'border-b border-gray-100' : ''}`}
+                    >
+                      <span className="flex-1 text-xl text-gray-700 truncate">{item.name}</span>
+                      <span className="w-32 text-xl font-bold text-right text-[#DF0C0C]">
+                        {item.stock} {item.unit}
+                      </span>
+                    </div>
+                  ))
                 }
               </div>
             </div>
@@ -475,7 +514,7 @@ export default function Dashboard({ role }) {
             <div className="flex items-center justify-between px-8 py-5 border-b border-gray-200 shrink-0">
               <h3 className="text-2xl font-semibold text-gray-800">Viewing Sales Analytics</h3>
               <div className="flex items-center gap-3 text-gray-400">
-                <RefreshCw size={20} className="cursor-pointer hover:text-gray-600 transition-colors" onClick={loadData} />
+                <RefreshCw size={20} className="cursor-pointer hover:text-gray-600 transition-colors" onClick={loadSales} />
                 <button onClick={() => setShowAnalyticsModal(false)} className="hover:text-gray-600 transition-colors">
                   <X size={22} />
                 </button>
@@ -537,7 +576,15 @@ export default function Dashboard({ role }) {
                   <span className="w-24 text-xl font-semibold text-gray-700 text-right">Orders</span>
                 </div>
                 <div className="flex-1 overflow-y-auto flex flex-col" style={{ scrollbarGutter: 'stable' }}>
-                  {modalRanked.length === 0
+                  {analyticsRefreshing
+                    ? [...Array(5)].map((_, i) => (
+                      <div key={i} className="flex items-center px-5 py-3.5 border-b border-gray-100 animate-pulse">
+                        <div className="w-14 flex justify-center"><div className="h-5 w-7 bg-gray-200 rounded" /></div>
+                        <div className="flex-1 pl-2"><div className="h-5 bg-gray-200 rounded w-2/3" /></div>
+                        <div className="w-24 flex justify-end"><div className="h-5 w-10 bg-gray-200 rounded" /></div>
+                      </div>
+                    ))
+                    : modalRanked.length === 0
                     ? <p className="text-xl text-gray-400 text-center py-8">No sales for this period.</p>
                     : modalRanked.map((item, i) => (
                       <div key={item.name} className={`flex items-center px-5 py-3.5 ${i < modalRanked.length - 1 ? 'border-b border-gray-100' : ''}`}>
@@ -562,7 +609,7 @@ export default function Dashboard({ role }) {
             <div className="flex items-center justify-between px-8 py-5 border-b border-gray-200 shrink-0">
               <h3 className="text-2xl font-semibold text-gray-800">Viewing Critical Stock Materials / Ingredients</h3>
               <div className="flex items-center gap-3 text-gray-400">
-                <RefreshCw size={20} className="cursor-pointer hover:text-gray-600 transition-colors" onClick={loadData} />
+                <RefreshCw size={20} className="cursor-pointer hover:text-gray-600 transition-colors" onClick={loadStock} />
                 <button onClick={() => setShowStockModal(false)} className="hover:text-gray-600 transition-colors">
                   <X size={22} />
                 </button>
@@ -576,24 +623,21 @@ export default function Dashboard({ role }) {
                 <span className="flex-1 text-xl font-semibold text-gray-700 text-center">Last Updated</span>
               </div>
               <div className="flex-1 overflow-y-auto border border-t-0 border-gray-200 rounded-b-xl flex flex-col" style={{ scrollbarGutter: 'stable' }}>
-                {sortedStock.length === 0
-                  ? <p className="text-xl text-gray-400 text-center py-8">No items found.</p>
-                  : sortedStock.map((item, idx) => {
-                    const isLow = item.stock / item.maxLimit < 0.1;
-                    return (
-                      <div
-                        key={item.id}
-                        className={`flex items-center px-5 py-3.5 ${idx < sortedStock.length - 1 ? 'border-b border-gray-100' : ''}`}
-                      >
-                        <span className="w-[22%] text-xl text-gray-500 text-center">{item.displayId}</span>
-                        <span className="w-[30%] text-xl font-semibold text-gray-700 text-center">{item.name}</span>
-                        <span className={`w-[24%] text-xl text-center font-semibold ${isLow ? 'text-[#DF0C0C]' : 'text-[#06BC2E]'}`}>
-                          {item.stock} {item.unit}
-                        </span>
-                        <span className="flex-1 text-xl text-gray-500 text-center">{item.lastUpdated}</span>
-                      </div>
-                    );
-                  })
+                {criticalStock.length === 0
+                  ? <p className="text-xl text-gray-400 text-center py-8">No materials / ingredients low in supply.</p>
+                  : criticalStock.map((item, idx) => (
+                    <div
+                      key={item.id}
+                      className={`flex items-center px-5 py-3.5 ${idx < criticalStock.length - 1 ? 'border-b border-gray-100' : ''}`}
+                    >
+                      <span className="w-[22%] text-xl text-gray-500 text-center">{item.displayId}</span>
+                      <span className="w-[30%] text-xl font-semibold text-gray-700 text-center">{item.name}</span>
+                      <span className="w-[24%] text-xl text-center font-semibold text-[#DF0C0C]">
+                        {item.stock} {item.unit}
+                      </span>
+                      <span className="flex-1 text-xl text-gray-500 text-center">{item.lastUpdated}</span>
+                    </div>
+                  ))
                 }
               </div>
             </div>

@@ -29,7 +29,6 @@ export default function StaffSidebar() {
   const navigate = useNavigate();
   const [userName, setUserName] = useState('');
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [animations, setAnimations] = useState(true);
   const [darkMode, setDarkMode] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -45,18 +44,10 @@ export default function StaffSidebar() {
   }, []);
 
   useEffect(() => {
-    const a = localStorage.getItem('pref_animations');
     const d = localStorage.getItem('pref_darkMode');
-    if (a !== null) setAnimations(a === 'true');
     if (d !== null) setDarkMode(d === 'true');
     document.documentElement.classList.toggle('dark', d === 'true');
   }, []);
-
-  const toggleAnimations = () => {
-    const next = !animations;
-    setAnimations(next);
-    localStorage.setItem('pref_animations', String(next));
-  };
 
   const toggleDarkMode = () => {
     const next = !darkMode;
@@ -122,20 +113,6 @@ export default function StaffSidebar() {
         </button>
         {settingsOpen && (
           <div className="flex flex-col gap-0.5 pl-10 pr-4 pb-1">
-            <div className="flex items-center justify-between py-2">
-              <span className="text-white/80 text-xl">Animations</span>
-              <button
-                type="button"
-                onClick={toggleAnimations}
-                className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${
-                  animations ? 'bg-teal-400' : 'bg-white/20'
-                }`}
-              >
-                <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${
-                  animations ? 'translate-x-4' : 'translate-x-1'
-                }`} />
-              </button>
-            </div>
             <div className="flex items-center justify-between py-2">
               <span className="text-white/80 text-xl">Dark Mode</span>
               <button

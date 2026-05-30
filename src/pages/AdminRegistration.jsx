@@ -4,17 +4,21 @@ import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { auth, db } from '../firebase';
 import { Search, Plus, RefreshCw, X, AlignJustify } from 'lucide-react';
 import AdminSidebar from '../layouts/AdminSidebar';
+import emailjs from '@emailjs/browser';
+
 
 function generatePassword() {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
   return Array.from({ length: 8 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
 }
 
+
 function fmtDate(ts) {
   if (!ts) return '—';
   const d = ts.toDate ? ts.toDate() : new Date(ts);
   return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('en-US');
 }
+
 
 function DiscardDialog({ onCancel, onConfirm }) {
   return (
@@ -31,10 +35,12 @@ function DiscardDialog({ onCancel, onConfirm }) {
   );
 }
 
+
 export default function AdminRegistration() {
   const [accounts, setAccounts] = useState([]);
   const [showInactive, setShowInactive] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+
 
   // ── New Account ──
   const [showForm, setShowForm] = useState(false);
@@ -48,14 +54,17 @@ export default function AdminRegistration() {
   const [generatedPassword, setGeneratedPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
+
   // ── Arrange / Sort ──
   const [sortField, setSortField] = useState('empId');
   const [sortDir, setSortDir]     = useState('asc');
   const [showArrange, setShowArrange] = useState(false);
 
+
   // ── Deactivate confirmation ──
   const [deactivateTarget,    setDeactivateTarget]    = useState(null);
   const [showDeactivateConf,  setShowDeactivateConf]  = useState(false);
+
 
   // ── Edit ──
   const [editRow, setEditRow] = useState(null);
@@ -65,6 +74,7 @@ export default function AdminRegistration() {
   const [showEditConfirm, setShowEditConfirm] = useState(false);
   const [showEditOk, setShowEditOk] = useState(false);
   const [showEditDiscard, setShowEditDiscard] = useState(false);
+
 
   // ── Load ──
   const loadData = async () => {
@@ -80,6 +90,7 @@ export default function AdminRegistration() {
     return () => document.removeEventListener('click', close);
   }, []);
 
+
   const logAudit = async (action, itemId, itemName, details = {}) => {
     try {
       let performedBy = 'Unknown';
@@ -94,6 +105,7 @@ export default function AdminRegistration() {
     } catch (e) { console.error('Audit log error:', e); }
   };
 
+
   const generateNextEmpId = async () => {
     const snap = await getDocs(collection(db, 'users'));
     const nums = snap.docs
@@ -104,14 +116,17 @@ export default function AdminRegistration() {
     return `EMP${String(base + 1).padStart(3, '0')}`;
   };
 
+
   // ── New account flow ──
   const formHasData = () => fullName.trim() !== '' || displayName.trim() !== '' || email.trim() !== '';
   const resetForm = () => { setFullName(''); setDisplayName(''); setEmail(''); setPendingAccount(null); setGeneratedPassword(''); };
+
 
   const closeForm = () => {
     if (formHasData()) setShowDiscard(true);
     else { setShowForm(false); resetForm(); }
   };
+
 
   const handleSaveAccount = async () => {
     if (!fullName.trim() || !displayName.trim() || !email.trim()) return;
@@ -119,6 +134,7 @@ export default function AdminRegistration() {
     setPendingAccount({ fullName: fullName.trim(), displayName: displayName.trim(), email: email.trim(), empId });
     setShowConfirm(true);
   };
+
 
   const handleConfirmAccount = async () => {
     if (!pendingAccount || submitting) return;
@@ -137,10 +153,33 @@ export default function AdminRegistration() {
         isOnline: false,
         createdAt: new Date(),
       });
+     
       await logAudit('CREATE_ACCOUNT', pendingAccount.empId, pendingAccount.displayName, {
         fullName: pendingAccount.fullName,
         email: pendingAccount.email,
       });
+
+
+      // --- SEND WELCOME EMAIL WITH EMAILJS ---
+try {
+  await emailjs.send(
+    'service_n5mgbkx',     // Your EmailJS Service ID
+    'template_hsvtggg',    // Your EmailJS Template ID
+    {
+      fullName: pendingAccount.fullName, // Matches {{fullName}} in EmailJS
+      email: pendingAccount.email,       // Matches {{email}} in EmailJS
+      empId: pendingAccount.empId,       // Matches {{empId}} in EmailJS
+      password: password,                 // Matches {{password}} in EmailJS
+    },
+    'jzCDdLVx4vyXA8oVy'      // Your EmailJS Public Key
+  );
+  console.log("Welcome email sent successfully via EmailJS!");
+} catch (emailErr) {
+  console.error("Failed to send welcome email via EmailJS:", emailErr);
+}
+      // -------------------------------------------
+
+
       await loadData();
       setShowConfirm(false);
       setShowSuccess(true);
@@ -150,6 +189,7 @@ export default function AdminRegistration() {
       setSubmitting(false);
     }
   };
+
 
   // ── Deactivate / Reactivate ──
   const handleDeactivateClick = acc => { setDeactivateTarget(acc); setShowDeactivateConf(true); };
@@ -178,6 +218,7 @@ export default function AdminRegistration() {
     setShowReactivateConf(false);
     setReactivateTarget(null);
   };
+
 
   // ── Edit flow ──
   const handleEditClick = acc => {
@@ -211,6 +252,7 @@ export default function AdminRegistration() {
     setShowEditOk(true);
   };
 
+
   // ── Filtered + sorted list ──
   const toDate = ts => ts ? (ts.toDate ? ts.toDate() : new Date(ts)) : new Date(0);
   const displayed = accounts
@@ -237,11 +279,14 @@ export default function AdminRegistration() {
       return 0;
     });
 
+
   return (
     <div className="flex w-full h-full">
       <AdminSidebar />
 
+
       <main className="flex-1 bg-white overflow-hidden flex flex-col p-8">
+
 
         {/* Header */}
         <div className="mb-5 shrink-0">
@@ -311,6 +356,7 @@ export default function AdminRegistration() {
           </div>
         </div>
 
+
         {/* Search */}
         <div className="flex items-center gap-2 border-b border-gray-300 pb-1 mb-5 shrink-0">
           <Search size={18} className="text-gray-400 shrink-0" />
@@ -322,6 +368,7 @@ export default function AdminRegistration() {
             className="flex-1 outline-none text-xl text-gray-700 placeholder-gray-400 bg-transparent"
           />
         </div>
+
 
         {/* Table */}
         <div className="flex-1 rounded-xl border border-gray-200 overflow-hidden flex flex-col min-h-0 shadow-md">
@@ -368,6 +415,7 @@ export default function AdminRegistration() {
           </div>
         </div>
       </main>
+
 
       {/* ══════════════════════════════════════════
           NEW ACCOUNT FORM
@@ -425,6 +473,7 @@ export default function AdminRegistration() {
         </div>
       )}
 
+
       {/* ══════════════════════════════════════════
           CONFIRM NEW ACCOUNT
       ══════════════════════════════════════════ */}
@@ -443,8 +492,8 @@ export default function AdminRegistration() {
               <div className="mt-2 flex flex-col gap-1">
                 <p className="text-xl font-semibold text-gray-700">Reminder</p>
                 <p className="text-xl text-gray-500">
-                  After confirming, a randomly generated password will be assigned<br />
-                  to the account. The employee can change it by themselves after.
+                  After confirming, an email with the login credentials<br />
+                  will be sent to the employee.
                 </p>
               </div>
               <button
@@ -459,6 +508,7 @@ export default function AdminRegistration() {
         </div>
       )}
 
+
       {/* ══════════════════════════════════════════
           SUCCESS
       ══════════════════════════════════════════ */}
@@ -472,6 +522,9 @@ export default function AdminRegistration() {
               <p className="text-2xl font-semibold text-gray-800">Success!</p>
               <p className="text-xl text-gray-600">
                 {pendingAccount.fullName} has been saved as <span className="font-bold">{pendingAccount.empId}</span>.
+              </p>
+              <p className="text-xl text-green-600 mt-2 font-medium">
+                The account credentials have been emailed to the employee!
               </p>
               <div className="flex items-center gap-6 mt-3">
                 <span className="text-xl text-gray-700">Initial Password</span>
@@ -490,6 +543,7 @@ export default function AdminRegistration() {
         </div>
       )}
 
+
       {/* ══════════════════════════════════════════
           DISCARD
       ══════════════════════════════════════════ */}
@@ -499,6 +553,7 @@ export default function AdminRegistration() {
           onConfirm={() => { setShowDiscard(false); setShowForm(false); resetForm(); }}
         />
       )}
+
 
       {/* ══════════════════════════════════════════
           EDIT ACCOUNT MODAL
@@ -540,6 +595,7 @@ export default function AdminRegistration() {
         </div>
       )}
 
+
       {showEditConfirm && editRow && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[60]">
           <div className="bg-white rounded-2xl shadow-2xl w-[500px] px-8 py-6 flex flex-col gap-4">
@@ -553,6 +609,7 @@ export default function AdminRegistration() {
         </div>
       )}
 
+
       {showEditOk && editRow && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[60]">
           <div className="bg-white rounded-2xl shadow-2xl w-[500px] px-8 py-6 flex flex-col gap-4">
@@ -565,12 +622,14 @@ export default function AdminRegistration() {
         </div>
       )}
 
+
       {showEditDiscard && (
         <DiscardDialog
           onCancel={() => setShowEditDiscard(false)}
           onConfirm={() => { setShowEditDiscard(false); setShowEditForm(false); setEditRow(null); }}
         />
       )}
+
 
       {/* ══════════════════════════════════════════
           REACTIVATE CONFIRMATION
@@ -601,6 +660,7 @@ export default function AdminRegistration() {
           </div>
         </div>
       )}
+
 
       {/* ══════════════════════════════════════════
           DEACTIVATE CONFIRMATION
@@ -634,3 +694,4 @@ export default function AdminRegistration() {
     </div>
   );
 }
+

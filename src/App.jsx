@@ -14,13 +14,12 @@ import AdminHome from "./pages/AdminHome";
 import Inventory from "./pages/Inventory";
 import AdminRegistration from "./pages/AdminRegistration";
 import MenuItems from "./pages/MenuItems";
+import MenuCategories from "./pages/MenuCategories";
 import AdminHelp from "./pages/AdminHelp";
-import AdminSearch from "./pages/AdminSearch";
 
 // Staff Pages
 import StaffHome from "./pages/StaffHome";
 import StaffInventory from "./pages/StaffInventory";
-import StaffSearch from "./pages/StaffSearch";
 import StaffHelp from "./pages/StaffHelp";
 
 // Placeholder Pages
@@ -56,9 +55,8 @@ function App() {
             <Route path="/admin-dashboard" element={<Dashboard role="admin" />} />
             <Route path="/inventory" element={<Inventory />} />
             <Route path="/menu-items" element={<MenuItems />} />
+            <Route path="/menu-categories" element={<MenuCategories />} />
             <Route path="/registration" element={<AdminRegistration />} />
-            <Route path="/search" element={<AdminSearch />} />
-            
             {/* Admin Dedicated Placeholders */}
             <Route path="/admin-maintenance" element={<Maintenance role="admin" />} />
             <Route path="/documents" element={<Documents />} />
@@ -72,8 +70,7 @@ function App() {
             <Route path="/staff" element={<StaffHome />} />
             <Route path="/staff-dashboard" element={<Dashboard role="staff" />} />
             <Route path="/staff-inventory" element={<StaffInventory />} />
-            <Route path="/staff-search" element={<StaffSearch />} />
-            
+
             <Route path="/staff-help" element={<StaffHelp />} />
             <Route path="/staff-about" element={<About role="staff" />} />
             <Route path="/staff-settings" element={<Settings role="staff" />} />
