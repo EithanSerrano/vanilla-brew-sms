@@ -110,6 +110,7 @@ export default function Inventory() {
   const [ingType,      setIngType]      = useState('Dry');
   const [ingUnit,      setIngUnit]      = useState('grams');
   const [ingIsAddOn,   setIngIsAddOn]   = useState(false);
+  const [ingHasLevels, setIngHasLevels] = useState(false);
   const [ingMaxLimit,  setIngMaxLimit]  = useState('');
   const [ingExpDate,   setIngExpDate]   = useState('');
   const [ingBatchQty,  setIngBatchQty]  = useState('');
@@ -185,7 +186,8 @@ export default function Inventory() {
   const [editMaxLimit,    setEditMaxLimit]    = useState('');
   const [editIngType,     setEditIngType]     = useState('Dry');
   const [editIngUnit,     setEditIngUnit]     = useState('grams');
-  const [editIngIsAddOn,  setEditIngIsAddOn]  = useState(false);
+  const [editIngIsAddOn,   setEditIngIsAddOn]   = useState(false);
+  const [editIngHasLevels, setEditIngHasLevels] = useState(false);
   const [showEditForm,    setShowEditForm]    = useState(false);
   const [showEditConf,    setShowEditConf]    = useState(false);
   const [showEditOk,      setShowEditOk]      = useState(false);
@@ -340,7 +342,7 @@ export default function Inventory() {
   // NEW INGREDIENT
   // ════════════════════════════════════
   const ingHasData = () => ingName.trim() !== '' || ingExpDate !== '' || ingBatchQty !== '' || ingMaxLimit !== '';
-  const resetIng = () => { setIngName(''); setIngType('Dry'); setIngUnit('grams'); setIngIsAddOn(false); setIngMaxLimit(''); setIngExpDate(''); setIngBatchQty(''); setPendingIng(null); };
+  const resetIng = () => { setIngName(''); setIngType('Dry'); setIngUnit('grams'); setIngIsAddOn(false); setIngHasLevels(false); setIngMaxLimit(''); setIngExpDate(''); setIngBatchQty(''); setPendingIng(null); };
   const closeIng = () => { ingHasData() ? setShowIngDisc(true) : (setShowNewIng(false), resetIng()); };
 
   const handleSaveIng = async () => {
@@ -351,7 +353,7 @@ export default function Inventory() {
     const newId = `ING${String(base+1).padStart(3,'0')}`;
     setPendingIng({
       ingredientId: newId, name: ingName.trim(), type: ingType, unit: ingUnit,
-      isAddOn: ingIsAddOn, maxLimit: parseInt(ingMaxLimit) || 0,
+      isAddOn: ingIsAddOn, hasLevels: ingHasLevels, maxLimit: parseInt(ingMaxLimit) || 0,
       batchId: genBatchId(ingExpDate, 0), expirationDate: new Date(ingExpDate),
       quantity: parseInt(ingBatchQty) || 0,
     });
@@ -366,7 +368,7 @@ export default function Inventory() {
       const now = new Date();
       await addDoc(collection(db, 'ingredients'), {
         ingredientId: pendingIng.ingredientId, name: pendingIng.name, type: pendingIng.type,
-        unit: pendingIng.unit, isAddOn: pendingIng.isAddOn, maxLimit: pendingIng.maxLimit,
+        unit: pendingIng.unit, isAddOn: pendingIng.isAddOn, hasLevels: pendingIng.hasLevels, maxLimit: pendingIng.maxLimit,
         isActive: true,
         batches: [{ batchId: pendingIng.batchId, expirationDate: pendingIng.expirationDate, quantity: pendingIng.quantity, createdAt: now }],
         createdAt: now,
@@ -564,6 +566,7 @@ export default function Inventory() {
       setEditIngType(row.raw.type || 'Dry');
       setEditIngUnit(row.raw.unit || 'grams');
       setEditIngIsAddOn(row.raw.isAddOn || false);
+      setEditIngHasLevels(row.raw.hasLevels || false);
     }
     setShowEditForm(true);
   };
@@ -571,7 +574,7 @@ export default function Inventory() {
     if (!editRow) return false;
     const base = editName !== (editRow.raw.name || '') || editMaxLimit !== String(editRow.raw.maxLimit || '');
     if (editRow._type === 'material') return base;
-    return base || editIngType !== (editRow.raw.type || 'Dry') || editIngUnit !== (editRow.raw.unit || 'grams') || editIngIsAddOn !== (editRow.raw.isAddOn || false);
+    return base || editIngType !== (editRow.raw.type || 'Dry') || editIngUnit !== (editRow.raw.unit || 'grams') || editIngIsAddOn !== (editRow.raw.isAddOn || false) || editIngHasLevels !== (editRow.raw.hasLevels || false);
   };
   const closeEdit = () => { editHasChanges() ? setShowEditDisc(true) : (setShowEditForm(false), setEditRow(null)); };
   const handleConfirmEdit = async () => {
@@ -588,7 +591,7 @@ export default function Inventory() {
     } else {
       await updateDoc(doc(db, 'ingredients', editRow._docId), {
         name: editName.trim(), type: editIngType, unit: editIngUnit,
-        isAddOn: editIngIsAddOn, maxLimit: parseInt(editMaxLimit) || 0,
+        isAddOn: editIngIsAddOn, hasLevels: editIngHasLevels, maxLimit: parseInt(editMaxLimit) || 0,
       });
       await logAudit('EDIT', 'ingredient', editRow.displayId, editRow.displayName, {
         previousName: editRow.raw.name, newName: editName.trim(),
@@ -955,6 +958,16 @@ export default function Inventory() {
                     <button onClick={() => setIngIsAddOn(v => !v)}
                       className={`w-10 h-10 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${ingIsAddOn ? 'bg-[#3ca4c7] border-[#3ca4c7] text-white' : 'bg-white border-gray-300'}`}>
                       {ingIsAddOn && <span className="font-bold text-xl">✓</span>}
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-5">
+                    <div className="flex-1">
+                      <span className="text-xl text-gray-600">Ingredient Has Levels?</span>
+                      <p className="text-xl text-gray-400 mt-0.5">If checked, POS will show level options: 0%, 25%, 50%, 75%, 100% (normal)</p>
+                    </div>
+                    <button onClick={() => setIngHasLevels(v => !v)}
+                      className={`w-10 h-10 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${ingHasLevels ? 'bg-[#3ca4c7] border-[#3ca4c7] text-white' : 'bg-white border-gray-300'}`}>
+                      {ingHasLevels && <span className="font-bold text-xl">✓</span>}
                     </button>
                   </div>
                 </div>
@@ -1645,6 +1658,16 @@ export default function Inventory() {
                         <button onClick={() => setEditIngIsAddOn(v => !v)}
                           className={`w-10 h-10 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${editIngIsAddOn ? 'bg-[#3ca4c7] border-[#3ca4c7] text-white' : 'bg-white border-gray-300'}`}>
                           {editIngIsAddOn && <span className="font-bold text-xl">✓</span>}
+                        </button>
+                      </div>
+                      <div className="flex items-center gap-5">
+                        <div className="flex-1">
+                          <span className="text-xl text-gray-600">Ingredient Has Levels?</span>
+                          <p className="text-xl text-gray-400 mt-0.5">If checked, POS will show level options: 0%, 25%, 50%, 75%, 100% (normal)</p>
+                        </div>
+                        <button onClick={() => setEditIngHasLevels(v => !v)}
+                          className={`w-10 h-10 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${editIngHasLevels ? 'bg-[#3ca4c7] border-[#3ca4c7] text-white' : 'bg-white border-gray-300'}`}>
+                          {editIngHasLevels && <span className="font-bold text-xl">✓</span>}
                         </button>
                       </div>
                     </>

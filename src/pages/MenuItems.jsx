@@ -7,12 +7,7 @@ import {
 } from 'lucide-react';
 import AdminSidebar from '../layouts/AdminSidebar';
 
-const MENU_SIZES = ['Small', 'Medium', 'Large'];
-const EMPTY_SIZES = {
-  Small:  { enabled: false, price: '' },
-  Medium: { enabled: false, price: '' },
-  Large:  { enabled: false, price: '' },
-};
+const LEVELS = [0, 25, 50, 75, 100];
 const EXPIRING_DAYS = 7;
 
 function sizePrefix(size) { return size ? `(${size[0]}) ` : ''; }
@@ -47,8 +42,8 @@ function computeIngStatus(ing) {
 
 function computeMenuStatus(item, allIngredients, allMaterials) {
   if (item.isAvailable === false) return 'unavailable';
-  for (const sz of (item.sizes || [])) {
-    for (const conn of (sz.connections || [])) {
+  for (const v of (item.variants || item.sizes || [])) {
+    for (const conn of (v.connections || [])) {
       if (conn.type === 'ingredient') {
         const ing = allIngredients.find(i => i.id === conn.refId);
         if (ing && computeIngStatus(ing) === 'low') return 'low_supply';
@@ -98,16 +93,16 @@ export default function MenuItems() {
 
   // ── New / Edit — Step 1 ──
   const [showStep1,    setShowStep1]    = useState(false);
-  const [editingItem,  setEditingItem]  = useState(null); // null = create mode
+  const [editingItem,  setEditingItem]  = useState(null);
   const [menuName,     setMenuName]     = useState('');
   const [menuCategory, setMenuCategory] = useState('');
-  const [menuSizes,    setMenuSizes]    = useState(EMPTY_SIZES);
+  const [variants,     setVariants]     = useState([{ name: '', price: '' }]);
   const [addOns,       setAddOns]       = useState([]);
 
   // ── New / Edit — Step 2 ──
-  const [showStep2,      setShowStep2]      = useState(false);
-  const [currentSizeIdx, setCurrentSizeIdx] = useState(0);
-  const [connections,    setConnections]    = useState({ Small: [], Medium: [], Large: [] });
+  const [showStep2,         setShowStep2]         = useState(false);
+  const [currentVariantIdx, setCurrentVariantIdx] = useState(0);
+  const [connections,       setConnections]       = useState([[]]);
 
   // ── Confirmation / discard ──
   const [pendingMenu,  setPendingMenu]  = useState(null);
@@ -134,14 +129,26 @@ export default function MenuItems() {
       setMenuItems(ms.docs.map(d => ({ id: d.id, ...d.data() })).filter(d => d.menuItemId));
       setIngredients(is.docs.map(d => ({ id: d.id, ...d.data() })));
       setMaterials(mats.docs.map(d => ({ id: d.id, ...d.data() })));
-      const catNames = cats.docs.map(d => d.data().name);
-      setCategories(catNames);
-      setMenuCategory(prev => prev || catNames[0] || '');
+      const catDocs = cats.docs.map(d => ({ id: d.id, ...d.data() }));
+      setCategories(catDocs);
+      setMenuCategory(prev => prev || catDocs.find(c => !c.parentId)?.name || catDocs[0]?.name || '');
     } catch (e) { console.error('MenuItems load error:', e); }
   };
   useEffect(() => { loadData(); }, []);
 
   // ── Derived ──
+  const sortedCategories = (() => {
+    const tops = categories.filter(c => !c.parentId);
+    const result = [];
+    for (const top of tops) {
+      result.push({ ...top, indent: false });
+      categories.filter(c => c.parentId === top.id).forEach(sub => result.push({ ...sub, indent: true }));
+    }
+    const listed = new Set(result.map(c => c.id));
+    categories.filter(c => !listed.has(c.id)).forEach(c => result.push({ ...c, indent: !!c.parentId }));
+    return result;
+  })();
+
   const activeIngredients = ingredients.filter(i => i.isActive !== false && i.archived !== true);
   const addOnIngredients  = activeIngredients.filter(i => i.isAddOn === true);
   const activeMaterials   = materials.filter(m => m.isActive !== false);
@@ -166,26 +173,37 @@ export default function MenuItems() {
   // ════════════════════════════════════
   // FORM HELPERS
   // ════════════════════════════════════
-  const enabledSizes = MENU_SIZES.filter(s => menuSizes[s].enabled);
+  const validVariants = variants
+    .map((v, i) => ({ ...v, origIdx: i }))
+    .filter(v => v.name.trim());
 
   const step1HasData = () =>
     menuName.trim() !== '' ||
-    MENU_SIZES.some(s => menuSizes[s].enabled || menuSizes[s].price !== '') ||
+    variants.some(v => v.name.trim() || v.price) ||
     addOns.length > 0;
 
   const resetAll = () => {
-    setMenuName(''); setMenuCategory('Frappe'); setMenuSizes(EMPTY_SIZES);
-    setAddOns([]); setConnections({ Small: [], Medium: [], Large: [] });
-    setCurrentSizeIdx(0); setPendingMenu(null); setEditingItem(null);
+    setMenuName(''); setMenuCategory(categories.find(c => !c.parentId)?.name || categories[0]?.name || '');
+    setVariants([{ name: '', price: '' }]); setAddOns([]);
+    setConnections([[]]); setCurrentVariantIdx(0);
+    setPendingMenu(null); setEditingItem(null);
   };
 
   const handleCloseStep1 = () => {
-    // In edit mode always confirm discard; in create mode only if form has data
     (editingItem || step1HasData()) ? setShowDiscard(true) : (setShowStep1(false), resetAll());
   };
 
-  const toggleMenuSize = s =>
-    setMenuSizes(p => ({ ...p, [s]: { enabled: !p[s].enabled, price: p[s].enabled ? '' : p[s].price } }));
+  const addVariant = () => {
+    setVariants(p => [...p, { name: '', price: '' }]);
+    setConnections(p => [...p, []]);
+  };
+  const removeVariant = i => {
+    if (variants.length <= 1) return;
+    setVariants(p => p.filter((_, idx) => idx !== i));
+    setConnections(p => p.filter((_, idx) => idx !== i));
+  };
+  const updateVariant = (i, field, val) =>
+    setVariants(p => p.map((v, idx) => idx === i ? { ...v, [field]: val } : v));
 
   // ════════════════════════════════════
   // OPEN EDIT
@@ -193,20 +211,21 @@ export default function MenuItems() {
   const handleOpenEdit = (item) => {
     setEditingItem(item);
     setMenuName(item.name || '');
-    setMenuCategory(item.category || 'Frappe');
+    setMenuCategory(item.category || categories.find(c => !c.parentId)?.name || categories[0]?.name || '');
 
-    // Reconstruct sizes
-    const newSizes = {
-      Small:  { enabled: false, price: '' },
-      Medium: { enabled: false, price: '' },
-      Large:  { enabled: false, price: '' },
-    };
-    for (const sz of (item.sizes || [])) {
-      if (newSizes[sz.size] !== undefined) {
-        newSizes[sz.size] = { enabled: true, price: String(sz.price ?? '') };
-      }
-    }
-    setMenuSizes(newSizes);
+    // Reconstruct variants (support legacy 'sizes' field)
+    const srcVariants = item.variants || (item.sizes || []).map(s => ({ name: s.size, price: s.price, connections: s.connections }));
+    const newVariants = srcVariants.map(v => ({ name: v.name || '', price: String(v.price ?? '') }));
+    setVariants(newVariants.length ? newVariants : [{ name: '', price: '' }]);
+
+    // Reconstruct connections parallel to variants
+    const newConns = srcVariants.map(v =>
+      (v.connections || []).map(c => ({
+        type: c.type, refId: c.refId || '', name: c.name || '',
+        amount: String(c.amount ?? ''), unit: c.unit || '',
+      }))
+    );
+    setConnections(newConns.length ? newConns : [[]]);
 
     // Reconstruct add-ons
     setAddOns((item.addOns || []).map(a => ({
@@ -215,21 +234,6 @@ export default function MenuItems() {
       amount:       String(a.amount ?? ''),
       price:        String(a.price ?? ''),
     })));
-
-    // Reconstruct connections per size
-    const newConns = { Small: [], Medium: [], Large: [] };
-    for (const sz of (item.sizes || [])) {
-      if (newConns[sz.size] !== undefined) {
-        newConns[sz.size] = (sz.connections || []).map(c => ({
-          type:   c.type,
-          refId:  c.refId || '',
-          name:   c.name || '',
-          amount: String(c.amount ?? ''),
-          unit:   c.unit || '',
-        }));
-      }
-    }
-    setConnections(newConns);
 
     setShowStep1(true);
   };
@@ -246,8 +250,8 @@ export default function MenuItems() {
   };
 
   const handleNextStep = () => {
-    if (!menuName.trim() || enabledSizes.length === 0) return;
-    setCurrentSizeIdx(0);
+    if (!menuName.trim() || validVariants.length === 0) return;
+    setCurrentVariantIdx(0);
     setShowStep1(false);
     setShowStep2(true);
   };
@@ -255,29 +259,23 @@ export default function MenuItems() {
   // ════════════════════════════════════
   // CONNECTIONS
   // ════════════════════════════════════
-  const currentSize  = enabledSizes[currentSizeIdx] || '';
-  const currentConns = connections[currentSize] || [];
+  const currentVariantEntry = validVariants[currentVariantIdx];
+  const currentConns = connections[currentVariantEntry?.origIdx ?? 0] || [];
 
-  const addConn = type => setConnections(p => ({
-    ...p,
-    [currentSize]: [...(p[currentSize] || []), { type, refId: '', name: '', amount: '', unit: '' }],
-  }));
-
-  const removeConn = idx => setConnections(p => ({
-    ...p,
-    [currentSize]: p[currentSize].filter((_, i) => i !== idx),
-  }));
-
-  const updateConn = (idx, changes) => setConnections(p => ({
-    ...p,
-    [currentSize]: p[currentSize].map((c, i) => i === idx ? { ...c, ...changes } : c),
-  }));
+  const addConn = type => setConnections(p =>
+    p.map((c, i) => i === (currentVariantEntry?.origIdx ?? 0) ? [...c, { type, refId: '', name: '', amount: '', unit: '' }] : c)
+  );
+  const removeConn = idx => setConnections(p =>
+    p.map((c, i) => i === (currentVariantEntry?.origIdx ?? 0) ? c.filter((_, j) => j !== idx) : c)
+  );
+  const updateConn = (idx, changes) => setConnections(p =>
+    p.map((c, i) => i === (currentVariantEntry?.origIdx ?? 0) ? c.map((conn, j) => j === idx ? { ...conn, ...changes } : conn) : c)
+  );
 
   const handleSelectConnIng = (idx, ingId) => {
     const ing = activeIngredients.find(x => x.id === ingId);
     updateConn(idx, { refId: ingId, name: ing?.name || '', unit: ing?.unit || 'grams' });
   };
-
   const handleSelectConnMat = (idx, matId) => {
     const mat = activeMaterials.find(x => x.id === matId);
     updateConn(idx, { refId: matId, name: mat ? `${sizePrefix(mat.size)}${mat.name}` : '', unit: 'pieces' });
@@ -314,19 +312,24 @@ export default function MenuItems() {
           amount: parseFloat(a.amount) || 0,
           price:  parseFloat(a.price)  || 0,
         })),
-      sizes: enabledSizes.map(sz => ({
-        size:  sz,
-        price: parseFloat(menuSizes[sz].price) || 0,
-        connections: (connections[sz] || [])
-          .filter(c => c.refId)
-          .map(c => ({
-            type:   c.type,
-            refId:  c.refId,
-            name:   c.name,
-            amount: parseFloat(c.amount) || 0,
-            unit:   c.unit,
-          })),
-      })),
+      variants: variants
+        .filter(v => v.name.trim())
+        .map((v, _, arr) => {
+          const origIdx = variants.indexOf(v);
+          return {
+            name:  v.name.trim(),
+            price: parseFloat(v.price) || 0,
+            connections: (connections[origIdx] || [])
+              .filter(c => c.refId)
+              .map(c => ({
+                type:   c.type,
+                refId:  c.refId,
+                name:   c.name,
+                amount: parseFloat(c.amount) || 0,
+                unit:   c.unit,
+              })),
+          };
+        }),
     });
     setShowMenuConf(true);
   };
@@ -346,7 +349,7 @@ export default function MenuItems() {
           name:      pendingMenu.name,
           category:  pendingMenu.category,
           addOns:    pendingMenu.addOns,
-          sizes:     pendingMenu.sizes,
+          variants:  pendingMenu.variants,
           updatedAt: new Date(),
         });
       } else {
@@ -357,7 +360,7 @@ export default function MenuItems() {
           isActive:    true,
           isAvailable: true,
           addOns:      pendingMenu.addOns,
-          sizes:       pendingMenu.sizes,
+          variants:    pendingMenu.variants,
           createdAt:   new Date(),
           hiddenAt:    null,
         });
@@ -460,16 +463,20 @@ export default function MenuItems() {
                     <div className="px-4 pt-3 pb-1">
                       <p className="text-lg font-medium text-gray-500 mb-1.5">Category</p>
                       <div className="flex flex-col">
-                        {categories.map(cat => (
+                        {sortedCategories.map(cat => (
                           <button
-                            key={cat}
-                            onClick={() => setFilterCategory(filterCategory === cat ? '' : cat)}
-                            className={`w-full text-left px-3 py-2 text-xl rounded-lg transition-colors ${
-                              filterCategory === cat
+                            key={cat.id}
+                            onClick={() => setFilterCategory(filterCategory === cat.name ? '' : cat.name)}
+                            className={`w-full text-left py-2 text-xl rounded-lg transition-colors ${
+                              cat.indent ? 'pl-7' : 'px-3'
+                            } ${
+                              filterCategory === cat.name
                                 ? 'bg-[#3ca4c7]/10 text-[#3ca4c7] font-medium'
                                 : 'text-gray-700 hover:bg-gray-50'
                             }`}
-                          >{cat}</button>
+                          >
+                            {cat.indent ? `↳ ${cat.name}` : cat.name}
+                          </button>
                         ))}
                       </div>
                     </div>
@@ -649,9 +656,13 @@ export default function MenuItems() {
                           value={menuCategory} onChange={e => setMenuCategory(e.target.value)}
                           className="w-full border border-gray-300 rounded-lg px-4 py-3 text-xl text-gray-700 outline-none appearance-none bg-white focus:border-[#3ca4c7]"
                         >
-                          {categories.length === 0
+                          {sortedCategories.length === 0
                             ? <option value="">No categories — add one in Menu Categories</option>
-                            : categories.map(c => <option key={c}>{c}</option>)
+                            : sortedCategories.map(c => (
+                                <option key={c.id} value={c.name}>
+                                  {c.indent ? `    ↳ ${c.name}` : c.name}
+                                </option>
+                              ))
                           }
                         </select>
                         <span className="absolute right-4 top-3.5 text-gray-400 pointer-events-none text-xl">▾</span>
@@ -661,39 +672,39 @@ export default function MenuItems() {
                 </div>
 
                 <div>
-                  <p className="text-xl font-semibold text-gray-700 mb-4">Sizes and Price</p>
-                  <div className="grid grid-cols-2 gap-x-8 mb-3 px-2">
-                    <span className="text-xl text-gray-500 text-center">Sizes</span>
-                    <span className="text-xl text-gray-500 text-center">Price</span>
-                  </div>
-                  {MENU_SIZES.map(sz => (
-                    <div key={sz} className="grid grid-cols-2 gap-x-8 items-center mb-4">
-                      <div className="flex items-center justify-center gap-4">
-                        <span className="text-xl text-gray-700 w-16">{sz}</span>
+                  <p className="text-xl font-semibold text-gray-700 mb-4">Variants</p>
+                  <div className="border border-gray-200 rounded-xl px-5 pt-5 pb-4 flex flex-col gap-4 max-h-[380px] overflow-y-auto">
+                    {variants.map((v, i) => (
+                      <div key={i} className="flex items-center gap-3">
+                        <span className="text-xl text-gray-500 w-6 shrink-0 text-center">{i + 1}</span>
+                        <input
+                          type="text" value={v.name}
+                          placeholder="Variant name (e.g. Regular)"
+                          onChange={e => updateVariant(i, 'name', e.target.value)}
+                          className="flex-1 border border-gray-300 rounded-lg px-4 py-3 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]"
+                        />
+                        <span className="text-xl text-gray-600 shrink-0">₱</span>
+                        <input
+                          type="number" min="0" value={v.price}
+                          onChange={e => updateVariant(i, 'price', e.target.value)}
+                          className="w-28 border border-gray-300 rounded-lg px-3 py-3 text-xl text-gray-700 outline-none text-center focus:border-[#3ca4c7]"
+                        />
                         <button
-                          onClick={() => toggleMenuSize(sz)}
-                          className={`w-9 h-9 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${
-                            menuSizes[sz].enabled
-                              ? 'bg-[#3ca4c7] border-[#3ca4c7] text-white'
-                              : 'bg-gray-100 border-gray-300'
-                          }`}
+                          onClick={() => removeVariant(i)}
+                          disabled={variants.length <= 1}
+                          className="text-gray-400 hover:text-red-400 transition-colors shrink-0 disabled:opacity-30"
                         >
-                          {menuSizes[sz].enabled && <span className="font-bold text-white text-xl">✓</span>}
+                          <Trash2 size={18} />
                         </button>
                       </div>
-                      <input
-                        type="number" min="0"
-                        disabled={!menuSizes[sz].enabled}
-                        value={menuSizes[sz].price}
-                        onChange={e => setMenuSizes(p => ({ ...p, [sz]: { ...p[sz], price: e.target.value } }))}
-                        className={`border rounded-lg px-4 py-3 text-xl outline-none text-center transition-colors ${
-                          menuSizes[sz].enabled
-                            ? 'border-gray-300 text-gray-700 bg-white focus:border-[#3ca4c7]'
-                            : 'border-gray-200 bg-gray-50 text-gray-300 cursor-not-allowed'
-                        }`}
-                      />
-                    </div>
-                  ))}
+                    ))}
+                    <button
+                      onClick={addVariant}
+                      className="mt-1 w-full bg-gray-200 hover:bg-gray-300 text-gray-600 py-3 rounded-full text-xl transition-colors"
+                    >
+                      Add another Variant
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -782,18 +793,23 @@ export default function MenuItems() {
             <div className="flex-1 px-12 py-8 overflow-y-auto flex flex-col gap-6">
               <div className="flex items-center justify-center gap-5">
                 <button
-                  onClick={() => setCurrentSizeIdx(idx => Math.max(0, idx - 1))}
-                  disabled={currentSizeIdx === 0}
+                  onClick={() => setCurrentVariantIdx(i => Math.max(0, i - 1))}
+                  disabled={currentVariantIdx === 0}
                   className="text-gray-400 hover:text-gray-600 disabled:opacity-30 transition-colors"
                 >
                   <ChevronLeft size={24} />
                 </button>
-                <h4 className="text-2xl font-semibold text-gray-800">
-                  Connections for {currentSize} {menuName}
-                </h4>
+                <div className="text-center">
+                  <h4 className="text-2xl font-semibold text-gray-800">
+                    {currentVariantEntry?.name || `Variant ${currentVariantIdx + 1}`} — {menuName}
+                  </h4>
+                  <p className="text-xl text-gray-400 mt-1">
+                    Variant {currentVariantIdx + 1} of {validVariants.length}
+                  </p>
+                </div>
                 <button
-                  onClick={() => setCurrentSizeIdx(idx => Math.min(enabledSizes.length - 1, idx + 1))}
-                  disabled={currentSizeIdx === enabledSizes.length - 1}
+                  onClick={() => setCurrentVariantIdx(i => Math.min(validVariants.length - 1, i + 1))}
+                  disabled={currentVariantIdx === validVariants.length - 1}
                   className="text-gray-400 hover:text-gray-600 disabled:opacity-30 transition-colors"
                 >
                   <ChevronRight size={24} />
@@ -887,11 +903,11 @@ export default function MenuItems() {
               <p className="text-xl text-gray-700">ID: <span className="font-semibold">{pendingMenu.menuItemId}</span></p>
               <p className="text-xl text-gray-700">Name: <span className="font-semibold">{pendingMenu.name}</span></p>
               <p className="text-xl text-gray-700">Category: <span className="font-semibold">{pendingMenu.category}</span></p>
-              <p className="text-xl text-gray-700 mt-1 font-semibold">Sizes:</p>
-              {pendingMenu.sizes.map(sz => (
-                <p key={sz.size} className="text-xl text-gray-600 pl-4">
-                  {sz.size} — ₱{sz.price}
-                  {sz.connections.length > 0 && ` (${sz.connections.length} connection${sz.connections.length > 1 ? 's' : ''})`}
+              <p className="text-xl text-gray-700 mt-1 font-semibold">Variants:</p>
+              {pendingMenu.variants.map((v, i) => (
+                <p key={i} className="text-xl text-gray-600 pl-4">
+                  {v.name} — ₱{v.price}
+                  {v.connections.length > 0 && ` (${v.connections.length} connection${v.connections.length > 1 ? 's' : ''})`}
                 </p>
               ))}
             </div>
@@ -1035,15 +1051,15 @@ export default function MenuItems() {
                 <span className="font-semibold">Category</span>
                 <span>{viewingItem.category}</span>
               </div>
-              {(viewingItem.sizes || []).length > 0 && (
+              {(viewingItem.variants || viewingItem.sizes || []).length > 0 && (
                 <div className="border-b border-gray-100 pb-3">
-                  <p className="font-semibold mb-2">Sizes</p>
-                  {viewingItem.sizes.map(sz => (
-                    <div key={sz.size} className="pl-4 mb-2">
-                      <p className="text-gray-700">{sz.size} — ₱{sz.price}</p>
-                      {(sz.connections || []).length > 0 && (
+                  <p className="font-semibold mb-2">Variants</p>
+                  {(viewingItem.variants || viewingItem.sizes || []).map((v, vi) => (
+                    <div key={vi} className="pl-4 mb-2">
+                      <p className="text-gray-700">{v.name || v.size} — ₱{v.price}</p>
+                      {(v.connections || []).length > 0 && (
                         <div className="pl-4 mt-1 flex flex-col gap-0.5">
-                          {sz.connections.map((c, i) => (
+                          {v.connections.map((c, i) => (
                             <p key={i} className="text-gray-500 text-xl">
                               {c.type === 'ingredient' ? 'Ing' : 'Mat'}: {c.name} × {c.amount} {c.unit}
                             </p>

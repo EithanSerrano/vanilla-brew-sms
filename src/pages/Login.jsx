@@ -183,7 +183,7 @@ export default function Login() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               service_id: 'service_jl3bsze',
-              //template_id: 'template_fqiqd8q',
+              template_id: 'template_fqiqd8q',
               user_id: 'ir051N-QwmFGXmsYY',
               template_params: {
                 user_email: trimmedUsername,
@@ -219,7 +219,7 @@ export default function Login() {
           template_id: 'template_lb1szcb',
           user_id: 'ir051N-QwmFGXmsYY',
           template_params: {
-            admin_email: 'qraalcanzo@tip.edu.ph',
+            admin_email: 'qcjenueva@tip.edu.ph',
             otp: generatedCode,
             time: new Date().toLocaleString(),
           }

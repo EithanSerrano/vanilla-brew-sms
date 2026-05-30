@@ -52,6 +52,7 @@ export default function AdminSidebar() {
   const [darkMode, setDarkMode] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [clock, setClock] = useState(new Date());
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -61,6 +62,11 @@ export default function AdminSidebar() {
       }
     });
     return unsubscribe;
+  }, []);
+
+  useEffect(() => {
+    const id = setInterval(() => setClock(new Date()), 1000);
+    return () => clearInterval(id);
   }, []);
 
   useEffect(() => {
@@ -112,6 +118,12 @@ export default function AdminSidebar() {
         <p className="text-white/60 text-xl font-medium">Welcome</p>
         <p className="text-white text-2xl font-bold leading-snug mt-0.5 break-words">
           {userName || '—'}
+        </p>
+        <p className="text-white text-2xl font-bold tabular-nums mt-2">
+          {clock.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+        </p>
+        <p className="text-white/60 text-xl mt-0.5">
+          {clock.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
         </p>
       </div>
 
