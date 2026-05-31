@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
-import { Search, Filter, RefreshCw, Maximize2, X, Download } from 'lucide-react';
+import { Search, Filter, RefreshCw, Maximize2, X, Printer } from 'lucide-react';
 import AdminSidebar from '../layouts/AdminSidebar';
 import StaffSidebar from '../layouts/StaffSidebar';
 
@@ -272,31 +272,76 @@ export default function Dashboard({ role }) {
     setFilterIsRange(false); setFilterOrderMode('');
   };
 
-  const handleDownloadReceipt = sale => {
+  const handlePrintReceipt = sale => {
     const { date, time } = splitDateTime(sale.dateAndTimeStr);
-    const lines = [
-      '=== RECEIPT ===',
-      `Sales ID   : ${sale.transactionNumber || sale.id}`,
-      `Date       : ${date}`,
-      `Time       : ${time}`,
-      `Order Mode : ${sale.orderMode || '—'}`,
-      `Payment    : ${sale.modeOfPayment || '—'}`,
-      '',
-      '--- ITEMS ---',
-      ...(sale.orders || []).map(o =>
-        `  ${o.qty}x ${o.name}${o.size ? ` (${o.size})` : ''}${o.addons ? ` + ${o.addons}` : ''}  ₱${o.totalPrice}`
-      ),
-      '',
-      `TOTAL      : ₱${sale.totalAmount ?? '—'}`,
-      '================',
-    ];
-    const blob = new Blob([lines.join('\n')], { type: 'text/plain' });
+    const itemsHtml = (sale.orders || []).map(o => `
+      <div class="item">
+        <div class="item-row">
+          <span class="item-name">${o.qty}x ${o.name}${o.size ? ` ${o.size}` : ''}</span>
+          <span class="item-price">&#8369;${Number(o.totalPrice || 0).toFixed(2)}</span>
+        </div>
+        ${o.addons ? `<div class="addons">&#42; ${o.addons}</div>` : ''}
+      </div>`).join('');
+
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Receipt ${sale.transactionNumber || sale.id}</title>
+  <style>
+    @page { size: 58mm auto; margin: 4mm 3mm; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 9.5px;
+      width: 52mm;
+      color: #000;
+    }
+    .center { text-align: center; }
+    .shop-name { font-size: 15px; font-weight: bold; text-align: center; letter-spacing: 2px; margin-bottom: 1px; }
+    .shop-sub  { font-size: 8.5px; text-align: center; color: #333; margin-bottom: 3px; }
+    .dash { border: none; border-top: 1px dashed #000; margin: 4px 0; }
+    .trans-num { font-size: 10.5px; font-weight: bold; text-align: center; margin: 3px 0 4px; }
+    .info-row  { font-size: 9px; margin: 1.5px 0; }
+    .section-title { font-weight: bold; font-size: 9.5px; margin: 3px 0 2px; }
+    .item { margin: 3px 0; }
+    .item-row  { display: flex; justify-content: space-between; font-weight: bold; }
+    .item-name { flex: 1; padding-right: 4px; word-break: break-word; }
+    .item-price { white-space: nowrap; }
+    .addons { font-size: 8px; color: #555; padding-left: 10px; line-height: 1.3; }
+    .sub-row  { display: flex; justify-content: space-between; font-size: 9px; margin: 2px 0; }
+    .total-row { display: flex; justify-content: space-between; font-size: 11px; font-weight: bold; margin: 3px 0; }
+    .footer { text-align: center; font-size: 8.5px; margin: 2px 0; }
+  </style>
+</head>
+<body>
+  <div class="shop-name">VANILLA BREW</div>
+  <div class="shop-sub">Coffee &amp; More</div>
+  <hr class="dash">
+  <div class="trans-num">${sale.transactionNumber || sale.id}</div>
+  <div class="info-row">${date}, ${time}</div>
+  <div class="info-row">Cashier: ${sale.cashierName || '&#8212;'}</div>
+  <div class="info-row">Customer: ${sale.customerName || '&#8212;'}</div>
+  ${sale.customerType ? `<div class="info-row">Type: ${sale.customerType}</div>` : ''}
+  <div class="info-row">Mode: ${sale.orderMode || '&#8212;'}</div>
+  <div class="info-row">Payment: ${sale.modeOfPayment || '&#8212;'}</div>
+  <hr class="dash">
+  <div class="section-title">ORDER ITEMS</div>
+  ${itemsHtml}
+  <hr class="dash">
+  <div class="sub-row"><span>Subtotal:</span><span>&#8369;${Number(sale.totalAmount || 0).toFixed(2)}</span></div>
+  <div class="total-row"><span>TOTAL:</span><span>&#8369;${Number(sale.totalAmount || 0).toFixed(2)}</span></div>
+  <hr class="dash">
+  <div class="footer">Thank you for your purchase!</div>
+  <div class="footer">Please come again.</div>
+  <script>window.onload = function() { window.print(); };</script>
+</body>
+</html>`;
+
+    const blob = new Blob([html], { type: 'text/html' });
     const url  = URL.createObjectURL(blob);
-    const a    = document.createElement('a');
-    a.href = url;
-    a.download = `receipt-${sale.transactionNumber || sale.id}.txt`;
-    a.click();
-    URL.revokeObjectURL(url);
+    window.open(url, '_blank');
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
   };
 
   return (
@@ -440,6 +485,14 @@ export default function Dashboard({ role }) {
                   <RefreshCw size={18} className="cursor-pointer hover:text-gray-600 transition-colors" onClick={loadSales} />
                 </div>
               </div>
+              {!analyticsRefreshing && ranked.length > 0 && (
+                <div className="px-5 py-2 bg-[#f0f9fc] border-b border-[#cce8f4] shrink-0">
+                  <p className="text-sm text-[#1e6f92] leading-snug">
+                    <span className="font-semibold">{ranked[0].name}</span> leads this week with{' '}
+                    <span className="font-semibold">{ranked[0].count}</span> order{ranked[0].count !== 1 ? 's' : ''}.
+                  </p>
+                </div>
+              )}
               <div className="flex items-center px-5 py-2.5 border-b border-gray-100 bg-gray-50 shrink-0">
                 <span className="w-14 text-base font-semibold text-gray-600 text-center">Top</span>
                 <span className="flex-1 text-base font-semibold text-gray-600 pl-2">Menu Item</span>
@@ -575,6 +628,19 @@ export default function Dashboard({ role }) {
                   <span className="flex-1 text-xl font-semibold text-gray-700 pl-2">Menu Item</span>
                   <span className="w-24 text-xl font-semibold text-gray-700 text-right">Orders</span>
                 </div>
+                {!analyticsRefreshing && modalRanked.length > 0 && (
+                  <div className="px-5 py-2.5 bg-[#f0f9fc] border-b border-[#cce8f4] shrink-0">
+                    <p className="text-base text-[#1e6f92] leading-snug">
+                      <span className="font-semibold">{modalRanked[0].name}</span> is the top selling item
+                      {analyticsDate && !analyticsIsRange
+                        ? ` on ${new Date(analyticsDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`
+                        : analyticsDate && analyticsIsRange && analyticsRangeEnd
+                        ? ` from ${new Date(analyticsDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${new Date(analyticsRangeEnd + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
+                        : ' for the selected period'
+                      }{' '}with <span className="font-semibold">{modalRanked[0].count}</span> order{modalRanked[0].count !== 1 ? 's' : ''}.
+                    </p>
+                  </div>
+                )}
                 <div className="flex-1 overflow-y-auto flex flex-col" style={{ scrollbarGutter: 'stable' }}>
                   {analyticsRefreshing
                     ? [...Array(5)].map((_, i) => (
@@ -715,11 +781,11 @@ export default function Dashboard({ role }) {
                 </div>
                 <div className="flex justify-end shrink-0">
                   <button
-                    onClick={() => handleDownloadReceipt(viewingSale)}
+                    onClick={() => handlePrintReceipt(viewingSale)}
                     className="flex items-center gap-2 bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white px-6 py-2.5 rounded-full text-xl transition-colors"
                   >
-                    <Download size={18} />
-                    Download Receipt
+                    <Printer size={18} />
+                    Print Receipt
                   </button>
                 </div>
               </div>

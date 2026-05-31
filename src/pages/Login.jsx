@@ -207,7 +207,9 @@ export default function Login() {
     setOtpSentMessage('');
     setPasskeyError('');
    
-    const generatedCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const buf = new Uint32Array(1);
+    crypto.getRandomValues(buf);
+    const generatedCode = String(100000 + (buf[0] % 900000));
 
 
     try {

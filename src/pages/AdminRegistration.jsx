@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { collection, query, orderBy, getDocs, doc, updateDoc, setDoc, addDoc, getDoc } from 'firebase/firestore';
-import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { createUserWithEmailAndPassword, getAuth } from 'firebase/auth';
+import { initializeApp, getApps } from 'firebase/app';
+import { firebaseConfig } from '../firebase';
 import { auth, db } from '../firebase';
 import { Search, Plus, RefreshCw, X, AlignJustify } from 'lucide-react';
 import AdminSidebar from '../layouts/AdminSidebar';
@@ -9,7 +11,9 @@ import emailjs from '@emailjs/browser';
 
 function generatePassword() {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  return Array.from({ length: 8 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+  const bytes = new Uint8Array(8);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, b => chars[b % chars.length]).join('');
 }
 
 
@@ -142,7 +146,12 @@ export default function AdminRegistration() {
     const password = generatePassword();
     setGeneratedPassword(password);
     try {
-      const cred = await createUserWithEmailAndPassword(auth, pendingAccount.email, password);
+      // Use a secondary app so creating the new user doesn't sign out the admin
+      const secondaryApp = getApps().find(a => a.name === 'secondary')
+        || initializeApp(firebaseConfig, 'secondary');
+      const secondaryAuth = getAuth(secondaryApp);
+      const cred = await createUserWithEmailAndPassword(secondaryAuth, pendingAccount.email, password);
+      await secondaryAuth.signOut();
       await setDoc(doc(db, 'users', cred.user.uid), {
         empId: pendingAccount.empId,
         fullName: pendingAccount.fullName,

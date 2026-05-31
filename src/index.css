@@ -13,41 +13,39 @@ html.dark {
   color-scheme: dark;
 }
 
-html.dark [class~="bg-white"] {
-  background-color: #1e293b !important;
-}
-html.dark [class~="bg-gray-50"] {
-  background-color: #0f172a !important;
-}
-html.dark [class~="bg-gray-100"] {
-  background-color: #1e293b !important;
-}
-html.dark [class~="bg-gray-200"] {
-  background-color: #334155 !important;
-}
+/* Background */
+html.dark [class~="bg-white"]    { background-color: #202020 !important; }
+html.dark [class~="bg-gray-50"]  { background-color: #202020 !important; }
 
-html.dark [class~="text-gray-900"] { color: #f1f5f9 !important; }
-html.dark [class~="text-gray-800"] { color: #e2e8f0 !important; }
-html.dark [class~="text-gray-700"] { color: #cbd5e1 !important; }
-html.dark [class~="text-gray-600"] { color: #94a3b8 !important; }
-html.dark [class~="text-gray-500"] { color: #64748b !important; }
-html.dark [class~="text-gray-400"] { color: #475569 !important; }
+/* Containers */
+html.dark [class~="bg-gray-100"] { background-color: #333333 !important; }
+html.dark [class~="bg-gray-200"] { background-color: #333333 !important; }
 
-html.dark [class~="border-gray-200"] { border-color: #334155 !important; }
-html.dark [class~="border-gray-300"] { border-color: #475569 !important; }
-html.dark [class~="border-gray-100"] { border-color: #1e293b !important; }
+/* Text */
+html.dark [class~="text-gray-900"] { color: #efefef !important; }
+html.dark [class~="text-gray-800"] { color: #efefef !important; }
+html.dark [class~="text-gray-700"] { color: #d4d4d4 !important; }
+html.dark [class~="text-gray-600"] { color: #b0b0b0 !important; }
+html.dark [class~="text-gray-500"] { color: #888888 !important; }
+html.dark [class~="text-gray-400"] { color: #666666 !important; }
 
+/* Outlines / borders */
+html.dark [class~="border-gray-100"] { border-color: #efefef !important; }
+html.dark [class~="border-gray-200"] { border-color: #efefef !important; }
+html.dark [class~="border-gray-300"] { border-color: #efefef !important; }
+
+/* Inputs */
 html.dark input,
 html.dark select,
 html.dark textarea {
-  background-color: #1e293b !important;
-  color: #f1f5f9 !important;
-  border-color: #334155 !important;
+  background-color: #333333 !important;
+  color: #efefef !important;
+  border-color: #efefef !important;
 }
 
 html.dark input::placeholder,
 html.dark textarea::placeholder {
-  color: #475569 !important;
+  color: #888888 !important;
 }
 
 /* ── Custom scrollbar: thin line with rounded edges ── */
