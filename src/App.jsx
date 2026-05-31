@@ -1,10 +1,10 @@
-﻿import { useEffect } from "react";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { useEffect } from "react";
+import { createBrowserRouter, RouterProvider, Navigate, Outlet } from "react-router-dom";
 import { startSalesInventoryListener } from "./utils/inventoryDeduction";
 
 // Pages
 import Login from "./pages/Login";
-import ResetPassword from "./pages/ResetPassword"; // <-- Added this import
+import ResetPassword from "./pages/ResetPassword";
 
 // Shared Pages
 import Dashboard from "./pages/Dashboard";
@@ -30,59 +30,58 @@ import Settings from "./pages/Settings";
 import Account from "./pages/Account";
 import PaymentQR from "./pages/PaymentQR";
 
-function App() {
+function RootLayout() {
   useEffect(() => {
     const unsubscribe = startSalesInventoryListener();
     return () => unsubscribe();
   }, []);
 
   return (
-    <BrowserRouter>
-      <div className="h-screen font-sans flex flex-col">
-        <div className="flex-1 overflow-hidden">
-          <Routes>
-            {/* Default redirect is strictly to LOGIN */}
-            <Route path="/" element={<Navigate to="/login" replace />} />
-            
-            {/* Authentication */}
-            <Route path="/login" element={<Login />} />
-            
-            {/* --- ADDED RESET PASSWORD ROUTE HERE --- */}
-            <Route path="/reset-password" element={<ResetPassword />} />
-            
-            {/* --- ADMIN ROUTES --- */}
-            <Route path="/admin" element={<AdminHome />} /> 
-            <Route path="/admin-dashboard" element={<Dashboard role="admin" />} />
-            <Route path="/inventory" element={<Inventory />} />
-            <Route path="/menu-items" element={<MenuItems />} />
-            <Route path="/menu-categories" element={<MenuCategories />} />
-            <Route path="/registration" element={<AdminRegistration />} />
-            {/* Admin Dedicated Placeholders */}
-            <Route path="/admin-maintenance" element={<Maintenance role="admin" />} />
-            <Route path="/documents" element={<Documents />} />
-            <Route path="/admin-help" element={<AdminHelp />} />
-            <Route path="/admin-about" element={<About role="admin" />} />
-            <Route path="/admin-settings" element={<Settings role="admin" />} />
-            <Route path="/admin-account" element={<Account role="admin" />} />
-            <Route path="/payment-qr" element={<PaymentQR />} />
-            
-            {/* --- STAFF ROUTES --- */}
-            <Route path="/staff" element={<StaffHome />} />
-            <Route path="/staff-dashboard" element={<Dashboard role="staff" />} />
-            <Route path="/staff-inventory" element={<StaffInventory />} />
-
-            <Route path="/staff-help" element={<StaffHelp />} />
-            <Route path="/staff-about" element={<About role="staff" />} />
-            <Route path="/staff-settings" element={<Settings role="staff" />} />
-            <Route path="/staff-account" element={<Account role="staff" />} />
-            
-            {/* Catch-all: Must be at the bottom */}
-            <Route path="*" element={<Navigate to="/login" replace />} />
-          </Routes>
-        </div>
+    <div className="h-screen font-sans flex flex-col">
+      <div className="flex-1 overflow-hidden">
+        <Outlet />
       </div>
-    </BrowserRouter>
+    </div>
   );
 }
 
-export default App;
+const router = createBrowserRouter([
+  {
+    element: <RootLayout />,
+    children: [
+      { path: "/",                  element: <Navigate to="/login" replace /> },
+      { path: "/login",             element: <Login /> },
+      { path: "/reset-password",    element: <ResetPassword /> },
+
+      // Admin routes
+      { path: "/admin",             element: <AdminHome /> },
+      { path: "/admin-dashboard",   element: <Dashboard role="admin" /> },
+      { path: "/inventory",         element: <Inventory /> },
+      { path: "/menu-items",        element: <MenuItems /> },
+      { path: "/menu-categories",   element: <MenuCategories /> },
+      { path: "/registration",      element: <AdminRegistration /> },
+      { path: "/admin-maintenance", element: <Maintenance role="admin" /> },
+      { path: "/documents",         element: <Documents /> },
+      { path: "/admin-help",        element: <AdminHelp /> },
+      { path: "/admin-about",       element: <About role="admin" /> },
+      { path: "/admin-settings",    element: <Settings role="admin" /> },
+      { path: "/admin-account",     element: <Account role="admin" /> },
+      { path: "/payment-qr",        element: <PaymentQR /> },
+
+      // Staff routes
+      { path: "/staff",             element: <StaffHome /> },
+      { path: "/staff-dashboard",   element: <Dashboard role="staff" /> },
+      { path: "/staff-inventory",   element: <StaffInventory /> },
+      { path: "/staff-help",        element: <StaffHelp /> },
+      { path: "/staff-about",       element: <About role="staff" /> },
+      { path: "/staff-settings",    element: <Settings role="staff" /> },
+      { path: "/staff-account",     element: <Account role="staff" /> },
+
+      { path: "*",                  element: <Navigate to="/login" replace /> },
+    ],
+  },
+]);
+
+export default function App() {
+  return <RouterProvider router={router} />;
+}

@@ -161,6 +161,7 @@ export default function AdminRegistration() {
         status: 'Active',
         isOnline: false,
         createdAt: new Date(),
+        mustChangePassword: true,
       });
      
       await logAudit('CREATE_ACCOUNT', pendingAccount.empId, pendingAccount.displayName, {
@@ -535,11 +536,8 @@ try {
               <p className="text-xl text-green-600 mt-2 font-medium">
                 The account credentials have been emailed to the employee!
               </p>
-              <div className="flex items-center gap-6 mt-3">
-                <span className="text-xl text-gray-700">Initial Password</span>
-                <div className="border-2 border-gray-300 rounded-xl px-8 py-3 text-xl font-mono text-gray-800 tracking-widest">
-                  {generatedPassword}
-                </div>
+              <div className="border-2 border-green-200 bg-green-50 rounded-xl px-8 py-3 mt-3 text-xl text-green-700">
+                A temporary password has been sent to <span className="font-semibold">{pendingAccount.email}</span>.
               </div>
               <button
                 onClick={() => { setShowSuccess(false); setShowForm(false); resetForm(); }}

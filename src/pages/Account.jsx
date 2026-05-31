@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useBlocker } from 'react-router-dom';
 import { auth, db } from '../firebase';
 import {
   updatePassword, updateEmail, EmailAuthProvider, reauthenticateWithCredential
@@ -194,6 +195,17 @@ export default function Account({ role }) {
 
   const locked = !otpVerified;
 
+  const isDirty = otpVerified && !!(currentPw || newPw || confirmPw || newEmail);
+
+  const blocker = useBlocker(isDirty);
+
+  useEffect(() => {
+    if (!isDirty) return;
+    const handler = e => { e.preventDefault(); e.returnValue = ''; };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [isDirty]);
+
   return (
     <div className="flex w-full h-full">
       <Sidebar />
@@ -296,6 +308,34 @@ export default function Account({ role }) {
 
         </div>
       </main>
+
+      {/* ══════════════════════════════════════════
+          UNSAVED CHANGES CONFIRMATION
+      ══════════════════════════════════════════ */}
+      {blocker.state === 'blocked' && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl shadow-2xl w-[440px] px-8 py-7 flex flex-col gap-5">
+            <h3 className="text-2xl font-semibold text-gray-800">Leave this page?</h3>
+            <p className="text-xl text-gray-500 leading-snug">
+              You have unsaved credential changes. If you leave now, your progress will be lost.
+            </p>
+            <div className="flex justify-end gap-3 mt-1">
+              <button
+                onClick={() => blocker.reset()}
+                className="px-6 py-2 rounded-full border border-gray-300 text-xl text-gray-600 hover:bg-gray-50 transition-colors"
+              >
+                Stay
+              </button>
+              <button
+                onClick={() => blocker.proceed()}
+                className="px-6 py-2 rounded-full bg-red-400 hover:bg-red-500 text-white text-xl transition-colors"
+              >
+                Leave
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ══════════════════════════════════════════
           OTP VERIFICATION MODAL

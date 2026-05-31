@@ -1,9 +1,9 @@
 ﻿import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { signInWithEmailAndPassword, sendPasswordResetEmail, signOut } from 'firebase/auth';
+import { signInWithEmailAndPassword, sendPasswordResetEmail, signOut, updatePassword } from 'firebase/auth';
 import { doc, getDoc, collection, query, where, getDocs, updateDoc, addDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../firebase';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, Lock } from 'lucide-react';
 
 
 export default function Login() {
@@ -47,6 +47,18 @@ export default function Login() {
 
 
   const [resetEmail, setResetEmail] = useState('');
+
+  // Force password change on first login
+  const [showForcePw,    setShowForcePw]    = useState(false);
+  const [forcePwNew,     setForcePwNew]     = useState('');
+  const [forcePwConfirm, setForcePwConfirm] = useState('');
+  const [forcePwErr,     setForcePwErr]     = useState('');
+  const [forcePwSaving,  setForcePwSaving]  = useState(false);
+  const [forcePwUser,    setForcePwUser]    = useState(null);
+  const [forcePwDest,    setForcePwDest]    = useState('');
+  const [forcePwDocRef,  setForcePwDocRef]  = useState(null);
+  const [showForcePwNew, setShowForcePwNew] = useState(false);
+  const [showForcePwCfm, setShowForcePwCfm] = useState(false);
 
 
   // Handle Lockout Countdown
@@ -154,13 +166,23 @@ export default function Login() {
           timestamp: serverTimestamp(),
         });
 
-        setLoginSuccess(true);
         const destination = userData.role === 'admin' ? '/admin' : userData.role === 'staff' ? '/staff' : null;
         if (!destination) {
           setUsernameError("Unauthorized role");
-          setLoginSuccess(false);
+          setIsLoggingIn(false);
           return;
         }
+
+        if (userData.mustChangePassword) {
+          setForcePwUser(user);
+          setForcePwDest(destination);
+          setForcePwDocRef(userDocRef);
+          setShowForcePw(true);
+          setIsLoggingIn(false);
+          return;
+        }
+
+        setLoginSuccess(true);
         setTimeout(() => navigate(destination), 1500);
       } else {
         throw new Error("Document not found");
@@ -310,6 +332,23 @@ export default function Login() {
     }
   };
 
+
+  const handleForcePwSubmit = async (e) => {
+    e.preventDefault();
+    setForcePwErr('');
+    if (forcePwNew.length < 8)              return setForcePwErr('Password must be at least 8 characters.');
+    if (forcePwNew !== forcePwConfirm)       return setForcePwErr('Passwords do not match.');
+    setForcePwSaving(true);
+    try {
+      await updatePassword(forcePwUser, forcePwNew);
+      await updateDoc(forcePwDocRef, { mustChangePassword: false });
+      navigate(forcePwDest);
+    } catch (err) {
+      console.error('Force password change error:', err);
+      setForcePwErr('Failed to update password. Please try again.');
+      setForcePwSaving(false);
+    }
+  };
 
   const isLockedOut = lockoutUntil > Date.now();
   const bannerMessage = isLockedOut
@@ -520,6 +559,77 @@ export default function Login() {
         )}
 
       </div>
+
+      {/* ── Force Password Change Modal ── */}
+      {showForcePw && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl shadow-2xl w-[460px] flex flex-col overflow-hidden">
+            <div className="bg-[#b87050] px-8 py-5 flex items-center gap-3">
+              <Lock size={22} className="text-white shrink-0" />
+              <h3 className="text-xl font-semibold text-white">Password Change Required</h3>
+            </div>
+            <div className="px-8 py-6 flex flex-col gap-5">
+              <p className="text-xl text-gray-600 leading-snug">
+                This is your <span className="font-semibold text-gray-800">first time logging in</span>. For security, you must set a new password before continuing.
+              </p>
+              <form onSubmit={handleForcePwSubmit} className="flex flex-col gap-4">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xl text-gray-600">New Password</label>
+                  <div className="relative">
+                    <input
+                      type={showForcePwNew ? 'text' : 'password'}
+                      value={forcePwNew}
+                      onChange={e => { setForcePwNew(e.target.value); setForcePwErr(''); }}
+                      placeholder="At least 8 characters"
+                      disabled={forcePwSaving}
+                      className="w-full border border-gray-300 rounded-xl px-4 py-3 text-xl text-gray-700 outline-none focus:border-[#b87050] pr-12 disabled:opacity-60"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowForcePwNew(v => !v)}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      tabIndex={-1}
+                    >
+                      {showForcePwNew ? <EyeOff size={20} /> : <Eye size={20} />}
+                    </button>
+                  </div>
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xl text-gray-600">Confirm New Password</label>
+                  <div className="relative">
+                    <input
+                      type={showForcePwCfm ? 'text' : 'password'}
+                      value={forcePwConfirm}
+                      onChange={e => { setForcePwConfirm(e.target.value); setForcePwErr(''); }}
+                      placeholder="Re-enter new password"
+                      disabled={forcePwSaving}
+                      className="w-full border border-gray-300 rounded-xl px-4 py-3 text-xl text-gray-700 outline-none focus:border-[#b87050] pr-12 disabled:opacity-60"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowForcePwCfm(v => !v)}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      tabIndex={-1}
+                    >
+                      {showForcePwCfm ? <EyeOff size={20} /> : <Eye size={20} />}
+                    </button>
+                  </div>
+                </div>
+                {forcePwErr && (
+                  <p className="text-red-500 text-xl">{forcePwErr}</p>
+                )}
+                <button
+                  type="submit"
+                  disabled={forcePwSaving}
+                  className="mt-1 w-full bg-[#b87050] hover:bg-[#9e5e3e] text-white text-xl font-medium py-3 rounded-full transition-colors disabled:opacity-60"
+                >
+                  {forcePwSaving ? 'Saving...' : 'Set Password & Continue'}
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
