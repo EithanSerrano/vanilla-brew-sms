@@ -114,6 +114,9 @@ function renderDetails(log) {
         { label: 'Display Name',  value: `${d.previousDisplayName || '—'} → ${d.newDisplayName || '—'}` },
       ];
     default:
+      if (typeof d !== 'object' || d === null) {
+        return [{ label: 'Details', value: String(d) }];
+      }
       return Object.entries(d).map(([k, v]) => ({ label: k, value: String(v) }));
   }
 }
@@ -391,6 +394,7 @@ export default function Maintenance() {
         const { date, time } = splitTimestamp(viewLog.timestamp);
         const label = ACTION_LABELS[viewLog.action] || viewLog.action || '—';
         const details = renderDetails(viewLog);
+        const isAuthAction = /login|logout/i.test(viewLog.action || '');
         return (
           <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
             <div className="bg-white rounded-2xl shadow-2xl w-[700px] max-h-[90vh] overflow-y-auto">
@@ -405,9 +409,11 @@ export default function Maintenance() {
                   {[
                     { label: 'Date & Time',   value: `${date} ${time}` },
                     { label: 'Action',        value: label },
-                    { label: 'Item Type',     value: viewLog.itemType ? (viewLog.itemType.charAt(0).toUpperCase() + viewLog.itemType.slice(1)) : '—' },
-                    { label: 'Item ID',       value: viewLog.itemId   || '—' },
-                    { label: 'Item Name',     value: viewLog.itemName || '—' },
+                    ...(!isAuthAction ? [
+                      { label: 'Item Type', value: viewLog.itemType ? (viewLog.itemType.charAt(0).toUpperCase() + viewLog.itemType.slice(1)) : '—' },
+                      { label: 'Item ID',   value: viewLog.itemId || '—' },
+                      { label: 'Item Name', value: viewLog.itemName || '—' },
+                    ] : []),
                     { label: 'Performed by',  value: viewLog.performedBy || '—' },
                   ].map(({ label, value }) => (
                     <div key={label} className="flex items-start px-5 py-3 gap-4">
@@ -424,8 +430,8 @@ export default function Maintenance() {
                     <div className="bg-gray-50 rounded-xl border border-gray-100 divide-y divide-gray-100">
                       {details.map(({ label, value }) => (
                         <div key={label} className="flex items-start px-5 py-3 gap-4">
-                          <span className="w-36 text-xl font-medium text-gray-500 shrink-0">{label}</span>
-                          <span className="flex-1 text-xl text-gray-800">{String(value)}</span>
+                          <span className="w-44 text-xl font-medium text-gray-500 shrink-0 break-words">{label}</span>
+                          <span className="flex-1 text-xl text-gray-800 break-words">{String(value)}</span>
                         </div>
                       ))}
                     </div>

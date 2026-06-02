@@ -7,7 +7,7 @@ import {
   LayoutGrid, Package, FolderCog, Coffee, Users, Tag,
   FileText, ScrollText, Settings, Info,
   HelpCircle, LogOut, ChevronDown, ChevronUp,
-  QrCode, UserCircle
+  QrCode, UserCircle, Percent
 } from 'lucide-react';
 
 function NavItem({ to, icon, label, end = false }) {
@@ -147,6 +147,7 @@ export default function AdminSidebar() {
           <div className="flex flex-col gap-0.5">
             <SubNavItem to="/menu-items" icon={<Coffee size={15} />} label="Menu Items" />
             <SubNavItem to="/menu-categories" icon={<Tag size={15} />} label="Menu Categories" />
+            <SubNavItem to="/promotions" icon={<Percent size={15} />} label="Promotions" />
             <SubNavItem to="/registration" icon={<Users size={15} />} label="Manage Accounts" />
           </div>
         )}

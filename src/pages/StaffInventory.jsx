@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { collection, getDocs, doc, addDoc, updateDoc, getDoc } from 'firebase/firestore';
 import { db, auth } from '../firebase';
-import { Search, Filter, X, RefreshCw, MoreVertical } from 'lucide-react';
+import { Search, Filter, X, RefreshCw, MoreVertical, AlertTriangle } from 'lucide-react';
 import StaffSidebar from '../layouts/StaffSidebar';
 
 const STATUS_STYLES = {
@@ -459,9 +459,17 @@ export default function StaffInventory() {
               <input type="number" min="0" value={resupMatAmount} onChange={e => setResupMatAmount(e.target.value)}
                 className="flex-1 border border-gray-300 rounded-lg px-4 py-3 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]" />
             </div>
+            {resupMatRow.raw.maxLimit > 0 && (resupMatRow.raw.stock || 0) + (parseInt(resupMatAmount) || 0) > resupMatRow.raw.maxLimit && (
+              <div className="flex items-center gap-2 text-red-500">
+                <AlertTriangle size={16} />
+                <span className="text-lg">Maximum limit of {resupMatRow.raw.maxLimit} units reached.</span>
+              </div>
+            )}
             <div className="flex gap-3 justify-end mt-2">
               <button onClick={closeResupMat} className="px-6 py-2 rounded-full border border-gray-300 text-xl text-gray-600 hover:bg-gray-50 transition-colors">Cancel</button>
-              <button onClick={() => setShowResupMatConf(true)} className="px-6 py-2 rounded-full bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white text-xl transition-colors">Confirm</button>
+              <button onClick={() => setShowResupMatConf(true)}
+                disabled={resupMatRow.raw.maxLimit > 0 && (resupMatRow.raw.stock || 0) + (parseInt(resupMatAmount) || 0) > resupMatRow.raw.maxLimit}
+                className="px-6 py-2 rounded-full bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white text-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed">Confirm</button>
             </div>
           </div>
         </div>
@@ -512,6 +520,12 @@ export default function StaffInventory() {
                     className="flex-1 border border-gray-300 rounded-lg px-4 py-3 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]" />
                   <span className="text-xl text-gray-500 shrink-0">{resupIngRow.displayUnit}</span>
                 </div>
+                {resupIngRow.raw.maxLimit > 0 && (resupIngRow.raw.batches || []).reduce((s, b) => s + (b.quantity || 0), 0) + (parseInt(resupIngQty) || 0) > resupIngRow.raw.maxLimit && (
+                  <div className="flex items-center gap-2 text-red-500">
+                    <AlertTriangle size={16} />
+                    <span className="text-lg">Maximum limit of {resupIngRow.raw.maxLimit} {resupIngRow.raw.unit || 'units'} reached.</span>
+                  </div>
+                )}
                 <div className="flex items-center gap-4">
                   <label className="text-xl text-gray-600 w-44 shrink-0">Expiration Date</label>
                   <input type="date" value={resupIngExpDate} onChange={e => setResupIngExpDate(e.target.value)}
@@ -519,7 +533,9 @@ export default function StaffInventory() {
                 </div>
                 <div className="flex gap-3 justify-end mt-2">
                   <button onClick={closeResupIng} className="px-6 py-2 rounded-full border border-gray-300 text-xl text-gray-600 hover:bg-gray-50 transition-colors">Cancel</button>
-                  <button onClick={() => setShowResupIngConf(true)} className="px-6 py-2 rounded-full bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white text-xl transition-colors">Confirm</button>
+                  <button onClick={() => setShowResupIngConf(true)}
+                    disabled={resupIngRow.raw.maxLimit > 0 && (resupIngRow.raw.batches || []).reduce((s, b) => s + (b.quantity || 0), 0) + (parseInt(resupIngQty) || 0) > resupIngRow.raw.maxLimit}
+                    className="px-6 py-2 rounded-full bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white text-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed">Confirm</button>
                 </div>
               </>
             )}
@@ -574,6 +590,12 @@ export default function StaffInventory() {
                     <input type="number" min="0" value={adjMatQty} onChange={e => setAdjMatQty(e.target.value)}
                       className="flex-1 border border-gray-300 rounded-lg px-4 py-3 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]" />
                   </div>
+                  {adjRow.raw.maxLimit > 0 && (parseInt(adjMatQty) || 0) > adjRow.raw.maxLimit && (
+                    <div className="flex items-center gap-2 text-red-500">
+                      <AlertTriangle size={16} />
+                      <span className="text-lg">Maximum limit of {adjRow.raw.maxLimit} units reached.</span>
+                    </div>
+                  )}
                   <div className="flex items-center gap-5">
                     <label className="text-xl text-gray-600 w-52 shrink-0">Reason (optional)</label>
                     <input type="text" value={adjReason} onChange={e => setAdjReason(e.target.value)}
@@ -613,6 +635,12 @@ export default function StaffInventory() {
                         />
                         <span className="text-xl text-gray-500 shrink-0">{adjRow.displayUnit}</span>
                       </div>
+                      {adjRow.raw.maxLimit > 0 && adjIngBatches.reduce((s, b) => s + (parseInt(b.newQty ?? b.quantity) || 0), 0) > adjRow.raw.maxLimit && (
+                        <div className="flex items-center gap-2 text-red-500">
+                          <AlertTriangle size={16} />
+                          <span className="text-lg">Maximum limit of {adjRow.raw.maxLimit} {adjRow.raw.unit || 'units'} reached.</span>
+                        </div>
+                      )}
                     </div>
                   )}
                   <div className="flex items-center gap-5">
@@ -625,7 +653,13 @@ export default function StaffInventory() {
             </div>
             <div className="px-10 pb-8 flex justify-end gap-3">
               <button onClick={closeAdj} className="px-6 py-2 rounded-full border border-gray-300 text-xl text-gray-600 hover:bg-gray-50 transition-colors">Cancel</button>
-              <button onClick={() => setShowAdjConf(true)} className="px-6 py-2 rounded-full bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white text-xl transition-colors">Confirm</button>
+              <button onClick={() => setShowAdjConf(true)}
+                disabled={
+                  adjRow._type === 'material'
+                    ? adjRow.raw.maxLimit > 0 && (parseInt(adjMatQty) || 0) > adjRow.raw.maxLimit
+                    : adjRow.raw.maxLimit > 0 && adjIngBatches.reduce((s, b) => s + (parseInt(b.newQty ?? b.quantity) || 0), 0) > adjRow.raw.maxLimit
+                }
+                className="px-6 py-2 rounded-full bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white text-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed">Confirm</button>
             </div>
           </div>
         </div>

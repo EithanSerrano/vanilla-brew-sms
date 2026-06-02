@@ -15,6 +15,7 @@ import Inventory from "./pages/Inventory";
 import AdminRegistration from "./pages/AdminRegistration";
 import MenuItems from "./pages/MenuItems";
 import MenuCategories from "./pages/MenuCategories";
+import Promotions from "./pages/Promotions";
 import AdminHelp from "./pages/AdminHelp";
 
 // Staff Pages
@@ -59,6 +60,7 @@ const router = createBrowserRouter([
       { path: "/inventory",         element: <Inventory /> },
       { path: "/menu-items",        element: <MenuItems /> },
       { path: "/menu-categories",   element: <MenuCategories /> },
+      { path: "/promotions",        element: <Promotions /> },
       { path: "/registration",      element: <AdminRegistration /> },
       { path: "/admin-maintenance", element: <Maintenance role="admin" /> },
       { path: "/documents",         element: <Documents /> },

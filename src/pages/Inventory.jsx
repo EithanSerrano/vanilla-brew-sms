@@ -14,8 +14,7 @@ const STATUS_STYLES = {
 const MAT_SIZES   = ['Small', 'Medium', 'Large'];
 const SIZE_ORDER  = { Small: 0, Medium: 1, Large: 2 };
 const ING_TYPES   = ['Dry', 'Frozen', 'Wet'];
-const ING_UNITS   = ['grams', 'pumps', 'scoops'];
-const EMPTY_SIZES = { Small: { enabled: false, qty: '' }, Medium: { enabled: false, qty: '' }, Large: { enabled: false, qty: '' } };
+const ING_UNITS   = ['grams', 'mL', 'pumps', 'scoops'];
 const EXPIRING_DAYS = 7;
 
 function sizePrefix(size) { return size ? `(${size[0]}) ` : ''; }
@@ -95,7 +94,7 @@ export default function Inventory() {
   // ── New Material ──
   const [showNewMat,   setShowNewMat]   = useState(false);
   const [matName,      setMatName]      = useState('');
-  const [matSizes,     setMatSizes]     = useState(EMPTY_SIZES);
+  const [matStartQty,  setMatStartQty]  = useState('');
   const [matMaxLimit,  setMatMaxLimit]  = useState('');
   const [pendingMat,   setPendingMat]   = useState(null);
   const [showMatConf,  setShowMatConf]  = useState(false);
@@ -296,21 +295,18 @@ export default function Inventory() {
   // ════════════════════════════════════
   // NEW MATERIAL
   // ════════════════════════════════════
-  const matHasData = () =>
-    matName.trim() !== '' || MAT_SIZES.some(s => matSizes[s].enabled || matSizes[s].qty !== '') || matMaxLimit !== '';
-  const resetMat = () => { setMatName(''); setMatSizes(EMPTY_SIZES); setMatMaxLimit(''); setPendingMat(null); };
+  const matHasData = () => matName.trim() !== '' || matStartQty !== '' || matMaxLimit !== '';
+  const resetMat = () => { setMatName(''); setMatStartQty(''); setMatMaxLimit(''); setPendingMat(null); };
   const closeMat = () => { matHasData() ? setShowMatDisc(true) : (setShowNewMat(false), resetMat()); };
-  const toggleMatSize = s => setMatSizes(p => ({ ...p, [s]: { enabled: !p[s].enabled, qty: p[s].enabled ? '' : p[s].qty } }));
 
   const handleSaveMat = async () => {
-    const on = MAT_SIZES.filter(s => matSizes[s].enabled);
-    if (!matName.trim() || on.length === 0) return;
+    if (!matName.trim()) return;
     const snap = await getDocs(collection(db, 'materials'));
     const nums = snap.docs.map(d => d.data().materialId || '').filter(id => /^MAT\d+$/.test(id)).map(id => parseInt(id.slice(3)));
     const base = nums.length ? Math.max(...nums) : 0;
     setPendingMat({
       name: matName.trim(), maxLimit: parseInt(matMaxLimit) || 0,
-      entries: on.map((sz, i) => ({ size: sz, qty: parseInt(matSizes[sz].qty) || 0, matId: `MAT${String(base+i+1).padStart(3,'0')}` })),
+      entries: [{ qty: parseInt(matStartQty) || 0, matId: `MAT${String(base+1).padStart(3,'0')}` }],
     });
     setShowMatConf(true);
   };
@@ -323,12 +319,12 @@ export default function Inventory() {
       const now = new Date();
       for (const e of pendingMat.entries) {
         await addDoc(collection(db, 'materials'), {
-          materialId: e.matId, name: pendingMat.name, size: e.size,
+          materialId: e.matId, name: pendingMat.name,
           category: 'Material', stock: e.qty, startingQty: e.qty,
           maxLimit: pendingMat.maxLimit, isActive: true, createdAt: now,
         });
-        await logAudit('ADD_MATERIAL', 'material', e.matId, `${pendingMat.name} (${e.size})`, {
-          size: e.size, startingQty: e.qty, maxLimit: pendingMat.maxLimit,
+        await logAudit('ADD_MATERIAL', 'material', e.matId, pendingMat.name, {
+          startingQty: e.qty, maxLimit: pendingMat.maxLimit,
         });
       }
       await loadData(); setShowMatConf(false); setShowMatOk(true);
@@ -871,28 +867,13 @@ export default function Inventory() {
                 </div>
               </div>
               <div>
-                <p className="text-xl font-semibold text-gray-700 mb-4">Sizes</p>
-                <div className="grid grid-cols-2 gap-x-10 mb-3 px-2">
-                  <span className="text-xl text-gray-500 text-center">Sizes</span>
-                  <span className="text-xl text-gray-500 text-center">Starting Quantity</span>
+                <p className="text-xl font-semibold text-gray-700 mb-5">Starting Quantity</p>
+                <div className="flex items-center gap-5">
+                  <label className="text-xl text-gray-600 w-44 shrink-0">Starting Quantity</label>
+                  <input type="number" min="0" value={matStartQty} onChange={e => setMatStartQty(e.target.value)}
+                    className="flex-1 border border-gray-300 rounded-lg px-4 py-3 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]" />
+                  <span className="text-xl text-gray-500 shrink-0">units</span>
                 </div>
-                {MAT_SIZES.map(sz => (
-                  <div key={sz} className="grid grid-cols-2 gap-x-10 items-center mb-5">
-                    <div className="flex items-center justify-center gap-4">
-                      <span className="text-xl text-gray-700 w-18">{sz}</span>
-                      <button onClick={() => toggleMatSize(sz)}
-                        className={`w-9 h-9 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${matSizes[sz].enabled ? 'bg-[#3ca4c7] border-[#3ca4c7] text-white' : 'bg-gray-100 border-gray-300 text-gray-400'}`}>
-                        {matSizes[sz].enabled ? <span className="font-bold">✓</span> : <Lock size={13} />}
-                      </button>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <input type="number" min="0" disabled={!matSizes[sz].enabled} value={matSizes[sz].qty}
-                        onChange={e => setMatSizes(p => ({ ...p, [sz]: { ...p[sz], qty: e.target.value } }))}
-                        className={`flex-1 border rounded-lg px-4 py-3 text-xl outline-none text-center transition-colors ${matSizes[sz].enabled ? 'border-gray-300 text-gray-700 bg-white focus:border-[#3ca4c7]' : 'border-gray-200 bg-gray-50 text-gray-300 cursor-not-allowed'}`} />
-                      {!matSizes[sz].enabled && <Lock size={16} className="text-gray-400 shrink-0" />}
-                    </div>
-                  </div>
-                ))}
               </div>
               <div>
                 <p className="text-xl font-semibold text-gray-700 mb-5">Stock limit</p>
@@ -904,7 +885,7 @@ export default function Inventory() {
               </div>
               <div className="text-center px-4">
                 <p className="text-xl font-semibold text-gray-700 mb-2">Reminder</p>
-                <p className="text-xl text-gray-500">Each size of the material will be saved as a separate element in the database. The maximum limit is used for indicating if it is in low supply.</p>
+                <p className="text-xl text-gray-500">The maximum limit is used for indicating if the material is in low supply.</p>
               </div>
               <button onClick={handleSaveMat} className="w-full bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white py-3.5 rounded-xl text-xl font-semibold transition-colors">Save Material</button>
             </div>
@@ -1006,9 +987,8 @@ export default function Inventory() {
             <h3 className="text-2xl font-semibold text-gray-800">Save New Material?</h3>
             <p className="text-xl text-gray-600">Material: <span className="font-semibold">{pendingMat.name}</span></p>
             <div className="border border-gray-100 rounded-lg p-3 bg-gray-50 flex flex-col gap-1">
-              {pendingMat.entries.map(e => <p key={e.matId} className="text-xl text-gray-700">{e.matId} — {e.size} (Qty: {e.qty})</p>)}
+              {pendingMat.entries.map(e => <p key={e.matId} className="text-xl text-gray-700">{e.matId} — Starting Qty: {e.qty}</p>)}
             </div>
-            <p className="text-xl text-gray-400 italic">Each size will be saved as a separate entry in the database.</p>
             <div className="flex gap-3 justify-end mt-1">
               <button onClick={() => setShowMatConf(false)} disabled={matSaving} className="px-6 py-2 rounded-full border border-gray-300 text-xl text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50">Cancel</button>
               <button onClick={handleConfirmMat} disabled={matSaving} className={`px-6 py-2 rounded-full text-xl transition-colors ${matSaving ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white'}`}>{matSaving ? 'Saving...' : 'Confirm'}</button>
@@ -1022,7 +1002,7 @@ export default function Inventory() {
             <h3 className="text-2xl font-semibold text-gray-800">New Material Saved!</h3>
             <p className="text-xl text-gray-600">Material: <span className="font-semibold">{pendingMat.name}</span></p>
             <div className="border border-gray-100 rounded-lg p-3 bg-gray-50 flex flex-col gap-1">
-              {pendingMat.entries.map(e => <p key={e.matId} className="text-xl text-gray-700">{e.matId} — {e.size}</p>)}
+              {pendingMat.entries.map(e => <p key={e.matId} className="text-xl text-gray-700">{e.matId} — {pendingMat.name}</p>)}
             </div>
             <div className="flex justify-end mt-1">
               <button onClick={() => { setShowMatOk(false); setShowNewMat(false); resetMat(); }} className="px-6 py-2 rounded-full bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white text-xl transition-colors">Confirm</button>
@@ -1326,6 +1306,12 @@ export default function Inventory() {
                     className="flex-1 border border-gray-300 rounded-lg px-4 py-3 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]" />
                   <span className="text-xl text-gray-500 shrink-0">units</span>
                 </div>
+                {resupMatRow.raw.maxLimit > 0 && (resupMatRow.raw.stock || 0) + (parseInt(resupMatAmount) || 0) > resupMatRow.raw.maxLimit && (
+                  <div className="flex items-center gap-2 text-red-500 mt-1">
+                    <AlertTriangle size={16} />
+                    <span className="text-lg">Maximum limit of {resupMatRow.raw.maxLimit} units reached.</span>
+                  </div>
+                )}
               </div>
               <div className="text-center px-4">
                 <p className="text-xl font-semibold text-gray-700 mb-2">Reminder</p>
@@ -1335,7 +1321,9 @@ export default function Inventory() {
                     : 'No maximum limit is set for this material. You may set one via the Edit action.'}
                 </p>
               </div>
-              <button onClick={() => setShowResupMatConf(true)} className="w-full bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white py-3.5 rounded-xl text-xl font-semibold transition-colors">Confirm</button>
+              <button onClick={() => setShowResupMatConf(true)}
+                disabled={resupMatRow.raw.maxLimit > 0 && (resupMatRow.raw.stock || 0) + (parseInt(resupMatAmount) || 0) > resupMatRow.raw.maxLimit}
+                className="w-full bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white py-3.5 rounded-xl text-xl font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed">Confirm</button>
             </div>
           </div>
         </div>
@@ -1397,10 +1385,18 @@ export default function Inventory() {
                         <input type="date" value={resupIngExpDate} onChange={e => setResupIngExpDate(e.target.value)}
                           className="flex-1 border border-gray-300 rounded-lg px-4 py-3 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]" />
                       </div>
-                      <div className="flex items-center gap-4">
-                        <label className="text-xl text-gray-600 shrink-0">Batch quantity:</label>
-                        <input type="number" min="0" value={resupIngQty} onChange={e => setResupIngQty(e.target.value)}
-                          className="w-40 border border-gray-300 rounded-lg px-4 py-3 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]" />
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center gap-4">
+                          <label className="text-xl text-gray-600 shrink-0">Batch quantity:</label>
+                          <input type="number" min="0" value={resupIngQty} onChange={e => setResupIngQty(e.target.value)}
+                            className="w-40 border border-gray-300 rounded-lg px-4 py-3 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]" />
+                        </div>
+                        {resupIngRow.raw.maxLimit > 0 && (resupIngRow.raw.batches || []).reduce((s, b) => s + (b.quantity || 0), 0) + (parseInt(resupIngQty) || 0) > resupIngRow.raw.maxLimit && (
+                          <div className="flex items-center gap-2 text-red-500">
+                            <AlertTriangle size={16} />
+                            <span className="text-lg">Maximum limit of {resupIngRow.raw.maxLimit} {resupIngRow.raw.unit || 'units'} reached.</span>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -1413,7 +1409,9 @@ export default function Inventory() {
                         : 'No maximum limit is set.'}
                     </p>
                   </div>
-                  <button onClick={() => setShowResupIngConf(true)} className="w-full bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white py-3.5 rounded-xl text-xl font-semibold transition-colors">Confirm</button>
+                  <button onClick={() => setShowResupIngConf(true)}
+                    disabled={resupIngRow.raw.maxLimit > 0 && (resupIngRow.raw.batches || []).reduce((s, b) => s + (b.quantity || 0), 0) + (parseInt(resupIngQty) || 0) > resupIngRow.raw.maxLimit}
+                    className="w-full bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white py-3.5 rounded-xl text-xl font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed">Confirm</button>
                 </>
               )}
             </div>
@@ -1513,6 +1511,12 @@ export default function Inventory() {
                       className="flex-1 border border-gray-300 rounded-lg px-4 py-3 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]" />
                     <span className="text-xl text-gray-500 shrink-0">units</span>
                   </div>
+                  {adjRow.raw.maxLimit > 0 && (parseInt(adjMatQty) || 0) > adjRow.raw.maxLimit && (
+                    <div className="flex items-center gap-2 text-red-500">
+                      <AlertTriangle size={16} />
+                      <span className="text-lg">Maximum limit of {adjRow.raw.maxLimit} units reached.</span>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="flex flex-col gap-5">
@@ -1558,6 +1562,12 @@ export default function Inventory() {
                         />
                         <span className="text-xl text-gray-500 shrink-0">{adjRow.raw.unit || 'units'}</span>
                       </div>
+                      {adjRow.raw.maxLimit > 0 && adjIngBatches.reduce((s, b) => s + (parseInt(b.newQty ?? b.quantity) || 0), 0) > adjRow.raw.maxLimit && (
+                        <div className="flex items-center gap-2 text-red-500">
+                          <AlertTriangle size={16} />
+                          <span className="text-lg">Maximum limit of {adjRow.raw.maxLimit} {adjRow.raw.unit || 'units'} reached.</span>
+                        </div>
+                      )}
                     </>
                   )}
                 </div>
@@ -1571,7 +1581,13 @@ export default function Inventory() {
                   className="w-full border border-gray-300 rounded-lg px-4 py-3 text-xl text-gray-700 outline-none focus:border-[#3ca4c7] resize-none"
                 />
               </div>
-              <button onClick={() => setShowAdjConf(true)} className="w-full bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white py-3.5 rounded-xl text-xl font-semibold transition-colors">Confirm</button>
+              <button onClick={() => setShowAdjConf(true)}
+                disabled={
+                  adjRow._type === 'material'
+                    ? adjRow.raw.maxLimit > 0 && (parseInt(adjMatQty) || 0) > adjRow.raw.maxLimit
+                    : adjRow.raw.maxLimit > 0 && adjIngBatches.reduce((s, b) => s + (parseInt(b.newQty ?? b.quantity) || 0), 0) > adjRow.raw.maxLimit
+                }
+                className="w-full bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white py-3.5 rounded-xl text-xl font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed">Confirm</button>
             </div>
           </div>
         </div>
@@ -1684,7 +1700,7 @@ export default function Inventory() {
               {editRow._type === 'material' && (
                 <div className="text-center px-4">
                   <p className="text-xl font-semibold text-gray-700 mb-2">Note</p>
-                  <p className="text-xl text-gray-500">Changes to the name and maximum limit will apply to all sizes of this material.</p>
+                  <p className="text-xl text-gray-500">Changes to the name and maximum limit will be saved immediately.</p>
                 </div>
               )}
               <button onClick={() => setShowEditConf(true)} className="w-full bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white py-3.5 rounded-xl text-xl font-semibold transition-colors">Save Changes</button>

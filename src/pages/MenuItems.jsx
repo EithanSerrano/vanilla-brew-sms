@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { collection, getDocs, doc, addDoc, updateDoc, query, orderBy } from 'firebase/firestore';
 import { db } from '../firebase';
 import {
-  Search, Filter, Plus, X, RefreshCw,
+  Search, Filter, Plus, X, RefreshCw, AlignJustify,
   ChevronLeft, ChevronRight, ChevronsLeft, Trash2, Loader,
 } from 'lucide-react';
 import AdminSidebar from '../layouts/AdminSidebar';
@@ -85,6 +85,9 @@ export default function MenuItems() {
   const [categories,  setCategories]  = useState([]);
   const [showInactive,  setShowInactive]  = useState(false);
   const [searchQuery,   setSearchQuery]   = useState('');
+  const [sortField,     setSortField]     = useState('menuItemId');
+  const [sortDir,       setSortDir]       = useState('asc');
+  const [showArrange,   setShowArrange]   = useState(false);
 
   // ── Filters ──
   const [showFilterPanel, setShowFilterPanel] = useState(false);
@@ -135,6 +138,11 @@ export default function MenuItems() {
     } catch (e) { console.error('MenuItems load error:', e); }
   };
   useEffect(() => { loadData(); }, []);
+  useEffect(() => {
+    const close = () => setShowArrange(false);
+    document.addEventListener('click', close);
+    return () => document.removeEventListener('click', close);
+  }, []);
 
   // ── Derived ──
   const sortedCategories = (() => {
@@ -166,6 +174,22 @@ export default function MenuItems() {
     .filter(m => {
       if (!filterStatus) return true;
       return computeMenuStatus(m, ingredients, materials) === filterStatus;
+    })
+    .sort((a, b) => {
+      let av, bv;
+      if (sortField === 'name') {
+        av = (a.name || '').toLowerCase();
+        bv = (b.name || '').toLowerCase();
+      } else if (sortField === 'category') {
+        av = (a.category || '').toLowerCase();
+        bv = (b.category || '').toLowerCase();
+      } else {
+        av = a.menuItemId || '';
+        bv = b.menuItemId || '';
+      }
+      if (av < bv) return sortDir === 'asc' ? -1 : 1;
+      if (av > bv) return sortDir === 'asc' ? 1 : -1;
+      return 0;
     });
 
   const clearFilters = () => { setFilterCategory(''); setFilterStatus(''); };
@@ -498,6 +522,45 @@ export default function MenuItems() {
                         </div>
                       </div>
                     )}
+                  </div>
+                )}
+              </div>
+              <div className="relative shrink-0">
+                <button
+                  onClick={e => { e.stopPropagation(); setShowArrange(v => !v); }}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-full text-xl transition-colors shrink-0 ${
+                    showArrange ? 'bg-[#3ca4c7] text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
+                  }`}
+                >
+                  <AlignJustify size={16} /> Arrange
+                </button>
+                {showArrange && (
+                  <div
+                    className="absolute right-0 top-11 bg-white border border-gray-200 rounded-xl shadow-lg z-30 w-56 py-2"
+                    onClick={e => e.stopPropagation()}
+                  >
+                    <p className="px-4 pt-1 pb-2 text-lg font-semibold text-gray-500 uppercase tracking-wide border-b border-gray-100">Sort by</p>
+                    {[
+                      { field: 'menuItemId', labelAsc: 'ID (A → Z)',       labelDesc: 'ID (Z → A)' },
+                      { field: 'name',       labelAsc: 'Name (A → Z)',      labelDesc: 'Name (Z → A)' },
+                      { field: 'category',   labelAsc: 'Category (A → Z)',  labelDesc: 'Category (Z → A)' },
+                    ].map(({ field, labelAsc, labelDesc }) => (
+                      <div key={field}>
+                        {[{ dir: 'asc', label: labelAsc }, { dir: 'desc', label: labelDesc }].map(({ dir, label }) => (
+                          <button
+                            key={dir}
+                            onClick={() => { setSortField(field); setSortDir(dir); setShowArrange(false); }}
+                            className={`w-full px-4 py-2.5 text-left text-xl transition-colors ${
+                              sortField === field && sortDir === dir
+                                ? 'text-[#3ca4c7] font-semibold bg-blue-50'
+                                : 'text-gray-700 hover:bg-gray-50'
+                            }`}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
