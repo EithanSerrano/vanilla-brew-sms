@@ -7,7 +7,7 @@ import {
   LayoutGrid, Package, FolderCog, Coffee, Users, Tag,
   FileText, ScrollText, Settings, Info,
   HelpCircle, LogOut, ChevronDown, ChevronUp,
-  QrCode, UserCircle, Percent
+  QrCode, UserCircle, Percent, Database,
 } from 'lucide-react';
 
 function NavItem({ to, icon, label, end = false }) {
@@ -166,8 +166,9 @@ export default function AdminSidebar() {
         {maintenanceOpen && (
           <div className="flex flex-col gap-0.5">
             <SubNavItem to="/admin-maintenance" icon={<ScrollText size={15} />} label="Audit Logs" />
-            <SubNavItem to="/documents" icon={<FileText size={15} />} label="Documents" />
+            <SubNavItem to="/documents" icon={<FileText size={15} />} label="Reports" />
             <SubNavItem to="/payment-qr" icon={<QrCode size={15} />} label="Payment QR" />
+            <SubNavItem to="/backup-recovery" icon={<Database size={15} />} label="Backup & Recovery" />
           </div>
         )}
 

@@ -672,7 +672,7 @@ export default function Documents() {
 
         {/* ── Header ── */}
         <div className="mb-5 shrink-0">
-          <h1 className="text-3xl font-bold text-gray-900 mb-3">Documents</h1>
+          <h1 className="text-3xl font-bold text-gray-900 mb-3">Reports</h1>
           <div className="flex items-center justify-between">
             {/* Search */}
             <div className="flex items-center gap-2 border-b border-gray-300 pb-1 flex-1 mr-6">

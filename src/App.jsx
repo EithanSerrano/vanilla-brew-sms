@@ -30,6 +30,7 @@ import About from "./pages/About";
 import Settings from "./pages/Settings";
 import Account from "./pages/Account";
 import PaymentQR from "./pages/PaymentQR";
+import BackupRecovery from "./pages/BackupRecovery";
 
 function RootLayout() {
   useEffect(() => {
@@ -69,6 +70,7 @@ const router = createBrowserRouter([
       { path: "/admin-settings",    element: <Settings role="admin" /> },
       { path: "/admin-account",     element: <Account role="admin" /> },
       { path: "/payment-qr",        element: <PaymentQR /> },
+      { path: "/backup-recovery",   element: <BackupRecovery /> },
 
       // Staff routes
       { path: "/staff",             element: <StaffHome /> },

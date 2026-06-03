@@ -20,7 +20,10 @@ function generatePassword() {
 function fmtDate(ts) {
   if (!ts) return '—';
   const d = ts.toDate ? ts.toDate() : new Date(ts);
-  return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('en-US');
+  if (isNaN(d.getTime())) return '—';
+ 
+  // Shows Date AND exact Time perfectly
+  return `${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} at ${d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;
 }
 
 
@@ -171,22 +174,22 @@ export default function AdminRegistration() {
 
 
       // --- SEND WELCOME EMAIL WITH EMAILJS ---
-try {
-  await emailjs.send(
-    'service_n5mgbkx',     // Your EmailJS Service ID
-    'template_hsvtggg',    // Your EmailJS Template ID
-    {
-      fullName: pendingAccount.fullName, // Matches {{fullName}} in EmailJS
-      email: pendingAccount.email,       // Matches {{email}} in EmailJS
-      empId: pendingAccount.empId,       // Matches {{empId}} in EmailJS
-      password: password,                 // Matches {{password}} in EmailJS
-    },
-    'jzCDdLVx4vyXA8oVy'      // Your EmailJS Public Key
-  );
-  console.log("Welcome email sent successfully via EmailJS!");
-} catch (emailErr) {
-  console.error("Failed to send welcome email via EmailJS:", emailErr);
-}
+      try {
+        await emailjs.send(
+          'service_n5mgbkx',     // Your EmailJS Service ID
+          'template_hsvtggg',    // Your EmailJS Template ID
+          {
+            fullName: pendingAccount.fullName, // Matches {{fullName}} in EmailJS
+            email: pendingAccount.email,       // Matches {{email}} in EmailJS
+            empId: pendingAccount.empId,       // Matches {{empId}} in EmailJS
+            password: password,                 // Matches {{password}} in EmailJS
+          },
+          'jzCDdLVx4vyXA8oVy'      // Your EmailJS Public Key
+        );
+        console.log("Welcome email sent successfully via EmailJS!");
+      } catch (emailErr) {
+        console.error("Failed to send welcome email via EmailJS:", emailErr);
+      }
       // -------------------------------------------
 
 
@@ -701,4 +704,6 @@ try {
     </div>
   );
 }
+
+
 
