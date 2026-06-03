@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { collection, getDocs, addDoc, query, orderBy } from 'firebase/firestore';
-import { db } from '../firebase';
+import { collection, getDocs, doc, getDoc, addDoc, query, orderBy } from 'firebase/firestore';
+import { db, auth } from '../firebase';
 import { Plus, X, Tag, RefreshCw } from 'lucide-react';
 import AdminSidebar from '../layouts/AdminSidebar';
 
@@ -61,6 +61,20 @@ export default function MenuCategories() {
   const isDuplicate = name =>
     categories.some(c => c.name.trim().toLowerCase() === name.trim().toLowerCase());
 
+  const logAudit = async (action, itemId, itemName, details = {}) => {
+    try {
+      let performedBy = 'Unknown';
+      const currentUser = auth.currentUser;
+      if (currentUser) {
+        const snap = await getDoc(doc(db, 'users', currentUser.uid));
+        if (snap.exists()) performedBy = snap.data().name || 'Unknown';
+      }
+      await addDoc(collection(db, 'auditlog'), {
+        action, itemType: 'category', itemId, itemName, details, performedBy, timestamp: new Date(),
+      });
+    } catch (e) { console.error('Audit log error:', e); }
+  };
+
   // ── New Category handlers ──
   const handleOpenForm = () => {
     setCatName(''); setIsParent(false); setSubNames(['']); setNameError(''); setShowForm(true);
@@ -94,6 +108,9 @@ export default function MenuCategories() {
       await Promise.all(filledSubs.map(sub =>
         addDoc(collection(db, 'categories'), { name: sub, isParent: false, parentId: parentRef.id })
       ));
+      await logAudit('ADD_CATEGORY', parentRef.id, catName.trim(), {
+        isParent, subcategories: filledSubs,
+      });
       await loadData();
       setShowConfirm(false);
       setShowForm(false);
@@ -119,10 +136,13 @@ export default function MenuCategories() {
   const handleSubConfirm = async () => {
     setSubSaving(true);
     try {
-      await addDoc(collection(db, 'categories'), {
+      const subRef = await addDoc(collection(db, 'categories'), {
         name: subName.trim(),
         isParent: false,
         parentId: subParent.id,
+      });
+      await logAudit('ADD_SUBCATEGORY', subRef.id, subName.trim(), {
+        parentCategory: subParent.name, parentId: subParent.id,
       });
       await loadData();
       setShowSubConfirm(false);

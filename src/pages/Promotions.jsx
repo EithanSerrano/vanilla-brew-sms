@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { collection, getDocs, doc, addDoc, updateDoc, deleteDoc, getDoc } from 'firebase/firestore';
 import { db, auth } from '../firebase';
-import { Search, Plus, X, RefreshCw, MoreVertical } from 'lucide-react';
+import { Search, Plus, X, RefreshCw, Filter, AlignJustify } from 'lucide-react';
 import AdminSidebar from '../layouts/AdminSidebar';
 
 function fmtDate(ts) {
@@ -29,8 +29,12 @@ export default function Promotions() {
   const [promos,       setPromos]       = useState([]);
   const [menuItems,    setMenuItems]    = useState([]);
   const [searchQuery,  setSearchQuery]  = useState('');
-  const [showInactive, setShowInactive] = useState(false);
-  const [openDropdownId, setOpenDropdownId] = useState(null);
+  const [showInactive,    setShowInactive]    = useState(false);
+  const [showArrange,     setShowArrange]     = useState(false);
+  const [sortField,       setSortField]       = useState('promoId');
+  const [sortDir,         setSortDir]         = useState('asc');
+  const [showFilterPanel, setShowFilterPanel] = useState(false);
+  const [filterMenuItem,  setFilterMenuItem]  = useState('');
 
   // ── Form ──
   const [showForm,        setShowForm]        = useState(false);
@@ -69,7 +73,7 @@ export default function Promotions() {
   };
   useEffect(() => { loadData(); }, []);
   useEffect(() => {
-    const close = () => setOpenDropdownId(null);
+    const close = () => { setShowArrange(false); setShowFilterPanel(false); };
     document.addEventListener('click', close);
     return () => document.removeEventListener('click', close);
   }, []);
@@ -80,6 +84,9 @@ export default function Promotions() {
     ? (selectedItem.variants || selectedItem.sizes || []).filter(v => v.name?.trim())
     : [];
 
+  const menuItemOptions = [...new Set(promos.map(p => p.menuItemName).filter(Boolean))].sort();
+  const isFiltered = !!filterMenuItem;
+
   const displayed = promos
     .filter(p => showInactive ? p.isActive === false : p.isActive !== false)
     .filter(p =>
@@ -88,7 +95,22 @@ export default function Promotions() {
       (p.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
       (p.menuItemName || '').toLowerCase().includes(searchQuery.toLowerCase())
     )
-    .sort((a, b) => (a.promoId || '').localeCompare(b.promoId || ''));
+    .filter(p => !filterMenuItem || p.menuItemName === filterMenuItem)
+    .sort((a, b) => {
+      let av, bv;
+      if (sortField === 'name') {
+        av = (a.name || '').toLowerCase(); bv = (b.name || '').toLowerCase();
+      } else if (sortField === 'menuItemName') {
+        av = (a.menuItemName || '').toLowerCase(); bv = (b.menuItemName || '').toLowerCase();
+      } else if (sortField === 'bundlePrice') {
+        av = a.bundlePrice ?? 0; bv = b.bundlePrice ?? 0;
+      } else {
+        av = a.promoId || ''; bv = b.promoId || '';
+      }
+      if (av < bv) return sortDir === 'asc' ? -1 : 1;
+      if (av > bv) return sortDir === 'asc' ? 1 : -1;
+      return 0;
+    });
 
   // ── Form helpers ──
   const formHasData = () => promoName.trim() !== '' || selectedItemId !== '' || bundlePrice !== '';
@@ -204,32 +226,137 @@ export default function Promotions() {
       <main className="flex-1 bg-white overflow-hidden flex flex-col p-8 gap-5">
 
         {/* Header */}
-        <div className="flex items-center justify-between shrink-0">
-          <h1 className="text-3xl font-bold text-gray-800">Promotions</h1>
-          <div className="flex items-center gap-3">
-            {/* Active / Archived toggle */}
-            <button
-              onClick={() => setShowInactive(v => !v)}
-              className={`relative w-11 h-6 rounded-full transition-colors shrink-0 ${showInactive ? 'bg-red-400' : 'bg-green-400'}`}
-            >
-              <span className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-all ${showInactive ? 'left-6' : 'left-1'}`} />
-            </button>
-            <span className="text-xl text-gray-600 shrink-0">
-              {showInactive ? 'Showing Archived List' : 'Showing Active List'}
-            </span>
-
-            {!showInactive && (
+        <div className="shrink-0">
+          <h1 className="text-3xl font-bold text-gray-900 mb-3">Promotions</h1>
+          <div className="flex items-center justify-between">
+            {/* Left — toggle */}
+            <div className="flex items-center gap-3">
               <button
-                onClick={openNew}
-                className="flex items-center gap-1.5 bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white px-4 py-2 rounded-full text-xl transition-colors shrink-0"
+                onClick={() => setShowInactive(v => !v)}
+                className={`relative w-11 h-6 rounded-full transition-colors shrink-0 ${showInactive ? 'bg-red-400' : 'bg-green-400'}`}
               >
-                <Plus size={16} /> New Promo
+                <span className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-all ${showInactive ? 'left-6' : 'left-1'}`} />
               </button>
-            )}
-            <button onClick={loadData} className="text-gray-400 hover:text-gray-600 p-1 shrink-0">
-              <RefreshCw size={20} />
-            </button>
+              <span className="text-xl text-gray-600 shrink-0">
+                {showInactive ? 'Showing Archived List' : 'Showing Active List'}
+              </span>
+            </div>
+
+            {/* Right — Filter, Arrange, New Promo, Refresh */}
+            <div className="flex items-center gap-3">
+
+              {/* Filter */}
+              <div className="relative shrink-0">
+                <button
+                  onClick={e => { e.stopPropagation(); setShowFilterPanel(v => !v); setShowArrange(false); }}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-full text-xl transition-colors ${
+                    isFiltered || showFilterPanel
+                      ? 'bg-[#3ca4c7] text-white hover:bg-[#2b8aa8]'
+                      : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
+                  }`}
+                >
+                  <Filter size={16} /> Filter List
+                </button>
+                {showFilterPanel && (
+                  <div
+                    className="absolute right-0 top-full mt-2 bg-white border border-gray-200 rounded-xl shadow-xl z-30 w-60 overflow-hidden"
+                    onClick={e => e.stopPropagation()}
+                  >
+                    <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+                      <span className="text-xl font-semibold text-gray-700">Filter</span>
+                      {isFiltered && (
+                        <button
+                          onClick={() => { setFilterMenuItem(''); setShowFilterPanel(false); }}
+                          className="text-xl text-red-400 hover:text-red-600 transition-colors"
+                        >Clear all</button>
+                      )}
+                    </div>
+                    <div className="px-4 pt-3 pb-3">
+                      <p className="text-lg font-medium text-gray-500 mb-1.5">Menu Item</p>
+                      <div className="flex flex-col max-h-48 overflow-y-auto">
+                        {menuItemOptions.map(name => (
+                          <button
+                            key={name}
+                            onClick={() => { setFilterMenuItem(filterMenuItem === name ? '' : name); setShowFilterPanel(false); }}
+                            className={`w-full text-left px-3 py-2 text-xl rounded-lg transition-colors ${
+                              filterMenuItem === name
+                                ? 'bg-[#3ca4c7]/10 text-[#3ca4c7] font-medium'
+                                : 'text-gray-700 hover:bg-gray-50'
+                            }`}
+                          >{name}</button>
+                        ))}
+                        {menuItemOptions.length === 0 && (
+                          <p className="text-xl text-gray-400 px-3 py-2">No items yet.</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Arrange */}
+              <div className="relative shrink-0">
+                <button
+                  onClick={e => { e.stopPropagation(); setShowArrange(v => !v); setShowFilterPanel(false); }}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-full text-xl transition-colors ${
+                    showArrange ? 'bg-[#3ca4c7] text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
+                  }`}
+                >
+                  <AlignJustify size={16} /> Arrange
+                </button>
+                {showArrange && (
+                  <div
+                    className="absolute right-0 top-11 bg-white border border-gray-200 rounded-xl shadow-lg z-30 w-60 py-2"
+                    onClick={e => e.stopPropagation()}
+                  >
+                    <p className="px-4 pt-1 pb-2 text-lg font-semibold text-gray-500 uppercase tracking-wide border-b border-gray-100">Sort by</p>
+                    {[
+                      { field: 'promoId',      labelAsc: 'ID (A → Z)',              labelDesc: 'ID (Z → A)' },
+                      { field: 'name',         labelAsc: 'Name (A → Z)',             labelDesc: 'Name (Z → A)' },
+                      { field: 'menuItemName', labelAsc: 'Menu Item (A → Z)',        labelDesc: 'Menu Item (Z → A)' },
+                      { field: 'bundlePrice',  labelAsc: 'Bundle Price (Low → High)',labelDesc: 'Bundle Price (High → Low)' },
+                    ].map(({ field, labelAsc, labelDesc }) => (
+                      <div key={field}>
+                        {[{ dir: 'asc', label: labelAsc }, { dir: 'desc', label: labelDesc }].map(({ dir, label }) => (
+                          <button
+                            key={dir}
+                            onClick={() => { setSortField(field); setSortDir(dir); setShowArrange(false); }}
+                            className={`w-full px-4 py-2.5 text-left text-xl transition-colors ${
+                              sortField === field && sortDir === dir
+                                ? 'text-[#3ca4c7] font-semibold bg-blue-50'
+                                : 'text-gray-700 hover:bg-gray-50'
+                            }`}
+                          >{label}</button>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {!showInactive && (
+                <button
+                  onClick={openNew}
+                  className="flex items-center gap-1.5 bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white px-4 py-2 rounded-full text-xl transition-colors shrink-0"
+                >
+                  <Plus size={16} /> New Promo
+                </button>
+              )}
+              <button onClick={loadData} className="text-gray-400 hover:text-gray-600 p-1 shrink-0">
+                <RefreshCw size={20} />
+              </button>
+            </div>
           </div>
+
+          {/* Active filter chips */}
+          {filterMenuItem && (
+            <div className="flex flex-wrap gap-2 mt-3">
+              <span className="flex items-center gap-1.5 bg-[#3ca4c7]/10 text-[#3ca4c7] text-xl font-medium px-3 py-1 rounded-full">
+                {filterMenuItem}
+                <button onClick={() => setFilterMenuItem('')} className="hover:text-[#2b8aa8] transition-colors ml-1"><X size={13} /></button>
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Search */}
@@ -248,9 +375,9 @@ export default function Promotions() {
             <span className="w-[11%] text-xl font-semibold text-gray-800 text-center">ID</span>
             <span className="w-[24%] text-xl font-semibold text-gray-800 text-center">Promo Name</span>
             <span className="w-[19%] text-xl font-semibold text-gray-800 text-center">Menu Item</span>
-            <span className="w-[14%] text-xl font-semibold text-gray-800 text-center">Variant</span>
-            <span className="w-[9%]  text-xl font-semibold text-gray-800 text-center">Buy Qty</span>
-            <span className="w-[13%] text-xl font-semibold text-gray-800 text-center">
+            <span className="w-[13%] text-xl font-semibold text-gray-800 text-center">Variant</span>
+            <span className="w-[10%]  text-xl font-semibold text-gray-800 text-center">Buy Qty</span>
+            <span className="w-[11%] text-xl font-semibold text-gray-800 text-center">
               {showInactive ? 'Date Archived' : 'Bundle Price'}
             </span>
             <span className="flex-1 text-xl font-semibold text-gray-800 text-center">Actions</span>
@@ -275,41 +402,26 @@ export default function Promotions() {
                     <div className="flex-1 flex items-center justify-center gap-2">
                       <button
                         onClick={() => { setRetrieveTarget(promo); setShowRetrieveConf(true); }}
-                        className="bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white px-4 py-1.5 rounded-full text-xl transition-colors"
+                        className="bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white px-3 py-1.5 rounded-full text-xl transition-colors"
                       >Retrieve</button>
                       <button
                         onClick={() => { setDeleteTarget(promo); setShowDeleteConf(true); }}
-                        className="px-4 py-1.5 rounded-full border border-red-200 text-red-400 text-xl hover:bg-red-50 transition-colors"
+                        className="bg-red-400 hover:bg-red-500 text-white px-3 py-1.5 rounded-full text-xl transition-colors"
                       >Delete</button>
                     </div>
                   </>
                 ) : (
                   <>
                     <span className="w-[13%] text-xl text-gray-700 text-center">₱{promo.bundlePrice}</span>
-                    <div className="flex-1 flex items-center justify-center">
-                      <div className="relative">
-                        <button
-                          onClick={e => { e.stopPropagation(); setOpenDropdownId(openDropdownId === promo.id ? null : promo.id); }}
-                          className="p-1.5 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors"
-                        >
-                          <MoreVertical size={18} />
-                        </button>
-                        {openDropdownId === promo.id && (
-                          <div
-                            className="absolute right-0 top-9 bg-white border border-gray-200 rounded-xl shadow-lg z-20 min-w-[140px] py-1"
-                            onClick={e => e.stopPropagation()}
-                          >
-                            <button
-                              onClick={() => { setOpenDropdownId(null); openEdit(promo); }}
-                              className="w-full px-4 py-2.5 text-left text-xl text-gray-700 hover:bg-gray-50 rounded-t-xl"
-                            >Edit</button>
-                            <button
-                              onClick={() => { setOpenDropdownId(null); setArchiveTarget(promo); setShowArchiveConf(true); }}
-                              className="w-full px-4 py-2.5 text-left text-xl text-red-500 hover:bg-gray-50 rounded-b-xl"
-                            >Archive</button>
-                          </div>
-                        )}
-                      </div>
+                    <div className="flex-1 flex items-center justify-center gap-2">
+                      <button
+                        onClick={() => openEdit(promo)}
+                        className="bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white px-3 py-1.5 rounded-full text-xl transition-colors"
+                      >Edit</button>
+                      <button
+                        onClick={() => { setArchiveTarget(promo); setShowArchiveConf(true); }}
+                        className="bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white px-3 py-1.5 rounded-full text-xl transition-colors"
+                      >Archive</button>
                     </div>
                   </>
                 )}

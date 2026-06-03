@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import { collection, getDocs, doc, addDoc, updateDoc, query, orderBy } from 'firebase/firestore';
-import { db } from '../firebase';
+import { collection, getDocs, doc, getDoc, addDoc, updateDoc, query, orderBy } from 'firebase/firestore';
+import { db, auth } from '../firebase';
 import {
   Search, Filter, Plus, X, RefreshCw, AlignJustify,
   ChevronLeft, ChevronRight, ChevronsLeft, Trash2, Loader,
@@ -363,6 +363,20 @@ export default function MenuItems() {
   const [hideSaving, setHideSaving] = useState(false);
   const [retrieveSaving, setRetrieveSaving] = useState(false);
 
+  const logAudit = async (action, itemId, itemName, details = {}) => {
+    try {
+      let performedBy = 'Unknown';
+      const currentUser = auth.currentUser;
+      if (currentUser) {
+        const snap = await getDoc(doc(db, 'users', currentUser.uid));
+        if (snap.exists()) performedBy = snap.data().name || 'Unknown';
+      }
+      await addDoc(collection(db, 'auditlog'), {
+        action, itemType: 'menuItem', itemId, itemName, details, performedBy, timestamp: new Date(),
+      });
+    } catch (e) { console.error('Audit log error:', e); }
+  };
+
   const handleConfirmSave = async () => {
     if (!pendingMenu || menuSavingRef.current) return;
     menuSavingRef.current = true;
@@ -376,6 +390,10 @@ export default function MenuItems() {
           variants:  pendingMenu.variants,
           updatedAt: new Date(),
         });
+        await logAudit('EDIT_MENU_ITEM', editingItem.menuItemId || editingItem.id, pendingMenu.name, {
+          category: pendingMenu.category,
+          variantCount: (pendingMenu.variants || []).length,
+        });
       } else {
         await addDoc(collection(db, 'menuItems'), {
           menuItemId:  pendingMenu.menuItemId,
@@ -387,6 +405,10 @@ export default function MenuItems() {
           variants:    pendingMenu.variants,
           createdAt:   new Date(),
           hiddenAt:    null,
+        });
+        await logAudit('ADD_MENU_ITEM', pendingMenu.menuItemId, pendingMenu.name, {
+          category: pendingMenu.category,
+          variantCount: (pendingMenu.variants || []).length,
         });
       }
       await loadData();
@@ -403,7 +425,13 @@ export default function MenuItems() {
   // AVAILABILITY TOGGLE
   // ════════════════════════════════════
   const handleToggleAvailability = async item => {
-    await updateDoc(doc(db, 'menuItems', item.id), { isAvailable: item.isAvailable === false });
+    const newAvail = item.isAvailable === false;
+    await updateDoc(doc(db, 'menuItems', item.id), { isAvailable: newAvail });
+    await logAudit(
+      newAvail ? 'SET_AVAILABLE' : 'SET_UNAVAILABLE',
+      item.menuItemId || item.id, item.name,
+      { isAvailable: newAvail }
+    );
     await loadData();
   };
 
@@ -415,6 +443,7 @@ export default function MenuItems() {
     setHideSaving(true);
     try {
       await updateDoc(doc(db, 'menuItems', hideRow.id), { isActive: false, hiddenAt: new Date() });
+      await logAudit('HIDE_MENU_ITEM', hideRow.menuItemId || hideRow.id, hideRow.name, {});
       setShowHideConf(false); setHideRow(null); await loadData();
     } finally {
       setHideSaving(false);
@@ -429,6 +458,7 @@ export default function MenuItems() {
     setRetrieveSaving(true);
     try {
       await updateDoc(doc(db, 'menuItems', retrieveRow.id), { isActive: true, hiddenAt: null });
+      await logAudit('RETRIEVE_MENU_ITEM', retrieveRow.menuItemId || retrieveRow.id, retrieveRow.name, {});
       setShowRetrieveConf(false); setRetrieveRow(null); await loadData();
     } finally {
       setRetrieveSaving(false);
