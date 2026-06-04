@@ -102,36 +102,12 @@ export default function Login() {
   const handleLogin = async (e) => {
     e.preventDefault();
     if (lockoutUntil > Date.now()) return;
-   
+
     setUsernameError('');
     setPasswordError('');
-   
+
     const trimmedUsername = credentials.username.trim();
-    let isValid = true;
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-
-    if (trimmedUsername.length < 6 || trimmedUsername.length > 254 || !emailRegex.test(trimmedUsername)) {
-      setUsernameError("Invalid email (6-254 chars)");
-      isValid = false;
-    }
-    if (credentials.password.length < 8 || credentials.password.length > 64) {
-      setPasswordError("Password must be 8-64 chars");
-      isValid = false;
-    }
-
-
-    if (!isValid) {
-      const newAttempts = attempts + 1;
-      setAttempts(newAttempts);
-
-      if (newAttempts >= 3) {
-        setLockoutUntil(Date.now() + 300000);
-        setCredFailed(true);
-      }
-      return;
-    }
-   
     setIsLoggingIn(true);
     try {
       const userCredential = await signInWithEmailAndPassword(auth, trimmedUsername, credentials.password);
