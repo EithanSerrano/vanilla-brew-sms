@@ -7,7 +7,6 @@ import {
 } from 'lucide-react';
 import AdminSidebar from '../layouts/AdminSidebar';
 
-const LEVELS = [0, 25, 50, 75, 100];
 const EXPIRING_DAYS = 7;
 
 function sizePrefix(size) { return size ? `(${size[0]}) ` : ''; }
@@ -99,13 +98,13 @@ export default function MenuItems() {
   const [editingItem,  setEditingItem]  = useState(null);
   const [menuName,     setMenuName]     = useState('');
   const [menuCategory, setMenuCategory] = useState('');
-  const [variants,     setVariants]     = useState([{ name: '', price: '' }]);
-  const [addOns,       setAddOns]       = useState([]);
+  // variantSelections: [{name, checked, price, connections, isLegacy?}]
+  const [variantSelections, setVariantSelections] = useState([]);
+  const [addOns,            setAddOns]            = useState([]);
 
   // ── New / Edit — Step 2 ──
   const [showStep2,         setShowStep2]         = useState(false);
   const [currentVariantIdx, setCurrentVariantIdx] = useState(0);
-  const [connections,       setConnections]       = useState([[]]);
 
   // ── Confirmation / discard ──
   const [pendingMenu,  setPendingMenu]  = useState(null);
@@ -194,107 +193,45 @@ export default function MenuItems() {
 
   const clearFilters = () => { setFilterCategory(''); setFilterStatus(''); };
 
-  // ════════════════════════════════════
-  // FORM HELPERS
-  // ════════════════════════════════════
-  const validVariants = variants
-    .map((v, i) => ({ ...v, origIdx: i }))
-    .filter(v => v.name.trim());
+  // ── Variant selection helpers ──
+  const checkedVariants  = variantSelections.filter(v => v.checked);
+  const currentVariantEntry = checkedVariants[currentVariantIdx];
+  const currentConns        = currentVariantEntry?.connections || [];
+  const currentVsIdx        = currentVariantEntry ? variantSelections.indexOf(currentVariantEntry) : -1;
 
-  const step1HasData = () =>
-    menuName.trim() !== '' ||
-    variants.some(v => v.name.trim() || v.price) ||
-    addOns.length > 0;
+  const toggleVariant = (i) =>
+    setVariantSelections(prev => prev.map((vs, idx) =>
+      idx === i ? { ...vs, checked: !vs.checked, price: vs.checked ? '' : vs.price } : vs
+    ));
 
-  const resetAll = () => {
-    setMenuName(''); setMenuCategory(categories.find(c => !c.parentId)?.name || categories[0]?.name || '');
-    setVariants([{ name: '', price: '' }]); setAddOns([]);
-    setConnections([[]]); setCurrentVariantIdx(0);
-    setPendingMenu(null); setEditingItem(null);
+  const updateVariantPrice = (i, price) =>
+    setVariantSelections(prev => prev.map((vs, idx) => idx === i ? { ...vs, price } : vs));
+
+  // ── Connection helpers ──
+  const addConn = type => {
+    if (currentVsIdx < 0) return;
+    setVariantSelections(prev => prev.map((v, i) =>
+      i === currentVsIdx
+        ? { ...v, connections: [...v.connections, { type, refId: '', name: '', amount: '', unit: '' }] }
+        : v
+    ));
   };
-
-  const handleCloseStep1 = () => {
-    (editingItem || step1HasData()) ? setShowDiscard(true) : (setShowStep1(false), resetAll());
+  const removeConn = idx => {
+    if (currentVsIdx < 0) return;
+    setVariantSelections(prev => prev.map((v, i) =>
+      i === currentVsIdx
+        ? { ...v, connections: v.connections.filter((_, j) => j !== idx) }
+        : v
+    ));
   };
-
-  const addVariant = () => {
-    setVariants(p => [...p, { name: '', price: '' }]);
-    setConnections(p => [...p, []]);
+  const updateConn = (idx, changes) => {
+    if (currentVsIdx < 0) return;
+    setVariantSelections(prev => prev.map((v, i) =>
+      i === currentVsIdx
+        ? { ...v, connections: v.connections.map((c, j) => j === idx ? { ...c, ...changes } : c) }
+        : v
+    ));
   };
-  const removeVariant = i => {
-    if (variants.length <= 1) return;
-    setVariants(p => p.filter((_, idx) => idx !== i));
-    setConnections(p => p.filter((_, idx) => idx !== i));
-  };
-  const updateVariant = (i, field, val) =>
-    setVariants(p => p.map((v, idx) => idx === i ? { ...v, [field]: val } : v));
-
-  // ════════════════════════════════════
-  // OPEN EDIT
-  // ════════════════════════════════════
-  const handleOpenEdit = (item) => {
-    setEditingItem(item);
-    setMenuName(item.name || '');
-    setMenuCategory(item.category || categories.find(c => !c.parentId)?.name || categories[0]?.name || '');
-
-    // Reconstruct variants (support legacy 'sizes' field)
-    const srcVariants = item.variants || (item.sizes || []).map(s => ({ name: s.size, price: s.price, connections: s.connections }));
-    const newVariants = srcVariants.map(v => ({ name: v.name || '', price: String(v.price ?? '') }));
-    setVariants(newVariants.length ? newVariants : [{ name: '', price: '' }]);
-
-    // Reconstruct connections parallel to variants
-    const newConns = srcVariants.map(v =>
-      (v.connections || []).map(c => ({
-        type: c.type, refId: c.refId || '', name: c.name || '',
-        amount: String(c.amount ?? ''), unit: c.unit || '',
-      }))
-    );
-    setConnections(newConns.length ? newConns : [[]]);
-
-    // Reconstruct add-ons
-    setAddOns((item.addOns || []).map(a => ({
-      ingredientId: a.ingredientId || '',
-      name:         a.name || '',
-      amount:       String(a.amount ?? ''),
-      price:        String(a.price ?? ''),
-    })));
-
-    setShowStep1(true);
-  };
-
-  // ════════════════════════════════════
-  // ADD-ONS
-  // ════════════════════════════════════
-  const addAddOn = () => setAddOns(p => [...p, { ingredientId: '', name: '', amount: '', price: '' }]);
-  const removeAddOn = i => setAddOns(p => p.filter((_, idx) => idx !== i));
-  const updateAddOn = (i, field, val) => setAddOns(p => p.map((a, idx) => idx === i ? { ...a, [field]: val } : a));
-  const handleSelectAddOnIng = (i, ingId) => {
-    const ing = addOnIngredients.find(x => x.id === ingId);
-    setAddOns(p => p.map((a, idx) => idx === i ? { ...a, ingredientId: ingId, name: ing?.name || '' } : a));
-  };
-
-  const handleNextStep = () => {
-    if (!menuName.trim() || validVariants.length === 0) return;
-    setCurrentVariantIdx(0);
-    setShowStep1(false);
-    setShowStep2(true);
-  };
-
-  // ════════════════════════════════════
-  // CONNECTIONS
-  // ════════════════════════════════════
-  const currentVariantEntry = validVariants[currentVariantIdx];
-  const currentConns = connections[currentVariantEntry?.origIdx ?? 0] || [];
-
-  const addConn = type => setConnections(p =>
-    p.map((c, i) => i === (currentVariantEntry?.origIdx ?? 0) ? [...c, { type, refId: '', name: '', amount: '', unit: '' }] : c)
-  );
-  const removeConn = idx => setConnections(p =>
-    p.map((c, i) => i === (currentVariantEntry?.origIdx ?? 0) ? c.filter((_, j) => j !== idx) : c)
-  );
-  const updateConn = (idx, changes) => setConnections(p =>
-    p.map((c, i) => i === (currentVariantEntry?.origIdx ?? 0) ? c.map((conn, j) => j === idx ? { ...conn, ...changes } : conn) : c)
-  );
 
   const handleSelectConnIng = (idx, ingId) => {
     const ing = activeIngredients.find(x => x.id === ingId);
@@ -305,11 +242,116 @@ export default function MenuItems() {
     updateConn(idx, { refId: matId, name: mat ? `${sizePrefix(mat.size)}${mat.name}` : '', unit: 'pieces' });
   };
 
+  // ── Build variantSelections from a category name ──
+  const buildSelectionsFromCategory = (catName, existingVariants = []) => {
+    const cat = categories.find(c => c.name === catName);
+    const catVars = cat?.variants || [];
+    const catVarNames = new Set(catVars.map(v => v.name));
+
+    const selections = catVars.map(cv => {
+      const existing = existingVariants.find(v => (v.name || v.size) === cv.name);
+      return {
+        name: cv.name,
+        checked: !!existing,
+        price: existing ? String(existing.price ?? '') : '',
+        connections: existing
+          ? (existing.connections || []).map(c => ({
+              type: c.type, refId: c.refId || '', name: c.name || '',
+              amount: String(c.amount ?? ''), unit: c.unit || '',
+            }))
+          : [],
+      };
+    });
+
+    // Preserve legacy variants (in item but no longer in category)
+    for (const sv of existingVariants) {
+      const svName = sv.name || sv.size || '';
+      if (svName && !catVarNames.has(svName)) {
+        selections.push({
+          name: svName,
+          checked: true,
+          price: String(sv.price ?? ''),
+          connections: (sv.connections || []).map(c => ({
+            type: c.type, refId: c.refId || '', name: c.name || '',
+            amount: String(c.amount ?? ''), unit: c.unit || '',
+          })),
+          isLegacy: true,
+        });
+      }
+    }
+    return selections;
+  };
+
+  // ── Form helpers ──
+  const step1HasData = () =>
+    menuName.trim() !== '' ||
+    variantSelections.some(v => v.checked || v.price) ||
+    addOns.length > 0;
+
+  const resetAll = () => {
+    const defaultCat = categories.find(c => !c.parentId) || categories[0];
+    const catVars = defaultCat?.variants || [];
+    setMenuName('');
+    setMenuCategory(defaultCat?.name || '');
+    setVariantSelections(catVars.map(v => ({ name: v.name, checked: false, price: '', connections: [] })));
+    setAddOns([]);
+    setCurrentVariantIdx(0);
+    setPendingMenu(null);
+    setEditingItem(null);
+  };
+
+  const handleCategoryChange = (catName) => {
+    setMenuCategory(catName);
+    setVariantSelections(buildSelectionsFromCategory(catName, []));
+    setCurrentVariantIdx(0);
+  };
+
+  const handleCloseStep1 = () => {
+    (editingItem || step1HasData()) ? setShowDiscard(true) : (setShowStep1(false), resetAll());
+  };
+
+  // ── ADD-ONS ──
+  const addAddOn    = () => setAddOns(p => [...p, { ingredientId: '', name: '', amount: '', price: '' }]);
+  const removeAddOn = i  => setAddOns(p => p.filter((_, idx) => idx !== i));
+  const updateAddOn = (i, field, val) => setAddOns(p => p.map((a, idx) => idx === i ? { ...a, [field]: val } : a));
+  const handleSelectAddOnIng = (i, ingId) => {
+    const ing = addOnIngredients.find(x => x.id === ingId);
+    setAddOns(p => p.map((a, idx) => idx === i ? { ...a, ingredientId: ingId, name: ing?.name || '' } : a));
+  };
+
+  const handleNextStep = () => {
+    if (!menuName.trim() || checkedVariants.length === 0) return;
+    setCurrentVariantIdx(0);
+    setShowStep1(false);
+    setShowStep2(true);
+  };
+
   const handleGoBackToStep1 = () => { setShowStep2(false); setShowStep1(true); };
 
-  // ════════════════════════════════════
-  // SAVE (create or update)
-  // ════════════════════════════════════
+  // ── OPEN EDIT ──
+  const handleOpenEdit = (item) => {
+    setEditingItem(item);
+    setMenuName(item.name || '');
+    const catName = item.category || categories.find(c => !c.parentId)?.name || categories[0]?.name || '';
+    setMenuCategory(catName);
+
+    const srcVariants = item.variants || (item.sizes || []).map(s => ({
+      name: s.size, price: s.price, connections: s.connections,
+    }));
+    setVariantSelections(buildSelectionsFromCategory(catName, srcVariants));
+
+    setAddOns((item.addOns || []).map(a => ({
+      ingredientId: a.ingredientId || '',
+      name:         a.name || '',
+      amount:       String(a.amount ?? ''),
+      price:        String(a.price ?? ''),
+    })));
+
+    setCurrentVariantIdx(0);
+    setShowStep1(true);
+  };
+
+  // ── SAVE ──
   const handlePrepareConfirm = async () => {
     let menuItemId;
     if (editingItem) {
@@ -336,31 +378,28 @@ export default function MenuItems() {
           amount: parseFloat(a.amount) || 0,
           price:  parseFloat(a.price)  || 0,
         })),
-      variants: variants
-        .filter(v => v.name.trim())
-        .map((v, _, arr) => {
-          const origIdx = variants.indexOf(v);
-          return {
-            name:  v.name.trim(),
-            price: parseFloat(v.price) || 0,
-            connections: (connections[origIdx] || [])
-              .filter(c => c.refId)
-              .map(c => ({
-                type:   c.type,
-                refId:  c.refId,
-                name:   c.name,
-                amount: parseFloat(c.amount) || 0,
-                unit:   c.unit,
-              })),
-          };
-        }),
+      variants: variantSelections
+        .filter(v => v.checked)
+        .map(v => ({
+          name:  v.name,
+          price: parseFloat(v.price) || 0,
+          connections: v.connections
+            .filter(c => c.refId)
+            .map(c => ({
+              type:   c.type,
+              refId:  c.refId,
+              name:   c.name,
+              amount: parseFloat(c.amount) || 0,
+              unit:   c.unit,
+            })),
+        })),
     });
     setShowMenuConf(true);
   };
 
   const menuSavingRef = useRef(false);
-  const [menuSaving, setMenuSaving] = useState(false);
-  const [hideSaving, setHideSaving] = useState(false);
+  const [menuSaving,     setMenuSaving]     = useState(false);
+  const [hideSaving,     setHideSaving]     = useState(false);
   const [retrieveSaving, setRetrieveSaving] = useState(false);
 
   const logAudit = async (action, itemId, itemName, details = {}) => {
@@ -421,9 +460,7 @@ export default function MenuItems() {
     }
   };
 
-  // ════════════════════════════════════
-  // AVAILABILITY TOGGLE
-  // ════════════════════════════════════
+  // ── AVAILABILITY TOGGLE ──
   const handleToggleAvailability = async item => {
     const newAvail = item.isAvailable === false;
     await updateDoc(doc(db, 'menuItems', item.id), { isAvailable: newAvail });
@@ -435,9 +472,7 @@ export default function MenuItems() {
     await loadData();
   };
 
-  // ════════════════════════════════════
-  // HIDE
-  // ════════════════════════════════════
+  // ── HIDE ──
   const handleConfirmHide = async () => {
     if (!hideRow || hideSaving) return;
     setHideSaving(true);
@@ -445,14 +480,10 @@ export default function MenuItems() {
       await updateDoc(doc(db, 'menuItems', hideRow.id), { isActive: false, hiddenAt: new Date() });
       await logAudit('HIDE_MENU_ITEM', hideRow.menuItemId || hideRow.id, hideRow.name, {});
       setShowHideConf(false); setHideRow(null); await loadData();
-    } finally {
-      setHideSaving(false);
-    }
+    } finally { setHideSaving(false); }
   };
 
-  // ════════════════════════════════════
-  // RETRIEVE
-  // ════════════════════════════════════
+  // ── RETRIEVE ──
   const handleConfirmRetrieve = async () => {
     if (!retrieveRow || retrieveSaving) return;
     setRetrieveSaving(true);
@@ -460,9 +491,7 @@ export default function MenuItems() {
       await updateDoc(doc(db, 'menuItems', retrieveRow.id), { isActive: true, hiddenAt: null });
       await logAudit('RETRIEVE_MENU_ITEM', retrieveRow.menuItemId || retrieveRow.id, retrieveRow.name, {});
       setShowRetrieveConf(false); setRetrieveRow(null); await loadData();
-    } finally {
-      setRetrieveSaving(false);
-    }
+    } finally { setRetrieveSaving(false); }
   };
 
   // ════════════════════════════════════════════════════════════
@@ -730,7 +759,7 @@ export default function MenuItems() {
             </div>
 
             <div className="px-12 py-8 grid grid-cols-2 gap-12">
-              {/* Left: General Information + Sizes and Price */}
+              {/* Left: General Information + Variants */}
               <div className="flex flex-col gap-8">
                 <div>
                   <p className="text-xl font-semibold text-gray-700 mb-5">General Information</p>
@@ -746,7 +775,8 @@ export default function MenuItems() {
                       <label className="text-xl text-gray-600 w-40 shrink-0">Menu Category</label>
                       <div className="relative flex-1">
                         <select
-                          value={menuCategory} onChange={e => setMenuCategory(e.target.value)}
+                          value={menuCategory}
+                          onChange={e => handleCategoryChange(e.target.value)}
                           className="w-full border border-gray-300 rounded-lg px-4 py-3 text-xl text-gray-700 outline-none appearance-none bg-white focus:border-[#3ca4c7]"
                         >
                           {sortedCategories.length === 0
@@ -764,40 +794,56 @@ export default function MenuItems() {
                   </div>
                 </div>
 
+                {/* Variants from category */}
                 <div>
                   <p className="text-xl font-semibold text-gray-700 mb-4">Variants</p>
-                  <div className="border border-gray-200 rounded-xl px-5 pt-5 pb-4 flex flex-col gap-4 max-h-[380px] overflow-y-auto">
-                    {variants.map((v, i) => (
-                      <div key={i} className="flex items-center gap-3">
-                        <span className="text-xl text-gray-500 w-6 shrink-0 text-center">{i + 1}</span>
-                        <input
-                          type="text" value={v.name}
-                          placeholder="Variant name (e.g. Regular)"
-                          onChange={e => updateVariant(i, 'name', e.target.value)}
-                          className="flex-1 border border-gray-300 rounded-lg px-4 py-3 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]"
-                        />
-                        <span className="text-xl text-gray-600 shrink-0">₱</span>
-                        <input
-                          type="number" min="0" value={v.price}
-                          onChange={e => updateVariant(i, 'price', e.target.value)}
-                          className="w-28 border border-gray-300 rounded-lg px-3 py-3 text-xl text-gray-700 outline-none text-center focus:border-[#3ca4c7]"
-                        />
-                        <button
-                          onClick={() => removeVariant(i)}
-                          disabled={variants.length <= 1}
-                          className="text-gray-400 hover:text-red-400 transition-colors shrink-0 disabled:opacity-30"
-                        >
-                          <Trash2 size={18} />
-                        </button>
-                      </div>
-                    ))}
-                    <button
-                      onClick={addVariant}
-                      className="mt-1 w-full bg-gray-200 hover:bg-gray-300 text-gray-600 py-3 rounded-full text-xl transition-colors"
-                    >
-                      Add another Variant
-                    </button>
-                  </div>
+                  {variantSelections.length === 0 ? (
+                    <div className="border border-orange-200 bg-orange-50 rounded-xl px-5 py-4">
+                      <p className="text-xl text-orange-600">
+                        The selected category has no variants defined. Add variants to the category in Menu Categories first.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="border border-gray-200 rounded-xl px-5 pt-5 pb-4 flex flex-col gap-4 max-h-[380px] overflow-y-auto">
+                      {variantSelections.map((v, i) => (
+                        <div key={i} className="flex items-center gap-4">
+                          {/* Checkbox */}
+                          <button
+                            onClick={() => toggleVariant(i)}
+                            className={`w-6 h-6 rounded border-2 flex items-center justify-center shrink-0 transition-colors ${
+                              v.checked
+                                ? 'bg-[#3ca4c7] border-[#3ca4c7] text-white'
+                                : 'bg-white border-gray-300 hover:border-[#3ca4c7]'
+                            }`}
+                          >
+                            {v.checked && <span className="font-bold text-sm leading-none">✓</span>}
+                          </button>
+
+                          {/* Variant name (read-only, from category) */}
+                          <span className={`text-xl flex-1 ${v.checked ? 'text-gray-700' : 'text-gray-400'}`}>
+                            {v.name}
+                            {v.isLegacy && (
+                              <span className="ml-2 text-lg text-orange-400">(not in category)</span>
+                            )}
+                          </span>
+
+                          {/* Price — only active when checked */}
+                          <span className={`text-xl shrink-0 ${v.checked ? 'text-gray-600' : 'text-gray-300'}`}>₱</span>
+                          <input
+                            type="number" min="0" value={v.price}
+                            disabled={!v.checked}
+                            onChange={e => updateVariantPrice(i, e.target.value)}
+                            placeholder="0"
+                            className={`w-28 border rounded-lg px-3 py-3 text-xl text-gray-700 outline-none text-center transition-colors ${
+                              v.checked
+                                ? 'border-gray-300 focus:border-[#3ca4c7]'
+                                : 'border-gray-100 bg-gray-50 text-gray-300 cursor-not-allowed'
+                            }`}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -855,7 +901,8 @@ export default function MenuItems() {
             <div className="px-12 pb-10 flex justify-center">
               <button
                 onClick={handleNextStep}
-                className="bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white px-20 py-3.5 rounded-full text-xl font-semibold transition-colors"
+                disabled={!menuName.trim() || checkedVariants.length === 0}
+                className="bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white px-20 py-3.5 rounded-full text-xl font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Next
               </button>
@@ -897,12 +944,12 @@ export default function MenuItems() {
                     {currentVariantEntry?.name || `Variant ${currentVariantIdx + 1}`} — {menuName}
                   </h4>
                   <p className="text-xl text-gray-400 mt-1">
-                    Variant {currentVariantIdx + 1} of {validVariants.length}
+                    Variant {currentVariantIdx + 1} of {checkedVariants.length}
                   </p>
                 </div>
                 <button
-                  onClick={() => setCurrentVariantIdx(i => Math.min(validVariants.length - 1, i + 1))}
-                  disabled={currentVariantIdx === validVariants.length - 1}
+                  onClick={() => setCurrentVariantIdx(i => Math.min(checkedVariants.length - 1, i + 1))}
+                  disabled={currentVariantIdx === checkedVariants.length - 1}
                   className="text-gray-400 hover:text-gray-600 disabled:opacity-30 transition-colors"
                 >
                   <ChevronRight size={24} />

@@ -1,5 +1,8 @@
 import AdminSidebar from '../layouts/AdminSidebar';
 import StaffSidebar from '../layouts/StaffSidebar';
+import devAlcanzo    from '../assets/dev-alcanzo.jpg';
+import devNueva      from '../assets/dev-nueva.jpg';
+import devSarmiento  from '../assets/dev-sarmiento.jpg';
 
 
 export default function About({ role }) {
@@ -64,19 +67,24 @@ export default function About({ role }) {
               <h3 className="font-bold text-gray-900 text-xl border-b pb-2">Development Team</h3>
               <p className="text-base font-semibold text-gray-500 uppercase tracking-wider mb-1">3rd Year BSCS Students — TIP Quezon City</p>
              
-              <div className="flex flex-col gap-3">
-                <div>
-                  <p className="font-semibold text-gray-800">Alcanzo, Renz A.</p>
-                  <p className="text-blue-600 underline text-base">qraalcanzo@tip.edu.ph</p>
-                </div>
-                <div>
-                  <p className="font-semibold text-gray-800">Nueva, Carl Josef E.</p>
-                  <p className="text-blue-600 underline text-base">qcjenueva@tip.edu.ph</p>
-                </div>
-                <div>
-                  <p className="font-semibold text-gray-800">Sarmiento, Joaquín Reymond G.</p>
-                  <p className="text-blue-600 underline text-base">qjrgsarmiento@tip.edu.ph</p>
-                </div>
+              <div className="flex flex-col gap-5">
+                {[
+                  { photo: devAlcanzo,   name: 'Alcanzo, Renz A.',              email: 'qraalcanzo@tip.edu.ph'    },
+                  { photo: devNueva,     name: 'Nueva, Carl Josef E.',           email: 'qcjenueva@tip.edu.ph'     },
+                  { photo: devSarmiento, name: 'Sarmiento, Joaquín Reymond G.', email: 'qjrgsarmiento@tip.edu.ph' },
+                ].map(({ photo, name, email }) => (
+                  <div key={email} className="flex items-center gap-4">
+                    <img
+                      src={photo}
+                      alt={name}
+                      className="w-20 h-20 rounded-full object-cover shrink-0 border-2 border-gray-200 shadow-sm"
+                    />
+                    <div>
+                      <p className="font-semibold text-gray-800 text-xl">{name}</p>
+                      <p className="text-blue-600 underline text-lg">{email}</p>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
 

@@ -887,6 +887,12 @@ export default function Inventory() {
                 <p className="text-xl font-semibold text-gray-700 mb-2">Reminder</p>
                 <p className="text-xl text-gray-500">The maximum limit is used for indicating if the material is in low supply.</p>
               </div>
+              {matMaxLimit && matStartQty && parseInt(matStartQty) > parseInt(matMaxLimit) && (
+                <div className="flex items-center gap-3 bg-orange-50 border border-orange-200 rounded-xl px-4 py-3">
+                  <AlertTriangle size={18} className="text-orange-500 shrink-0" />
+                  <p className="text-xl text-orange-600">Starting quantity exceeds the maximum limit of {matMaxLimit} units.</p>
+                </div>
+              )}
               <button onClick={handleSaveMat} className="w-full bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white py-3.5 rounded-xl text-xl font-semibold transition-colors">Save Material</button>
             </div>
           </div>
@@ -972,6 +978,12 @@ export default function Inventory() {
                 <p className="text-xl font-semibold text-gray-700 mb-2">Reminder</p>
                 <p className="text-xl text-gray-500">Once saved, only the General Information can be edited through the Inventory Actions.</p>
               </div>
+              {ingMaxLimit && ingBatchQty && parseInt(ingBatchQty) > parseInt(ingMaxLimit) && (
+                <div className="flex items-center gap-3 bg-orange-50 border border-orange-200 rounded-xl px-4 py-3">
+                  <AlertTriangle size={18} className="text-orange-500 shrink-0" />
+                  <p className="text-xl text-orange-600">Batch quantity exceeds the maximum limit of {ingMaxLimit} {ingUnit}.</p>
+                </div>
+              )}
               <button onClick={handleSaveIng} className="w-full bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white py-3.5 rounded-xl text-xl font-semibold transition-colors">Save Ingredient</button>
             </div>
           </div>
@@ -1307,9 +1319,9 @@ export default function Inventory() {
                   <span className="text-xl text-gray-500 shrink-0">units</span>
                 </div>
                 {resupMatRow.raw.maxLimit > 0 && (resupMatRow.raw.stock || 0) + (parseInt(resupMatAmount) || 0) > resupMatRow.raw.maxLimit && (
-                  <div className="flex items-center gap-2 text-red-500 mt-1">
-                    <AlertTriangle size={16} />
-                    <span className="text-lg">Maximum limit of {resupMatRow.raw.maxLimit} units reached.</span>
+                  <div className="flex items-center gap-3 bg-orange-50 border border-orange-200 rounded-xl px-4 py-3 mt-2">
+                    <AlertTriangle size={18} className="text-orange-500 shrink-0" />
+                    <p className="text-xl text-orange-600">New total exceeds the maximum limit of {resupMatRow.raw.maxLimit} units.</p>
                   </div>
                 )}
               </div>
@@ -1322,8 +1334,7 @@ export default function Inventory() {
                 </p>
               </div>
               <button onClick={() => setShowResupMatConf(true)}
-                disabled={resupMatRow.raw.maxLimit > 0 && (resupMatRow.raw.stock || 0) + (parseInt(resupMatAmount) || 0) > resupMatRow.raw.maxLimit}
-                className="w-full bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white py-3.5 rounded-xl text-xl font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed">Confirm</button>
+                className="w-full bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white py-3.5 rounded-xl text-xl font-semibold transition-colors">Confirm</button>
             </div>
           </div>
         </div>
@@ -1392,9 +1403,9 @@ export default function Inventory() {
                             className="w-40 border border-gray-300 rounded-lg px-4 py-3 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]" />
                         </div>
                         {resupIngRow.raw.maxLimit > 0 && (resupIngRow.raw.batches || []).reduce((s, b) => s + (b.quantity || 0), 0) + (parseInt(resupIngQty) || 0) > resupIngRow.raw.maxLimit && (
-                          <div className="flex items-center gap-2 text-red-500">
-                            <AlertTriangle size={16} />
-                            <span className="text-lg">Maximum limit of {resupIngRow.raw.maxLimit} {resupIngRow.raw.unit || 'units'} reached.</span>
+                          <div className="flex items-center gap-3 bg-orange-50 border border-orange-200 rounded-xl px-3 py-2 mt-1">
+                            <AlertTriangle size={16} className="text-orange-500 shrink-0" />
+                            <p className="text-lg text-orange-600">New total exceeds the limit of {resupIngRow.raw.maxLimit} {resupIngRow.raw.unit || 'units'}.</p>
                           </div>
                         )}
                       </div>
@@ -1410,8 +1421,7 @@ export default function Inventory() {
                     </p>
                   </div>
                   <button onClick={() => setShowResupIngConf(true)}
-                    disabled={resupIngRow.raw.maxLimit > 0 && (resupIngRow.raw.batches || []).reduce((s, b) => s + (b.quantity || 0), 0) + (parseInt(resupIngQty) || 0) > resupIngRow.raw.maxLimit}
-                    className="w-full bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white py-3.5 rounded-xl text-xl font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed">Confirm</button>
+                    className="w-full bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white py-3.5 rounded-xl text-xl font-semibold transition-colors">Confirm</button>
                 </>
               )}
             </div>
@@ -1512,9 +1522,9 @@ export default function Inventory() {
                     <span className="text-xl text-gray-500 shrink-0">units</span>
                   </div>
                   {adjRow.raw.maxLimit > 0 && (parseInt(adjMatQty) || 0) > adjRow.raw.maxLimit && (
-                    <div className="flex items-center gap-2 text-red-500">
-                      <AlertTriangle size={16} />
-                      <span className="text-lg">Maximum limit of {adjRow.raw.maxLimit} units reached.</span>
+                    <div className="flex items-center gap-3 bg-orange-50 border border-orange-200 rounded-xl px-4 py-3">
+                      <AlertTriangle size={18} className="text-orange-500 shrink-0" />
+                      <p className="text-xl text-orange-600">Quantity exceeds the maximum limit of {adjRow.raw.maxLimit} units.</p>
                     </div>
                   )}
                 </div>
@@ -1563,9 +1573,9 @@ export default function Inventory() {
                         <span className="text-xl text-gray-500 shrink-0">{adjRow.raw.unit || 'units'}</span>
                       </div>
                       {adjRow.raw.maxLimit > 0 && adjIngBatches.reduce((s, b) => s + (parseInt(b.newQty ?? b.quantity) || 0), 0) > adjRow.raw.maxLimit && (
-                        <div className="flex items-center gap-2 text-red-500">
-                          <AlertTriangle size={16} />
-                          <span className="text-lg">Maximum limit of {adjRow.raw.maxLimit} {adjRow.raw.unit || 'units'} reached.</span>
+                        <div className="flex items-center gap-3 bg-orange-50 border border-orange-200 rounded-xl px-4 py-3">
+                          <AlertTriangle size={18} className="text-orange-500 shrink-0" />
+                          <p className="text-xl text-orange-600">Total quantity exceeds the maximum limit of {adjRow.raw.maxLimit} {adjRow.raw.unit || 'units'}.</p>
                         </div>
                       )}
                     </>
@@ -1582,12 +1592,7 @@ export default function Inventory() {
                 />
               </div>
               <button onClick={() => setShowAdjConf(true)}
-                disabled={
-                  adjRow._type === 'material'
-                    ? adjRow.raw.maxLimit > 0 && (parseInt(adjMatQty) || 0) > adjRow.raw.maxLimit
-                    : adjRow.raw.maxLimit > 0 && adjIngBatches.reduce((s, b) => s + (parseInt(b.newQty ?? b.quantity) || 0), 0) > adjRow.raw.maxLimit
-                }
-                className="w-full bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white py-3.5 rounded-xl text-xl font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed">Confirm</button>
+                className="w-full bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white py-3.5 rounded-xl text-xl font-semibold transition-colors">Confirm</button>
             </div>
           </div>
         </div>
