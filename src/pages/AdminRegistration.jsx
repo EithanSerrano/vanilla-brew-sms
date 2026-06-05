@@ -176,15 +176,15 @@ export default function AdminRegistration() {
       // --- SEND WELCOME EMAIL WITH EMAILJS ---
       try {
         await emailjs.send(
-          'service_n5mgbkx',     // Your EmailJS Service ID
-          'template_hsvtggg',    // Your EmailJS Template ID
+          import.meta.env.VITE_EMAILJS_SERVICE_WELCOME,     // Your EmailJS Service ID
+          import.meta.env.VITE_EMAILJS_TEMPLATE_WELCOME,    // Your EmailJS Template ID
           {
-            fullName: pendingAccount.fullName, // Matches {{fullName}} in EmailJS
-            email: pendingAccount.email,       // Matches {{email}} in EmailJS
-            empId: pendingAccount.empId,       // Matches {{empId}} in EmailJS
-            password: password,                 // Matches {{password}} in EmailJS
+            fullName: pendingAccount.fullName, 
+            email: pendingAccount.email,       
+            empId: pendingAccount.empId,       
+            password: password,                 
           },
-          'jzCDdLVx4vyXA8oVy'      // Your EmailJS Public Key
+          import.meta.env.VITE_EMAILJS_PUBLIC_KEY_WELCOME   // Your EmailJS Public Key
         );
         console.log("Welcome email sent successfully via EmailJS!");
       } catch (emailErr) {

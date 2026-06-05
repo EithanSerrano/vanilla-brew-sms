@@ -100,33 +100,33 @@ export default function Account({ role }) {
     setOtpInput(''); setOtpCode(''); setOtpMsg(''); setOtpError('');
   };
 
-  const handleRequestOtp = async () => {
-    setOtpSending(true); setOtpMsg(''); setOtpError(''); setOtpInput('');
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
-    try {
-      await fetch('https://api.emailjs.com/api/v1.0/email/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          service_id: 'service_jl3bsze',
-          template_id: 'template_lb1szcb',
-          user_id: 'ir051N-QwmFGXmsYY',
-          template_params: {
-            admin_email: 'qcjenueva@tip.edu.ph',
-            otp: code,
-            time: new Date().toLocaleString(),
-          },
-        }),
-      });
-      setOtpCode(code);
-      setOtpExpiry(Date.now() + 5 * 60 * 1000);
-      setOtpMsg('OTP sent to your email. Valid for 5 minutes.');
-    } catch {
-      setOtpMsg('Failed to send OTP. Please try again.');
-    } finally {
-      setOtpSending(false);
-    }
-  };
+const handleRequestOtp = async () => {
+  setOtpSending(true); setOtpMsg(''); setOtpError(''); setOtpInput('');
+  const code = Math.floor(100000 + Math.random() * 900000).toString();
+  try {
+    await fetch('https://api.emailjs.com/api/v1.0/email/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        service_id: import.meta.env.VITE_EMAILJS_SERVICE_OTP,
+        template_id: import.meta.env.VITE_EMAILJS_TEMPLATE_OTP,
+        user_id: import.meta.env.VITE_EMAILJS_PUBLIC_KEY_OTP,
+        template_params: {
+          admin_email: 'qcjenueva@tip.edu.ph',
+          otp: code,
+          time: new Date().toLocaleString(),
+        },
+      }),
+    });
+    setOtpCode(code);
+    setOtpExpiry(Date.now() + 5 * 60 * 1000);
+    setOtpMsg('OTP sent to your email. Valid for 5 minutes.');
+  } catch {
+    setOtpMsg('Failed to send OTP. Please try again.');
+  } finally {
+    setOtpSending(false);
+  }
+};
 
   const handleVerifyOtp = () => {
     setOtpError('');
