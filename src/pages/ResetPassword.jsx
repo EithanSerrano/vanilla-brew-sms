@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { confirmPasswordReset } from 'firebase/auth';
+import { confirmPasswordReset, verifyPasswordResetCode } from 'firebase/auth';
 import { auth } from '../firebase'; 
+import { Eye, EyeOff } from 'lucide-react';
 
 export default function ResetPassword() {
   const navigate = useNavigate();
@@ -17,6 +18,31 @@ export default function ResetPassword() {
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+
+  // Added the missing states required by your UI and the verification process
+  const [isVerifying, setIsVerifying] = useState(true);
+  const [linkError, setLinkError] = useState(false);
+  const [showNew, setShowNew] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+
+  // Verification Logic to check if the link is valid before showing the form
+  useEffect(() => {
+    if (oobCode) {
+      verifyPasswordResetCode(auth, oobCode)
+        .then(() => {
+          setIsVerifying(false);
+          setLinkError(false);
+        })
+        .catch((err) => {
+          console.error("Verification Error: ", err);
+          setIsVerifying(false);
+          setLinkError(true);
+        });
+    } else {
+      setIsVerifying(false);
+      setLinkError(true); // Triggers the "Invalid Link" screen if no code is present
+    }
+  }, [oobCode]);
 
   const handleChange = (e) => {
     setPasswords({ ...passwords, [e.target.name]: e.target.value });
@@ -65,7 +91,7 @@ export default function ResetPassword() {
   // Loading Screen for System Status Visibility
   if (isVerifying) {
     return (
-      <div className="h-full w-full flex items-center justify-center font-sans z-10">
+      <div className="h-full w-full flex items-center justify-center font-sans z-10" style={{ background: 'linear-gradient(135deg, #d4a07a 0%, #7a3018 100%)' }}>
         <div className="bg-[#333333] p-10 rounded-2xl shadow-2xl flex flex-col items-center w-[480px]">
           <h2 className="text-white text-2xl font-bold mb-4 tracking-wide">Verifying Link...</h2>
           <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#3ca4c7] mb-4"></div>
@@ -77,11 +103,11 @@ export default function ResetPassword() {
   // Error Prevention Screen for Missing or Invalid Links
   if (!oobCode || linkError) {
     return (
-      <div className="h-full w-full flex items-center justify-center font-sans z-10">
+      <div className="h-full w-full flex items-center justify-center font-sans z-10" style={{ background: 'linear-gradient(135deg, #d4a07a 0%, #7a3018 100%)' }}>
         <div className="bg-[#333333] p-10 rounded-2xl shadow-2xl flex flex-col items-center w-[480px]">
           <h2 className="text-white text-2xl font-bold mb-4 tracking-wide">Invalid Link</h2>
           <p className="text-gray-300 text-xl mb-8 text-center leading-relaxed">
-            No secure reset code was found. Please request a new password reset link from the login screen.
+            This secure reset code is invalid or has already been used. Please request a new password reset link from the login screen.
           </p>
           <button
             onClick={() => navigate('/login')}
@@ -203,7 +229,7 @@ export default function ResetPassword() {
             </form>
           </div>
         )}
-      </div>
+      </div>  
     </div>
   );
 }

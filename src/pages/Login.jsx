@@ -278,11 +278,50 @@ export default function Login() {
         return;
       }
 
-      await sendPasswordResetEmail(auth, resetEmail.trim());
+      // 1. Ask the backend API to generate the secure Firebase link
+      const response = await fetch('/api/send-reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: resetEmail.trim() })
+      });
+
+      // Safely check if the response is JSON before parsing
+      const textResponse = await response.text();
+      let data;
+      try {
+        data = JSON.parse(textResponse);
+      } catch (err) {
+        throw new Error("Backend API not found. If running locally, you must use 'vercel dev' instead of 'npm run dev'.");
+      }
+
+      if (!response.ok) {
+        if (data.error && data.error.includes('user-not-found')) {
+           alert("There is no registered staff member with this email.");
+           setResetError(true);
+           return;
+        }
+        throw new Error(data.error || "Failed to generate link");
+      }
+
+      // 2. Pass the generated link to EmailJS to handle the delivery
+      await fetch('https://api.emailjs.com/api/v1.0/email/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          service_id: import.meta.env.VITE_EMAILJS_SERVICE_WELCOME,
+          template_id: import.meta.env.VITE_EMAILJS_TEMPLATE_RESET,
+          user_id: import.meta.env.VITE_EMAILJS_PUBLIC_KEY_WELCOME,
+          template_params: {
+            email: resetEmail.trim(), 
+            link: data.link,          
+          }
+        }),
+      });
+
       setSuccessMessage(true);
 
     } catch (error) {
-      console.error("Firebase Reset Error:", error);
+      console.error("Custom Reset Error:", error);
       alert(error.message);
       setResetError(true);
     } finally {
