@@ -1,0 +1,79 @@
+@import "tailwindcss";
+
+/* Enable class-based dark mode for Tailwind v4 */
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root,
+body {
+  color: white;
+}
+
+/* ── Dark mode global overrides ── */
+html.dark {
+  color-scheme: dark;
+}
+
+/* Background */
+html.dark [class~="bg-white"]    { background-color: #202020 !important; }
+html.dark [class~="bg-gray-50"]  { background-color: #202020 !important; }
+
+/* Containers */
+html.dark [class~="bg-gray-100"] { background-color: #333333 !important; }
+html.dark [class~="bg-gray-200"] { background-color: #333333 !important; }
+
+/* Text */
+html.dark [class~="text-gray-900"] { color: #efefef !important; }
+html.dark [class~="text-gray-800"] { color: #efefef !important; }
+html.dark [class~="text-gray-700"] { color: #d4d4d4 !important; }
+html.dark [class~="text-gray-600"] { color: #b0b0b0 !important; }
+html.dark [class~="text-gray-500"] { color: #888888 !important; }
+html.dark [class~="text-gray-400"] { color: #666666 !important; }
+
+/* Outlines / borders */
+html.dark [class~="border-gray-100"] { border-color: #efefef !important; }
+html.dark [class~="border-gray-200"] { border-color: #efefef !important; }
+html.dark [class~="border-gray-300"] { border-color: #efefef !important; }
+
+/* Inputs */
+html.dark input,
+html.dark select,
+html.dark textarea {
+  background-color: #333333 !important;
+  color: #efefef !important;
+  border-color: #efefef !important;
+}
+
+html.dark input::placeholder,
+html.dark textarea::placeholder {
+  color: #888888 !important;
+}
+
+/* ── Custom scrollbar: thin line with rounded edges ── */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
+
+@layer utilities {
+  .no-spinner {
+    -moz-appearance: textfield;
+    appearance: textfield;
+  }
+
+  .no-spinner::-webkit-outer-spin-button,
+  .no-spinner::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+}
+
