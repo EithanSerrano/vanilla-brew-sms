@@ -1,5 +1,5 @@
 ﻿import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { signInWithEmailAndPassword, sendPasswordResetEmail, signOut, updatePassword } from 'firebase/auth';
 import { doc, getDoc, collection, query, where, getDocs, updateDoc, addDoc, serverTimestamp, limit } from 'firebase/firestore';
 import { auth, db } from '../firebase';
@@ -7,7 +7,11 @@ import { Eye, EyeOff, Lock } from 'lucide-react';
 
 export default function Login() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [currentView, setCurrentView] = useState('login');
+  const [inactivityNotice, setInactivityNotice] = useState(
+    location.state?.reason === 'inactivity'
+  );
 
   const [usernameError, setUsernameError] = useState('');
   const [passwordError, setPasswordError] = useState('');
@@ -82,6 +86,7 @@ export default function Login() {
     if (e.target.name === 'password' && passwordError) setPasswordError('');
     if (loginBannerMsg) setLoginBannerMsg('');
     if (credFailed) setCredFailed(false);
+    if (inactivityNotice) setInactivityNotice(false);
   };
 
   const handlePasskeyChange = (e) => {
@@ -318,6 +323,11 @@ export default function Login() {
 
         {currentView === 'login' && (
           <div className="w-full flex flex-col items-center animate-in fade-in duration-300">
+            {inactivityNotice && (
+              <div className="w-full bg-amber-50 border border-amber-300 rounded-lg px-4 py-3 mb-4 text-center">
+                <p className="text-amber-700 text-xl font-medium">You have been logged out due to inactivity.</p>
+              </div>
+            )}
             {loginSuccess ? (
               <p className="text-green-600 text-xl font-semibold mb-4 text-center tracking-wide">Login successful! Redirecting...</p>
             ) : bannerMessage ? (

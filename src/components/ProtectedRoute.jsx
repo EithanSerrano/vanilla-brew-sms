@@ -35,7 +35,7 @@ export default function ProtectedRoute() {
       // best-effort; sign out regardless
     }
     await signOut(auth);
-    navigate('/login', { replace: true });
+    navigate('/login', { replace: true, state: { reason: 'inactivity' } });
   }, [navigate]);
 
   const resetTimer = useCallback(() => {
