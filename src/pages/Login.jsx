@@ -1,7 +1,7 @@
 ﻿import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { signInWithEmailAndPassword, sendPasswordResetEmail, signOut, updatePassword } from 'firebase/auth';
-import { collection, doc, getDoc, updateDoc, addDoc, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs, updateDoc, addDoc, serverTimestamp, limit } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 import { Eye, EyeOff, Lock } from 'lucide-react';
 
@@ -168,9 +168,9 @@ export default function Login() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              service_id: 'service_jl3bsze',
-              template_id: 'template_fqiqd8q',
-              user_id: 'ir051N-QwmFGXmsYY',
+              service_id: import.meta.env.VITE_EMAILJS_SERVICE_OTP,
+              template_id: import.meta.env.VITE_EMAILJS_TEMPLATE_ALERT,
+              user_id: import.meta.env.VITE_EMAILJS_PUBLIC_KEY_OTP,
               template_params: {
                 user_email: trimmedUsername,
                 time: new Date().toLocaleString(),
@@ -201,9 +201,9 @@ export default function Login() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          service_id: 'service_jl3bsze',
-          template_id: 'template_lb1szcb',
-          user_id: 'ir051N-QwmFGXmsYY',
+          service_id: import.meta.env.VITE_EMAILJS_SERVICE_OTP,
+          template_id: import.meta.env.VITE_EMAILJS_TEMPLATE_OTP,
+          user_id: import.meta.env.VITE_EMAILJS_PUBLIC_KEY_OTP,
           template_params: {
             admin_email: 'qcjenueva@tip.edu.ph',
             otp: generatedCode,
@@ -213,7 +213,6 @@ export default function Login() {
       });
 
       // ONLY set state AFTER the email sends.
-      // This stops the button from swapping too fast while your mouse click is still registering.
       setAdminOTP(generatedCode);
       setOtpExpiry(Date.now() + 5 * 60 * 1000);
       setOtpSentMessage('Passkey sent to Admin (Valid for 5 mins)');
@@ -255,19 +254,16 @@ export default function Login() {
 
   const handleResetPassword = async (e) => {
     e.preventDefault();
-
     if (resetEmail.trim() === '') {
       setResetError(true);
       return;
     }
-
     setIsSubmitting(true);
-    setResetError(false);
-
+   
     try {
-      // 1. Your friend's security check to ensure the user exists in Firestore
       const usersRef = collection(db, 'users');
-      const q = query(usersRef, where("email", "==", resetEmail.trim()));
+      // Added limit(1) to the query to satisfy Firebase security rules
+      const q = query(usersRef, where("email", "==", resetEmail.trim()), limit(1));
       const querySnapshot = await getDocs(q);
 
       if (querySnapshot.empty) {
@@ -277,31 +273,13 @@ export default function Login() {
         return;
       }
 
-      // 2. Your custom domain routing logic
-      const actionCodeSettings = {
-        url: 'https://vnlbrew.shop/reset-password',
-        handleCodeInApp: false,
-      };
-
-      await sendPasswordResetEmail(
-        auth,
-        resetEmail.trim(),
-        actionCodeSettings
-      );
-
+      await sendPasswordResetEmail(auth, resetEmail.trim());
       setSuccessMessage(true);
 
     } catch (error) {
       console.error("Firebase Reset Error:", error);
-
-      if (
-        error.code === 'auth/user-not-found' ||
-        error.code === 'auth/invalid-email'
-      ) {
-        setResetError(true);
-      } else {
-        alert(error.message);
-      }
+      alert(error.message);
+      setResetError(true);
     } finally {
       setIsSubmitting(false);
     }

@@ -157,7 +157,7 @@ export default function StaffSidebar() {
 
       {/* Version footer */}
       <div className="px-6 py-4 shrink-0">
-        <p className="text-white/40 text-xl">Ver. 1.0.0</p>
+        <p className="text-white/40 text-xl">Ver.</p>
       </div>
 
       {/* Logout confirmation dialog */}
@@ -177,7 +177,7 @@ export default function StaffSidebar() {
               <button
                 onClick={handleLogout}
                 disabled={isLoggingOut}
-                className="flex-1 py-2.5 rounded-full bg-[#b87050] hover:bg-[#9e5e3e] text-white text-xl font-medium transition-colors flex items-center justify-center gap-2"
+                className="flex-1 py-2.5 rounded-full bg-[#b87050] hover:bg-[#9e5e3e] text-white text-xl font-medium transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
               >
                 {isLoggingOut && (
                   <svg className="animate-spin h-5 w-5 text-white shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
