@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { createBrowserRouter, RouterProvider, Navigate, Outlet } from "react-router-dom";
 import { startSalesInventoryListener } from "./utils/inventoryDeduction";
+import ProtectedRoute from "./components/ProtectedRoute";
 
 // Pages
 import Login from "./pages/Login";
@@ -55,31 +56,37 @@ const router = createBrowserRouter([
       { path: "/login",             element: <Login /> },
       { path: "/reset-password",    element: <ResetPassword /> },
 
-      // Admin routes
-      { path: "/admin",             element: <AdminHome /> },
-      { path: "/admin-dashboard",   element: <Dashboard role="admin" /> },
-      { path: "/inventory",         element: <Inventory /> },
-      { path: "/menu-items",        element: <MenuItems /> },
-      { path: "/menu-categories",   element: <MenuCategories /> },
-      { path: "/promotions",        element: <Promotions /> },
-      { path: "/registration",      element: <AdminRegistration /> },
-      { path: "/admin-maintenance", element: <Maintenance role="admin" /> },
-      { path: "/documents",         element: <Documents /> },
-      { path: "/admin-help",        element: <AdminHelp /> },
-      { path: "/admin-about",       element: <About role="admin" /> },
-      { path: "/admin-settings",    element: <Settings role="admin" /> },
-      { path: "/admin-account",     element: <Account role="admin" /> },
-      { path: "/payment-qr",        element: <PaymentQR /> },
-      { path: "/backup-recovery",   element: <BackupRecovery /> },
+      // Protected routes — redirect to /login if not authenticated
+      {
+        element: <ProtectedRoute />,
+        children: [
+          // Admin routes
+          { path: "/admin",             element: <AdminHome /> },
+          { path: "/admin-dashboard",   element: <Dashboard role="admin" /> },
+          { path: "/inventory",         element: <Inventory /> },
+          { path: "/menu-items",        element: <MenuItems /> },
+          { path: "/menu-categories",   element: <MenuCategories /> },
+          { path: "/promotions",        element: <Promotions /> },
+          { path: "/registration",      element: <AdminRegistration /> },
+          { path: "/admin-maintenance", element: <Maintenance role="admin" /> },
+          { path: "/documents",         element: <Documents /> },
+          { path: "/admin-help",        element: <AdminHelp /> },
+          { path: "/admin-about",       element: <About role="admin" /> },
+          { path: "/admin-settings",    element: <Settings role="admin" /> },
+          { path: "/admin-account",     element: <Account role="admin" /> },
+          { path: "/payment-qr",        element: <PaymentQR /> },
+          { path: "/backup-recovery",   element: <BackupRecovery /> },
 
-      // Staff routes
-      { path: "/staff",             element: <StaffHome /> },
-      { path: "/staff-dashboard",   element: <Dashboard role="staff" /> },
-      { path: "/staff-inventory",   element: <StaffInventory /> },
-      { path: "/staff-help",        element: <StaffHelp /> },
-      { path: "/staff-about",       element: <About role="staff" /> },
-      { path: "/staff-settings",    element: <Settings role="staff" /> },
-      { path: "/staff-account",     element: <Account role="staff" /> },
+          // Staff routes
+          { path: "/staff",             element: <StaffHome /> },
+          { path: "/staff-dashboard",   element: <Dashboard role="staff" /> },
+          { path: "/staff-inventory",   element: <StaffInventory /> },
+          { path: "/staff-help",        element: <StaffHelp /> },
+          { path: "/staff-about",       element: <About role="staff" /> },
+          { path: "/staff-settings",    element: <Settings role="staff" /> },
+          { path: "/staff-account",     element: <Account role="staff" /> },
+        ],
+      },
 
       { path: "*",                  element: <Navigate to="/login" replace /> },
     ],
