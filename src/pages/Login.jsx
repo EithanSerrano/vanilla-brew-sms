@@ -1,7 +1,7 @@
 ﻿import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { signInWithEmailAndPassword, sendPasswordResetEmail, signOut, updatePassword } from 'firebase/auth';
-import { collection, doc, getDoc, updateDoc, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, getDoc, updateDoc, addDoc, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 import { Eye, EyeOff, Lock } from 'lucide-react';
 
@@ -254,45 +254,58 @@ export default function Login() {
   };
 
   const handleResetPassword = async (e) => {
-  e.preventDefault();
+    e.preventDefault();
 
-  if (resetEmail.trim() === '') {
-    setResetError(true);
-    return;
-  }
-
-  setIsSubmitting(true);
-  setResetError(false);
-
-  try {
-    const actionCodeSettings = {
-      url: 'https://vnlbrew.shop/reset-password',
-      handleCodeInApp: false,
-    };
-
-    await sendPasswordResetEmail(
-      auth,
-      resetEmail.trim(),
-      actionCodeSettings
-    );
-
-    setSuccessMessage(true);
-
-  } catch (error) {
-    console.error("Firebase Reset Error:", error);
-
-    if (
-      error.code === 'auth/user-not-found' ||
-      error.code === 'auth/invalid-email'
-    ) {
+    if (resetEmail.trim() === '') {
       setResetError(true);
-    } else {
-      alert(error.message);
+      return;
     }
-  } finally {
-    setIsSubmitting(false);
-  }
-};
+
+    setIsSubmitting(true);
+    setResetError(false);
+
+    try {
+      // 1. Your friend's security check to ensure the user exists in Firestore
+      const usersRef = collection(db, 'users');
+      const q = query(usersRef, where("email", "==", resetEmail.trim()));
+      const querySnapshot = await getDocs(q);
+
+      if (querySnapshot.empty) {
+        alert("There is no registered staff member with this email.");
+        setResetError(true);
+        setIsSubmitting(false);
+        return;
+      }
+
+      // 2. Your custom domain routing logic
+      const actionCodeSettings = {
+        url: 'https://vnlbrew.shop/reset-password',
+        handleCodeInApp: false,
+      };
+
+      await sendPasswordResetEmail(
+        auth,
+        resetEmail.trim(),
+        actionCodeSettings
+      );
+
+      setSuccessMessage(true);
+
+    } catch (error) {
+      console.error("Firebase Reset Error:", error);
+
+      if (
+        error.code === 'auth/user-not-found' ||
+        error.code === 'auth/invalid-email'
+      ) {
+        setResetError(true);
+      } else {
+        alert(error.message);
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const handleForcePwSubmit = async (e) => {
     e.preventDefault();
