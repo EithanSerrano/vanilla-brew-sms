@@ -215,10 +215,6 @@ export default function AdminSidebar() {
         </button>
       </nav>
 
-      {/* Version footer */}
-      <div className="px-6 py-4 shrink-0">
-        <p className="text-white/40 text-xl">Ver. 1.0.0</p>
-      </div>
 
       {/* Logout confirmation dialog */}
       {showLogoutConfirm && (

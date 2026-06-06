@@ -155,11 +155,6 @@ export default function StaffSidebar() {
         </button>
       </nav>
 
-      {/* Version footer */}
-      <div className="px-6 py-4 shrink-0">
-        <p className="text-white/40 text-xl">Ver.</p>
-      </div>
-
       {/* Logout confirmation dialog */}
       {showLogoutConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
