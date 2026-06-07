@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { onAuthStateChanged, signOut } from 'firebase/auth';
-import { doc, getDoc, updateDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { signOut } from 'firebase/auth';
+import { doc, updateDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 import {
   LayoutGrid, Package, Settings, Info, HelpCircle, LogOut, UserCircle,
@@ -35,13 +35,8 @@ export default function StaffSidebar() {
   const [clock, setClock] = useState(new Date());
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        const snap = await getDoc(doc(db, 'users', user.uid));
-        if (snap.exists()) setUserName(snap.data().name || '');
-      }
-    });
-    return unsubscribe;
+    const session = JSON.parse(sessionStorage.getItem('sessionUser') || '{}');
+    setUserName(session.name || '');
   }, []);
 
   useEffect(() => {
