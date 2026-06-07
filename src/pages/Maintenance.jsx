@@ -299,7 +299,7 @@ export default function Maintenance() {
               <div className="flex flex-col gap-1.5 min-w-[160px]">
                 <label className="text-xl font-medium text-gray-600">{filterIsRange ? 'Start Date' : 'Date'}</label>
                 <input type="date" value={filterDate} onChange={e => setFilterDate(e.target.value)}
-                  className="border border-gray-300 rounded-lg px-3 py-2 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]" />
+                  className="border border-gray-300 rounded-lg px-3 py-4 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]" />
               </div>
               <div className="flex items-center gap-2 pb-2">
                 <input type="checkbox" id="filterRange" checked={filterIsRange} onChange={e => setFilterIsRange(e.target.checked)}
@@ -310,7 +310,7 @@ export default function Maintenance() {
                 <div className="flex flex-col gap-1.5 min-w-[160px]">
                   <label className="text-xl font-medium text-gray-600">End Date</label>
                   <input type="date" value={filterRangeEnd} onChange={e => setFilterRangeEnd(e.target.value)}
-                    className="border border-gray-300 rounded-lg px-3 py-2 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]" />
+                    className="border border-gray-300 rounded-lg px-3 py-4 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]" />
                 </div>
               )}
 

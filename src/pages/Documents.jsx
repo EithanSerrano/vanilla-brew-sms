@@ -21,6 +21,14 @@ const AUDIT_ACTION_LABELS = {
   ADJUST: 'Adjust Stock', EDIT: 'Edit Item',
   CREATE_ACCOUNT: 'Create Account', DEACTIVATE_ACCOUNT: 'Deactivate Account',
   REACTIVATE_ACCOUNT: 'Reactivate Account', EDIT_ACCOUNT: 'Edit Account',
+  ADD_MENU_ITEM: 'Add Menu Item', EDIT_MENU_ITEM: 'Edit Menu Item',
+  HIDE_MENU_ITEM: 'Hide Menu Item', RETRIEVE_MENU_ITEM: 'Retrieve Menu Item',
+  SET_AVAILABLE: 'Set Available', SET_UNAVAILABLE: 'Set Unavailable',
+  ADD_CATEGORY: 'Add Category', EDIT_CATEGORY: 'Edit Category',
+  HIDE_CATEGORY: 'Hide Category', RETRIEVE_CATEGORY: 'Retrieve Category',
+  ADD_SUBCATEGORY: 'Add Subcategory',
+  ADD_PROMO: 'Add Promotion', EDIT_PROMO: 'Edit Promotion',
+  ARCHIVE_PROMO: 'Archive Promotion', RETRIEVE_PROMO: 'Retrieve Promotion',
 };
 
 function splitTimestamp(ts) {
@@ -547,11 +555,9 @@ export default function Documents() {
     return () => document.removeEventListener('click', handler);
   }, []);
 
-  const getPerformedBy = async () => {
-    const currentUser = auth.currentUser;
-    if (!currentUser) return 'Unknown';
-    const snap = await getDoc(doc(db, 'users', currentUser.uid));
-    return snap.exists() ? (snap.data().name || 'Unknown') : 'Unknown';
+  const getPerformedBy = () => {
+    const session = JSON.parse(sessionStorage.getItem('sessionUser') || '{}');
+    return session.name || 'Unknown';
   };
 
   const buildMeta = (docId, docType, performedBy, now, df, dt) => ({
@@ -577,7 +583,7 @@ export default function Documents() {
     if (!newDocType || !dateFrom) return;
     setGenerating(true);
     try {
-      const performedBy = await getPerformedBy();
+      const performedBy = getPerformedBy();
       const now     = new Date();
       const docId   = await generateNextDocId(TYPE_CODE[newDocType], dateFrom);
       const df      = dateFrom;
@@ -778,7 +784,7 @@ export default function Documents() {
                   type="date"
                   value={filterDate}
                   onChange={e => setFilterDate(e.target.value)}
-                  className="border border-gray-300 rounded-lg px-3 py-2 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]"
+                  className="border border-gray-300 rounded-lg px-3 py-4 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]"
                 />
               </div>
 
@@ -801,7 +807,7 @@ export default function Documents() {
                     value={filterRangeEnd}
                     onChange={e => setFilterRangeEnd(e.target.value)}
                     min={filterDate}
-                    className="border border-gray-300 rounded-lg px-3 py-2 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]"
+                    className="border border-gray-300 rounded-lg px-3 py-4 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]"
                   />
                 </div>
               )}
@@ -904,7 +910,7 @@ export default function Documents() {
                   value={dateFrom}
                   onChange={e => setDateFrom(e.target.value)}
                   disabled={generating}
-                  className="flex-1 border border-gray-300 rounded-lg px-4 py-3 text-xl text-gray-700 outline-none focus:border-[#3ca4c7] disabled:opacity-60"
+                  className="flex-1 border border-gray-300 rounded-lg px-4 py-4 text-xl text-gray-700 outline-none focus:border-[#3ca4c7] disabled:opacity-60"
                 />
               </div>
 
@@ -919,7 +925,7 @@ export default function Documents() {
                   onChange={e => setDateTo(e.target.value)}
                   min={dateFrom}
                   disabled={generating}
-                  className="flex-1 border border-gray-300 rounded-lg px-4 py-3 text-xl text-gray-700 outline-none focus:border-[#3ca4c7] disabled:opacity-60"
+                  className="flex-1 border border-gray-300 rounded-lg px-4 py-4 text-xl text-gray-700 outline-none focus:border-[#3ca4c7] disabled:opacity-60"
                 />
               </div>
 
@@ -1055,7 +1061,7 @@ export default function Documents() {
                         value={docFilters.performedBy || ''}
                         onChange={e => setDocFilters(f => ({ ...f, performedBy: e.target.value }))}
                         disabled={generating}
-                        className="flex-1 border border-gray-300 rounded-lg px-4 py-3 text-xl text-gray-700 outline-none focus:border-[#3ca4c7] disabled:opacity-60"
+                        className="flex-1 border border-gray-300 rounded-lg px-4 py-4 text-xl text-gray-700 outline-none focus:border-[#3ca4c7] disabled:opacity-60"
                       />
                     </div>
                   </div>

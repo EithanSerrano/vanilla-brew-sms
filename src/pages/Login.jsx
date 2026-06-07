@@ -1,6 +1,6 @@
 ﻿import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { signInWithEmailAndPassword, sendPasswordResetEmail, signOut, updatePassword } from 'firebase/auth';
+import { signInWithEmailAndPassword, sendPasswordResetEmail, signOut, updatePassword, setPersistence, browserSessionPersistence } from 'firebase/auth';
 import { doc, getDoc, collection, query, where, getDocs, updateDoc, addDoc, serverTimestamp, limit } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 import { Eye, EyeOff, Lock } from 'lucide-react';
@@ -106,6 +106,7 @@ export default function Login() {
 
     setIsLoggingIn(true);
     try {
+      await setPersistence(auth, browserSessionPersistence);
       const userCredential = await signInWithEmailAndPassword(auth, trimmedUsername, credentials.password);
       const user = userCredential.user;
 
@@ -141,6 +142,13 @@ export default function Login() {
           setIsLoggingIn(false);
           return;
         }
+
+        sessionStorage.setItem('sessionUser', JSON.stringify({
+          uid:   user.uid,
+          name:  userData.name  || '',
+          email: user.email     || '',
+          role:  userData.role  || '',
+        }));
 
         if (userData.mustChangePassword) {
           setForcePwUser(user);

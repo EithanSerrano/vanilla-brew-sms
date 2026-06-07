@@ -390,7 +390,7 @@ export default function Dashboard({ role }) {
                   <input
                     type="date" value={filterDate}
                     onChange={e => setFilterDate(e.target.value)}
-                    className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]"
+                    className="flex-1 border border-gray-300 rounded-lg px-3 py-4 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]"
                   />
                   <label className="flex items-center gap-2 text-xl text-gray-600 shrink-0 cursor-pointer">
                     <input
@@ -404,7 +404,7 @@ export default function Dashboard({ role }) {
                     type="date" value={filterRangeEnd}
                     onChange={e => setFilterRangeEnd(e.target.value)}
                     disabled={!filterIsRange}
-                    className={`flex-1 border rounded-lg px-3 py-2 text-xl outline-none transition-colors ${
+                    className={`flex-1 border rounded-lg px-3 py-4 text-xl outline-none transition-colors ${
                       filterIsRange
                         ? 'border-gray-300 text-gray-700 bg-white focus:border-[#3ca4c7]'
                         : 'border-gray-200 text-gray-300 bg-white cursor-not-allowed'

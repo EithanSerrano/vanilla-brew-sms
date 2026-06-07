@@ -1,7 +1,7 @@
 ﻿import { useState, useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { onAuthStateChanged, signOut } from 'firebase/auth';
-import { doc, getDoc, updateDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { signOut } from 'firebase/auth';
+import { doc, updateDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 import {
   LayoutGrid, Package, FolderCog, Coffee, Users, Tag,
@@ -55,13 +55,8 @@ export default function AdminSidebar() {
   const [clock, setClock] = useState(new Date());
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        const snap = await getDoc(doc(db, 'users', user.uid));
-        if (snap.exists()) setUserName(snap.data().name || '');
-      }
-    });
-    return unsubscribe;
+    const session = JSON.parse(sessionStorage.getItem('sessionUser') || '{}');
+    setUserName(session.name || '');
   }, []);
 
   useEffect(() => {
@@ -85,21 +80,21 @@ export default function AdminSidebar() {
   const handleLogout = async () => {
     setIsLoggingOut(true);
     try {
-      const user = auth.currentUser;
-      if (user) {
-        const snap = await getDoc(doc(db, 'users', user.uid));
-        const userData = snap.exists() ? snap.data() : {};
+      const session = JSON.parse(sessionStorage.getItem('sessionUser') || '{}');
+      const uid = session.uid;
+      if (uid) {
         await addDoc(collection(db, 'auditlog'), {
           action: 'Logout',
-          performedBy: user.email,
-          userId: user.uid,
-          userName: userData.name || '',
+          performedBy: session.email || '',
+          userId: uid,
+          userName: session.name || '',
           role: 'admin',
-          details: `${userData.name || user.email} logged out.`,
+          details: `${session.name || session.email} logged out.`,
           timestamp: serverTimestamp(),
         });
-        await updateDoc(doc(db, 'users', user.uid), { isOnline: false });
+        await updateDoc(doc(db, 'users', uid), { isOnline: false });
       }
+      sessionStorage.removeItem('sessionUser');
       await signOut(auth);
       navigate('/login');
     } catch (err) {

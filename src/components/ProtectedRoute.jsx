@@ -14,26 +14,26 @@ export default function ProtectedRoute() {
 
   const forceSignOut = useCallback(async () => {
     try {
-      const user = auth.currentUser;
-      if (user) {
-        const snap = await getDoc(doc(db, 'users', user.uid));
-        const userData = snap.exists() ? snap.data() : {};
+      const session = JSON.parse(sessionStorage.getItem('sessionUser') || '{}');
+      const uid = session.uid;
+      if (uid) {
         await Promise.all([
           addDoc(collection(db, 'auditlog'), {
             action: 'Auto Logout',
-            performedBy: user.email,
-            userId: user.uid,
-            userName: userData.name || '',
-            role: userData.role || '',
-            details: `${userData.name || user.email} was automatically logged out due to inactivity.`,
+            performedBy: session.email || '',
+            userId: uid,
+            userName: session.name || '',
+            role: session.role || '',
+            details: `${session.name || session.email} was automatically logged out due to inactivity.`,
             timestamp: serverTimestamp(),
           }),
-          updateDoc(doc(db, 'users', user.uid), { isOnline: false }),
+          updateDoc(doc(db, 'users', uid), { isOnline: false }),
         ]);
       }
     } catch {
       // best-effort; sign out regardless
     }
+    sessionStorage.removeItem('sessionUser');
     await signOut(auth);
     navigate('/login', { replace: true, state: { reason: 'inactivity' } });
   }, [navigate]);
