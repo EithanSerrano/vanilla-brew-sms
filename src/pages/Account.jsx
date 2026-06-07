@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useBlocker } from 'react-router-dom';
 import { auth, db } from '../firebase';
 import {
-  updatePassword, updateEmail, EmailAuthProvider, reauthenticateWithCredential
+  updatePassword, EmailAuthProvider, reauthenticateWithCredential
 } from 'firebase/auth';
 import {
   doc, getDoc, updateDoc, collection, addDoc, serverTimestamp
@@ -54,27 +54,30 @@ export default function Account({ role }) {
   const [otpError,      setOtpError]      = useState('');
   const [isOtpFocused,  setIsOtpFocused]  = useState(false);
 
-  // Change email
-  const [newEmail,    setNewEmail]    = useState('');
-  const [emailMsg,    setEmailMsg]    = useState({ text: '', ok: false });
-  const [emailSaving, setEmailSaving] = useState(false);
-
-  // Change password
+  // Change credentials (Name & Password)
+  const [newDisplayName, setNewDisplayName] = useState('');
   const [currentPw,     setCurrentPw]     = useState('');
   const [newPw,         setNewPw]         = useState('');
   const [confirmPw,     setConfirmPw]     = useState('');
   const [showCurrentPw, setShowCurrentPw] = useState(false);
   const [showNewPw,     setShowNewPw]     = useState(false);
   const [showConfirmPw, setShowConfirmPw] = useState(false);
-  const [pwMsg,         setPwMsg]         = useState({ text: '', ok: false });
-  const [pwSaving,      setPwSaving]      = useState(false);
+  const [credMsg,       setCredMsg]       = useState({ text: '', ok: false });
+  const [credSaving,    setCredSaving]    = useState(false);
+  
+  // Confirmation Modal
+  const [showConfirmUpdate, setShowConfirmUpdate] = useState(false);
 
   useEffect(() => {
     const user = auth.currentUser;
     if (!user) return;
     setUserEmail(user.email || '');
     getDoc(doc(db, 'users', user.uid)).then(snap => {
-      if (snap.exists()) setUserName(snap.data().name || '');
+      if (snap.exists()) {
+        const name = snap.data().name || '';
+        setUserName(name);
+        setNewDisplayName(name);
+      }
     });
   }, []);
 
@@ -100,33 +103,33 @@ export default function Account({ role }) {
     setOtpInput(''); setOtpCode(''); setOtpMsg(''); setOtpError('');
   };
 
-const handleRequestOtp = async () => {
-  setOtpSending(true); setOtpMsg(''); setOtpError(''); setOtpInput('');
-  const code = Math.floor(100000 + Math.random() * 900000).toString();
-  try {
-    await fetch('https://api.emailjs.com/api/v1.0/email/send', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        service_id: import.meta.env.VITE_EMAILJS_SERVICE_OTP,
-        template_id: import.meta.env.VITE_EMAILJS_TEMPLATE_OTP,
-        user_id: import.meta.env.VITE_EMAILJS_PUBLIC_KEY_OTP,
-        template_params: {
-          admin_email: 'qcjenueva@tip.edu.ph',
-          otp: code,
-          time: new Date().toLocaleString(),
-        },
-      }),
-    });
-    setOtpCode(code);
-    setOtpExpiry(Date.now() + 5 * 60 * 1000);
-    setOtpMsg('OTP sent to your email. Valid for 5 minutes.');
-  } catch {
-    setOtpMsg('Failed to send OTP. Please try again.');
-  } finally {
-    setOtpSending(false);
-  }
-};
+  const handleRequestOtp = async () => {
+    setOtpSending(true); setOtpMsg(''); setOtpError(''); setOtpInput('');
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    try {
+      await fetch('https://api.emailjs.com/api/v1.0/email/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          service_id: import.meta.env.VITE_EMAILJS_SERVICE_OTP,
+          template_id: import.meta.env.VITE_EMAILJS_TEMPLATE_OTP,
+          user_id: import.meta.env.VITE_EMAILJS_PUBLIC_KEY_OTP,
+          template_params: {
+            admin_email: 'qcjenueva@tip.edu.ph',
+            otp: code,
+            time: new Date().toLocaleString(),
+          },
+        }),
+      });
+      setOtpCode(code);
+      setOtpExpiry(Date.now() + 5 * 60 * 1000);
+      setOtpMsg('OTP sent to your email. Valid for 5 minutes.');
+    } catch {
+      setOtpMsg('Failed to send OTP. Please try again.');
+    } finally {
+      setOtpSending(false);
+    }
+  };
 
   const handleVerifyOtp = () => {
     setOtpError('');
@@ -143,59 +146,77 @@ const handleRequestOtp = async () => {
     }
   };
 
-  // ── Change Email ──
-  const handleUpdateEmail = async () => {
-    setEmailMsg({ text: '', ok: false });
-    if (!newEmail.trim()) return setEmailMsg({ text: 'Enter a new email address.', ok: false });
-    setEmailSaving(true);
-    try {
-      const user = auth.currentUser;
-      await updateEmail(user, newEmail.trim());
-      await updateDoc(doc(db, 'users', user.uid), { email: newEmail.trim() });
-      await logAudit('Update Email', `Email changed to ${newEmail.trim()}.`);
-      setUserEmail(newEmail.trim()); setNewEmail('');
-      setEmailMsg({ text: 'Email updated successfully.', ok: true });
-    } catch (err) {
-      const msg =
-        err.code === 'auth/email-already-in-use' ? 'Email already in use.' :
-        err.code === 'auth/invalid-email'         ? 'Invalid email format.' :
-        err.code === 'auth/requires-recent-login' ? 'Session expired. Please log in again.' :
-        'Failed to update email.';
-      setEmailMsg({ text: msg, ok: false });
-    } finally {
-      setEmailSaving(false);
+  // ── Pre-flight Check (Opens Confirmation) ──
+  const handlePreflightCheck = () => {
+    setCredMsg({ text: '', ok: false });
+    
+    const isNameChanged = newDisplayName.trim() !== userName;
+    const isPasswordAttempt = !!(currentPw || newPw || confirmPw);
+
+    if (!isNameChanged && !isPasswordAttempt) {
+      return setCredMsg({ text: 'No changes detected.', ok: false });
     }
+
+    if (isNameChanged && !newDisplayName.trim()) {
+      return setCredMsg({ text: 'Display name cannot be empty.', ok: false });
+    }
+
+    if (isPasswordAttempt) {
+      if (!currentPw) return setCredMsg({ text: 'Enter your current password.', ok: false });
+      if (newPw.length < 8) return setCredMsg({ text: 'New password must be at least 8 characters.', ok: false });
+      if (newPw !== confirmPw) return setCredMsg({ text: 'Passwords do not match.', ok: false });
+    }
+
+    // All validations passed, show the confirmation modal
+    setShowConfirmUpdate(true);
   };
 
-  // ── Change Password ──
-  const handleUpdatePassword = async () => {
-    setPwMsg({ text: '', ok: false });
-    if (!currentPw) return setPwMsg({ text: 'Enter your current password.', ok: false });
-    if (newPw.length < 8) return setPwMsg({ text: 'New password must be at least 8 characters.', ok: false });
-    if (newPw !== confirmPw) return setPwMsg({ text: 'Passwords do not match.', ok: false });
-    setPwSaving(true);
+  // ── Execute Change (After Confirmation) ──
+  const executeCredentialUpdate = async () => {
+    setShowConfirmUpdate(false);
+    setCredSaving(true);
+    
+    const isNameChanged = newDisplayName.trim() !== userName;
+    const isPasswordAttempt = !!(currentPw || newPw || confirmPw);
+
     try {
       const user = auth.currentUser;
-      const cred = EmailAuthProvider.credential(user.email, currentPw);
-      await reauthenticateWithCredential(user, cred);
-      await updatePassword(user, newPw);
-      await logAudit('Update Password', 'Account password changed.');
-      setCurrentPw(''); setNewPw(''); setConfirmPw('');
-      setPwMsg({ text: 'Password updated successfully.', ok: true });
+
+      // 1. Update Password if fields are filled
+      if (isPasswordAttempt) {
+        const cred = EmailAuthProvider.credential(user.email, currentPw);
+        await reauthenticateWithCredential(user, cred);
+        await updatePassword(user, newPw);
+        await logAudit('Update Password', 'Account password changed.');
+        setCurrentPw(''); setNewPw(''); setConfirmPw('');
+      }
+
+      // 2. Update Firestore Display Name if changed
+      if (isNameChanged) {
+        await updateDoc(doc(db, 'users', user.uid), { name: newDisplayName.trim() });
+        await logAudit('Update Display Name', `Name changed to ${newDisplayName.trim()}.`);
+        setUserName(newDisplayName.trim());
+      }
+
+      setCredMsg({ text: 'Credentials updated successfully. Please verify your identity to make further changes.', ok: true });
+      
+      // Relock the form immediately after a successful change
+      setOtpVerified(false);
+
     } catch (err) {
       const msg =
         err.code === 'auth/wrong-password'    ? 'Incorrect current password.' :
         err.code === 'auth/invalid-credential' ? 'Incorrect current password.' :
-        'Failed to update password.';
-      setPwMsg({ text: msg, ok: false });
+        'Failed to update credentials.';
+      setCredMsg({ text: msg, ok: false });
     } finally {
-      setPwSaving(false);
+      setCredSaving(false);
     }
   };
 
   const locked = !otpVerified;
 
-  const isDirty = otpVerified && !!(currentPw || newPw || confirmPw || newEmail);
+  const isDirty = otpVerified && !!(currentPw || newPw || confirmPw || (newDisplayName.trim() !== userName));
 
   const blocker = useBlocker(isDirty);
 
@@ -239,75 +260,85 @@ const handleRequestOtp = async () => {
 
         <div className="flex-1 overflow-y-auto flex flex-col gap-6" style={{ scrollbarGutter: 'stable' }}>
 
-          {/* ── Change Email ── */}
+          {/* ── Change Credentials (Combined Name & Password) ── */}
           <div className={`border border-gray-200 rounded-xl shadow-sm overflow-hidden transition-opacity ${locked ? 'opacity-50' : ''}`}>
             <div className="px-8 py-5 border-b border-gray-200">
-              <h2 className="text-2xl font-semibold text-gray-800">Change Email</h2>
-              <p className="text-xl text-gray-500 mt-0.5">
-                Current: <span className="font-medium text-gray-700">{userEmail}</span>
-              </p>
+              <h2 className="text-2xl font-semibold text-gray-800">Change Credentials</h2>
             </div>
             <div className="px-8 py-7 flex flex-col gap-5 max-w-lg">
+              
+              {/* Display Name Field */}
               <div className="flex flex-col gap-2">
-                <label className="text-xl font-medium text-gray-600">New Email Address</label>
+                <label className="text-xl font-medium text-gray-600">Display Name</label>
                 <input
-                  type="email"
-                  value={newEmail}
-                  onChange={e => setNewEmail(e.target.value)}
-                  placeholder="new@email.com"
+                  type="text"
+                  value={newDisplayName}
+                  onChange={e => setNewDisplayName(e.target.value)}
                   disabled={locked}
-                  className="border border-gray-300 rounded-lg px-4 py-3 text-xl text-gray-700 outline-none focus:border-[#3ca4c7] disabled:bg-gray-50 disabled:text-gray-400 disabled:cursor-not-allowed"
+                  placeholder="Enter display name"
+                  className="w-full border border-gray-300 rounded-lg px-4 py-3 text-xl text-gray-700 outline-none focus:border-[#3ca4c7] disabled:bg-gray-50 disabled:text-gray-400 disabled:cursor-not-allowed"
                 />
               </div>
-              {emailMsg.text && (
-                <p className={`text-xl font-medium ${emailMsg.ok ? 'text-green-600' : 'text-red-500'}`}>
-                  {emailMsg.text}
-                </p>
-              )}
-              <button
-                onClick={handleUpdateEmail}
-                disabled={locked || emailSaving}
-                className={`self-start px-8 py-2.5 rounded-full text-xl font-semibold transition-colors ${
-                  locked || emailSaving
-                    ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                    : 'bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white'
-                }`}
-              >
-                {emailSaving ? 'Saving…' : 'Update Email'}
-              </button>
-            </div>
-          </div>
 
-          {/* ── Change Password ── */}
-          <div className={`border border-gray-200 rounded-xl shadow-sm overflow-hidden transition-opacity ${locked ? 'opacity-50' : ''}`}>
-            <div className="px-8 py-5 border-b border-gray-200">
-              <h2 className="text-2xl font-semibold text-gray-800">Change Password</h2>
-            </div>
-            <div className="px-8 py-7 flex flex-col gap-5 max-w-lg">
+              <hr className="my-2 border-gray-200" />
+
+              {/* Password Fields */}
               <PwField label="Current Password"      value={currentPw} onChange={setCurrentPw} show={showCurrentPw} onToggle={() => setShowCurrentPw(v => !v)} disabled={locked} />
               <PwField label="New Password"          value={newPw}     onChange={setNewPw}     show={showNewPw}     onToggle={() => setShowNewPw(v => !v)}     disabled={locked} />
               <PwField label="Confirm New Password"  value={confirmPw} onChange={setConfirmPw} show={showConfirmPw} onToggle={() => setShowConfirmPw(v => !v)} disabled={locked} />
-              {pwMsg.text && (
-                <p className={`text-xl font-medium ${pwMsg.ok ? 'text-green-600' : 'text-red-500'}`}>
-                  {pwMsg.text}
+              
+              {credMsg.text && (
+                <p className={`text-xl font-medium ${credMsg.ok ? 'text-green-600' : 'text-red-500'} leading-snug`}>
+                  {credMsg.text}
                 </p>
               )}
+              
               <button
-                onClick={handleUpdatePassword}
-                disabled={locked || pwSaving}
+                onClick={handlePreflightCheck}
+                disabled={locked || credSaving}
                 className={`self-start px-8 py-2.5 rounded-full text-xl font-semibold transition-colors ${
-                  locked || pwSaving
+                  locked || credSaving
                     ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
                     : 'bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white'
                 }`}
               >
-                {pwSaving ? 'Saving…' : 'Update Password'}
+                {credSaving ? 'Saving…' : 'Update Credentials'}
               </button>
             </div>
           </div>
 
         </div>
       </main>
+
+      {/* ══════════════════════════════════════════
+          CONFIRMATION MODAL (Before saving changes)
+      ══════════════════════════════════════════ */}
+      {showConfirmUpdate && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl shadow-2xl w-[440px] px-8 py-7 flex flex-col gap-5">
+            <h3 className="text-2xl font-semibold text-gray-800">Confirm Changes</h3>
+            <p className="text-xl text-gray-500 leading-snug">
+              Are you sure you want to apply these credential updates? You will need to verify your identity again to make further changes.
+            </p>
+            <div className="flex justify-end gap-3 mt-1">
+              <button
+                onClick={() => setShowConfirmUpdate(false)}
+                disabled={credSaving}
+                className="px-6 py-2 rounded-full border border-gray-300 text-xl text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={executeCredentialUpdate}
+                disabled={credSaving}
+                className="px-6 py-2 rounded-full bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white text-xl transition-colors disabled:opacity-70"
+              >
+                {credSaving ? 'Saving...' : 'Yes, Save'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ══════════════════════════════════════════
           UNSAVED CHANGES CONFIRMATION
@@ -353,7 +384,7 @@ const handleRequestOtp = async () => {
                 : `A one-time passkey will be sent to your email to authorize changes.`}
             </p>
 
-            {/* Passkey form (Login style) */}
+            {/* Passkey form */}
             <form onSubmit={e => { e.preventDefault(); otpCode ? handleVerifyOtp() : handleRequestOtp(); }} className="w-full flex flex-col gap-5 px-10">
               <div className="flex flex-col gap-2 w-full items-center">
                 <label className="text-gray-800 text-xl font-medium tracking-wide self-start">
