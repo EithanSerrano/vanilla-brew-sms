@@ -12,6 +12,11 @@ const ACTION_LABELS = {
   RESUPPLY:          'Resupply in Inventory',
   ADJUST:            'Adjust Stock in Inventory',
   EDIT:              'Edit Item in Inventory',
+  ADD_CATEGORY:      'Add Category',
+  ADD_SUBCATEGORY:   'Add Subcategory',
+  EDIT_CATEGORY:     'Edit Category',
+  HIDE_CATEGORY:     'Hide Category',
+  RETRIEVE_CATEGORY: 'Retrieve Category',
   CREATE_ACCOUNT:    'Create Employee Account',
   DEACTIVATE_ACCOUNT:'Deactivate Employee Account',
   REACTIVATE_ACCOUNT:'Reactivate Employee Account',
@@ -108,6 +113,47 @@ function renderDetails(log) {
         { label: 'Full Name', value: d.fullName || '—' },
         { label: 'Email',     value: d.email    || '—' },
       ];
+    case 'EDIT_CATEGORY':
+      return [
+        d.oldName !== d.newName
+          ? { label: 'Name', value: `${d.oldName || '—'} → ${d.newName || '—'}` }
+          : { label: 'Name', value: d.newName || '—' },
+        {
+          label: 'Variants',
+          value: Array.isArray(d.variants) && d.variants.length > 0
+            ? d.variants.map(v => (typeof v === 'object' ? v.name : v)).filter(Boolean).join(', ')
+            : '—',
+        },
+      ];
+    case 'ADD_CATEGORY':
+      return [
+        { label: 'Is Parent', value: d.isParent ? 'Yes' : 'No' },
+        {
+          label: 'Variants',
+          value: Array.isArray(d.variants) && d.variants.length > 0
+            ? d.variants.map(v => (typeof v === 'object' ? v.name : v)).filter(Boolean).join(', ')
+            : '—',
+        },
+        ...(Array.isArray(d.subcategories) && d.subcategories.length > 0
+          ? [{ label: 'Subcategories', value: d.subcategories.join(', ') }]
+          : []),
+      ];
+    case 'ADD_SUBCATEGORY':
+      return [
+        { label: 'Parent Category', value: d.parentCategory || '—' },
+        {
+          label: 'Variants',
+          value: Array.isArray(d.variants) && d.variants.length > 0
+            ? d.variants.map(v => (typeof v === 'object' ? v.name : v)).filter(Boolean).join(', ')
+            : '—',
+        },
+      ];
+    case 'HIDE_CATEGORY':
+      return [
+        { label: 'Affected Menu Items', value: d.affectedItems ?? '—' },
+      ];
+    case 'RETRIEVE_CATEGORY':
+      return [];
     case 'EDIT_ACCOUNT':
       return [
         { label: 'Full Name',     value: `${d.previousFullName || '—'} → ${d.newFullName || '—'}` },
@@ -117,7 +163,14 @@ function renderDetails(log) {
       if (typeof d !== 'object' || d === null) {
         return [{ label: 'Details', value: String(d) }];
       }
-      return Object.entries(d).map(([k, v]) => ({ label: k, value: String(v) }));
+      return Object.entries(d).map(([k, v]) => ({
+        label: k,
+        value: Array.isArray(v)
+          ? v.map(item => typeof item === 'object' && item !== null ? (item.name || JSON.stringify(item)) : String(item)).join(', ')
+          : typeof v === 'object' && v !== null
+            ? JSON.stringify(v)
+            : String(v),
+      }));
   }
 }
 
@@ -299,7 +352,7 @@ export default function Maintenance() {
               <div className="flex flex-col gap-1.5 min-w-[160px]">
                 <label className="text-xl font-medium text-gray-600">{filterIsRange ? 'Start Date' : 'Date'}</label>
                 <input type="date" value={filterDate} onChange={e => setFilterDate(e.target.value)}
-                  className="border border-gray-300 rounded-lg px-3 py-4 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]" />
+                  className="border border-gray-300 rounded-lg px-3 py-2 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]" />
               </div>
               <div className="flex items-center gap-2 pb-2">
                 <input type="checkbox" id="filterRange" checked={filterIsRange} onChange={e => setFilterIsRange(e.target.checked)}
@@ -310,7 +363,7 @@ export default function Maintenance() {
                 <div className="flex flex-col gap-1.5 min-w-[160px]">
                   <label className="text-xl font-medium text-gray-600">End Date</label>
                   <input type="date" value={filterRangeEnd} onChange={e => setFilterRangeEnd(e.target.value)}
-                    className="border border-gray-300 rounded-lg px-3 py-4 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]" />
+                    className="border border-gray-300 rounded-lg px-3 py-2 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]" />
                 </div>
               )}
 

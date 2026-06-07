@@ -404,8 +404,12 @@ export default function MenuItems() {
 
   const logAudit = async (action, itemId, itemName, details = {}) => {
     try {
-      const session = JSON.parse(sessionStorage.getItem('sessionUser') || '{}');
-      const performedBy = session.name || 'Unknown';
+      let performedBy = 'Unknown';
+      const currentUser = auth.currentUser;
+      if (currentUser) {
+        const snap = await getDoc(doc(db, 'users', currentUser.uid));
+        if (snap.exists()) performedBy = snap.data().name || 'Unknown';
+      }
       await addDoc(collection(db, 'auditlog'), {
         action, itemType: 'menuItem', itemId, itemName, details, performedBy, timestamp: new Date(),
       });

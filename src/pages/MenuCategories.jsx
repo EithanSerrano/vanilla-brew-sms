@@ -56,7 +56,9 @@ export default function MenuCategories() {
   const [editVariants,    setEditVariants]    = useState([{ name: '' }]);
   const [editNameError,   setEditNameError]   = useState('');
   const [showEditConfirm, setShowEditConfirm] = useState(false);
+  const [showEditOk,      setShowEditOk]      = useState(false);
   const [editSaving,      setEditSaving]      = useState(false);
+  const [savedEditName,   setSavedEditName]   = useState('');
 
   // ── New Subcategory form ("+Sub" button) ──
   const [showSubForm,    setShowSubForm]    = useState(false);
@@ -171,8 +173,12 @@ export default function MenuCategories() {
   // ── Audit log ──
   const logAudit = async (action, itemId, itemName, details = {}) => {
     try {
-      const session = JSON.parse(sessionStorage.getItem('sessionUser') || '{}');
-      const performedBy = session.name || 'Unknown';
+      let performedBy = 'Unknown';
+      const currentUser = auth.currentUser;
+      if (currentUser) {
+        const snap = await getDoc(doc(db, 'users', currentUser.uid));
+        if (snap.exists()) performedBy = snap.data().name || 'Unknown';
+      }
       await addDoc(collection(db, 'auditlog'), {
         action, itemType: 'category', itemId, itemName, details, performedBy, timestamp: new Date(),
       });
@@ -262,7 +268,9 @@ export default function MenuCategories() {
     setShowEditForm(true);
   };
   const resetEditForm = () => {
-    setShowEditForm(false); setEditingCat(null); setEditName('');
+    setShowEditForm(false); setShowEditFormDiscard(false); setShowEditConfirm(false);
+    setShowEditOk(false); setSavedEditName('');
+    setEditingCat(null); setEditName('');
     setEditVariants([{ name: '' }]); setEditNameError('');
   };
   const closeEditForm = () => {
@@ -272,7 +280,7 @@ export default function MenuCategories() {
     const trimmed = editName.trim();
     if (!trimmed) { setEditNameError('Category name is required.'); return; }
     if (isDuplicate(trimmed, editingCat.id)) { setEditNameError('A category with this name already exists.'); return; }
-    setEditNameError(''); setShowEditConfirm(true);
+    setEditNameError(''); handleConfirmEdit();
   };
   const handleConfirmEdit = async () => {
     setEditSaving(true);
@@ -280,20 +288,58 @@ export default function MenuCategories() {
       const oldName = editingCat.name;
       const newName = editName.trim();
       const variantsToSave = editVariants.filter(v => v.name.trim()).map(v => ({ name: v.name.trim() }));
+      const oldVariants = editingCat.variants || [];
 
       await updateDoc(doc(db, 'categories', editingCat.id), { name: newName, variants: variantsToSave });
 
-      // Cascade rename to menu items if name changed
-      if (oldName !== newName) {
-        const affected = menuItems.filter(m => m.category === oldName);
-        await Promise.all(affected.map(item =>
-          updateDoc(doc(db, 'menuItems', item.id), { category: newName })
-        ));
+      // Cascade rename to menu items if category name changed
+      const affectedItems = menuItems.filter(m => m.category === oldName);
+      const categoryNameChanged = oldName !== newName;
+
+      // Build rename and removal maps for variants
+      // Match old→new by position (same index = same variant, just renamed)
+      // Any old variant with no corresponding new variant = removed
+      const variantRenameMap = {}; // oldVariantName → newVariantName
+      const removedVariantNames = new Set();
+
+      oldVariants.forEach((oldVar, idx) => {
+        if (idx < variantsToSave.length) {
+          // Variant still exists at this position — may have been renamed
+          variantRenameMap[oldVar.name] = variantsToSave[idx].name;
+        } else {
+          // No corresponding new variant — it was removed
+          removedVariantNames.add(oldVar.name);
+        }
+      });
+
+      const variantsChanged = oldVariants.length !== variantsToSave.length ||
+        oldVariants.some((v, i) => variantsToSave[i]?.name !== v.name);
+
+      if (affectedItems.length > 0 && (categoryNameChanged || variantsChanged)) {
+        await Promise.all(affectedItems.map(item => {
+          const updates = {};
+
+          if (categoryNameChanged) updates.category = newName;
+
+          if (variantsChanged) {
+            const updatedVariants = (item.variants || [])
+              .filter(v => !removedVariantNames.has(v.name))   // remove deleted variants
+              .map(v => ({
+                ...v,
+                name: variantRenameMap[v.name] ?? v.name,      // rename if needed
+              }));
+            updates.variants = updatedVariants;
+          }
+
+          return updateDoc(doc(db, 'menuItems', item.id), updates);
+        }));
       }
 
       await logAudit('EDIT_CATEGORY', editingCat.id, newName, { oldName, newName, variants: variantsToSave });
       await loadData();
-      setShowEditConfirm(false); closeEditForm();
+      setSavedEditName(newName);
+      setShowEditForm(false);
+      setShowEditOk(true);
     } catch (e) { console.error(e); }
     setEditSaving(false);
   };
@@ -546,7 +592,7 @@ export default function MenuCategories() {
                       {variantNames.length > 0 ? (
                         <span className="flex flex-wrap gap-1 justify-center">
                           {variantNames.map(n => (
-                            <span key={n} className="bg-gray-100 text-gray-600 text-lg px-2 py-0.5 rounded-full">{n}</span>
+                            <span key={n} className="bg-gray-100 text-gray-600 text-lg px-2 py-0.5 rounded-full max-w-[120px] truncate" title={n}>{n}</span>
                           ))}
                         </span>
                       ) : (
@@ -626,6 +672,7 @@ export default function MenuCategories() {
                           type="text" value={v.name}
                           onChange={e => setCatVariants(p => p.map((cv, idx) => idx === i ? { name: e.target.value } : cv))}
                           placeholder="e.g. Small, Regular, Large"
+                          maxLength={25}
                           className="flex-1 border border-gray-300 rounded-lg px-4 py-2.5 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]"
                         />
                         <button
@@ -685,6 +732,7 @@ export default function MenuCategories() {
                                 type="text" value={v.name}
                                 onChange={e => updateSubVariant(si, vi, e.target.value)}
                                 placeholder="e.g. Small"
+                                maxLength={25}
                                 className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]"
                               />
                               <button
@@ -728,7 +776,7 @@ export default function MenuCategories() {
             <div className="border border-gray-100 rounded-lg p-3 bg-gray-50 flex flex-col gap-1">
               <p className="text-xl text-gray-700">Name: <span className="font-semibold">{catName.trim()}</span></p>
               {catVariants.filter(v => v.name.trim()).length > 0 && (
-                <p className="text-xl text-gray-700">
+                <p className="text-xl text-gray-700 truncate">
                   Variants: <span className="font-semibold">{catVariants.filter(v => v.name.trim()).map(v => v.name.trim()).join(', ')}</span>
                 </p>
               )}
@@ -809,6 +857,7 @@ export default function MenuCategories() {
                           type="text" value={v.name}
                           onChange={e => setEditVariants(p => p.map((ev, idx) => idx === i ? { name: e.target.value } : ev))}
                           placeholder="e.g. Small"
+                          maxLength={25}
                           className="flex-1 border border-gray-300 rounded-lg px-4 py-2.5 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]"
                         />
                         <button
@@ -828,41 +877,35 @@ export default function MenuCategories() {
 
               <button
                 onClick={handleEditSubmit}
-                className="w-full bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white py-3 rounded-xl text-xl font-semibold transition-colors"
-              >Save Changes</button>
+                disabled={editSaving}
+                className="w-full bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white py-3 rounded-xl text-xl font-semibold transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
+              >
+                {editSaving ? <><Loader size={18} className="animate-spin" /> Saving…</> : 'Save Changes'}
+              </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* ── Confirm Edit ── */}
-      {showEditConfirm && editingCat && (
+      {/* ── Category Updated Success Dialog ── */}
+      {showEditOk && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[60]">
-          <div className="bg-white rounded-2xl shadow-2xl w-[460px] px-8 py-6 flex flex-col gap-4">
-            <h3 className="text-2xl font-semibold text-gray-800">Save Changes?</h3>
-            <div className="border border-gray-100 rounded-lg p-3 bg-gray-50 flex flex-col gap-1">
-              {editName.trim() !== editingCat.name ? (
-                <p className="text-xl text-gray-700">
-                  Name: <span className="line-through text-gray-400">{editingCat.name}</span>
-                  {' → '}
-                  <span className="font-semibold">{editName.trim()}</span>
-                </p>
-              ) : (
-                <p className="text-xl text-gray-700">Name: <span className="font-semibold">{editName.trim()}</span></p>
-              )}
-              {editVariants.filter(v => v.name.trim()).length > 0 && (
-                <p className="text-xl text-gray-700">
-                  Variants: <span className="font-semibold">{editVariants.filter(v => v.name.trim()).map(v => v.name.trim()).join(', ')}</span>
-                </p>
-              )}
+          <div className="bg-white rounded-2xl shadow-2xl w-[480px] px-8 py-6 flex flex-col gap-4">
+            <h3 className="text-2xl font-semibold text-gray-800">Category Updated!</h3>
+            <div className="border border-gray-100 rounded-lg p-4 bg-gray-50">
+              <p className="text-xl text-gray-700 font-medium">{savedEditName}</p>
+              {(() => {
+                const varNames = editVariants.filter(v => v.name.trim()).map(v => v.name.trim());
+                return varNames.length > 0
+                  ? <p className="text-xl text-gray-500 mt-1">Variants: {varNames.join(', ')}</p>
+                  : null;
+              })()}
             </div>
-            <div className="flex gap-3 justify-end mt-1">
-              <button onClick={() => setShowEditConfirm(false)} disabled={editSaving}
-                className="px-6 py-2 rounded-full border border-gray-300 text-xl text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50">Cancel</button>
-              <button onClick={handleConfirmEdit} disabled={editSaving}
-                className={`flex items-center gap-2 px-6 py-2 rounded-full text-xl transition-colors ${editSaving ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white'}`}>
-                {editSaving ? <><Loader size={18} className="animate-spin" /> Saving…</> : 'Confirm'}
-              </button>
+            <div className="flex justify-end mt-1">
+              <button
+                onClick={resetEditForm}
+                className="px-6 py-2 rounded-full bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white text-xl transition-colors"
+              >OK</button>
             </div>
           </div>
         </div>
@@ -964,6 +1007,7 @@ export default function MenuCategories() {
                         type="text" value={v.name}
                         onChange={e => setSubVariants(p => p.map((sv, idx) => idx === i ? { name: e.target.value } : sv))}
                         placeholder="e.g. Small, Regular, Large"
+                        maxLength={25}
                         className="flex-1 border border-gray-300 rounded-lg px-4 py-2.5 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]"
                       />
                       <button
@@ -1014,7 +1058,7 @@ export default function MenuCategories() {
               <p className="text-xl text-gray-700">Name: <span className="font-semibold">{subName.trim()}</span></p>
               <p className="text-xl text-gray-700">Under: <span className="font-semibold">{subParent.name}</span></p>
               {subVariants.filter(v => v.name.trim()).length > 0 && (
-                <p className="text-xl text-gray-700">
+                <p className="text-xl text-gray-700 truncate">
                   Variants: <span className="font-semibold">{subVariants.filter(v => v.name.trim()).map(v => v.name.trim()).join(', ')}</span>
                 </p>
               )}

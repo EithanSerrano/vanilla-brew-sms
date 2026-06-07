@@ -209,6 +209,9 @@ export default function Dashboard({ role }) {
   const oneWeekAgo = new Date(Date.now() - 7 * 86400000);
   const tally = {};
   sales.forEach(sale => {
+    // Exclude returned/refunded items from the analytics
+    if (sale.status === 'Returned' || sale.status === 'Refunded') return;
+    
     const d = parseSaleDate(sale);
     if (d && d < oneWeekAgo) return;
     (sale.orders || []).forEach(order => {
@@ -224,6 +227,9 @@ export default function Dashboard({ role }) {
   // ── Modal tally (date-filtered) ──
   const modalTally = {};
   sales.forEach(sale => {
+    // Exclude returned/refunded items from the analytics
+    if (sale.status === 'Returned' || sale.status === 'Refunded') return;
+
     const d = parseSaleDate(sale);
     if (!d) return;
     let include = false;
@@ -325,6 +331,7 @@ export default function Dashboard({ role }) {
   ${sale.customerType ? `<div class="info-row">Type: ${sale.customerType}</div>` : ''}
   <div class="info-row">Mode: ${sale.orderMode || '&#8212;'}</div>
   <div class="info-row">Payment: ${sale.modeOfPayment || '&#8212;'}</div>
+  <div class="info-row">Status: ${sale.status || 'Completed'}</div>
   <hr class="dash">
   <div class="section-title">ORDER ITEMS</div>
   ${itemsHtml}
@@ -390,7 +397,7 @@ export default function Dashboard({ role }) {
                   <input
                     type="date" value={filterDate}
                     onChange={e => setFilterDate(e.target.value)}
-                    className="flex-1 border border-gray-300 rounded-lg px-3 py-4 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]"
+                    className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]"
                   />
                   <label className="flex items-center gap-2 text-xl text-gray-600 shrink-0 cursor-pointer">
                     <input
@@ -404,7 +411,7 @@ export default function Dashboard({ role }) {
                     type="date" value={filterRangeEnd}
                     onChange={e => setFilterRangeEnd(e.target.value)}
                     disabled={!filterIsRange}
-                    className={`flex-1 border rounded-lg px-3 py-4 text-xl outline-none transition-colors ${
+                    className={`flex-1 border rounded-lg px-3 py-2 text-xl outline-none transition-colors ${
                       filterIsRange
                         ? 'border-gray-300 text-gray-700 bg-white focus:border-[#3ca4c7]'
                         : 'border-gray-200 text-gray-300 bg-white cursor-not-allowed'
@@ -437,10 +444,11 @@ export default function Dashboard({ role }) {
             )}
             {/* Column headers */}
             <div className="flex items-center px-5 py-3 border-b border-gray-200 bg-white shrink-0">
-              <span className="w-[18%] pl-10 text-xl font-semibold text-gray-800 text-center">Sales ID</span>
-              <span className="w-[40%] text-xl font-semibold text-gray-800 text-center">Date</span>
+              <span className="w-[18%] pl-5 text-xl font-semibold text-gray-800 text-center">Sales ID</span>
+              <span className="w-[26%] text-xl font-semibold text-gray-800 text-center">Date</span>
               <span className="w-[16%] text-xl font-semibold text-gray-800 text-center">Time</span>
-              <span className="w-[25%] text-xl font-semibold text-gray-800 text-center">Action</span>
+              <span className="w-[20%] text-xl font-semibold text-gray-800 text-center">Status</span>
+              <span className="w-[20%] text-xl font-semibold text-gray-800 text-center">Action</span>
             </div>
             <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-2" style={{ scrollbarGutter: 'stable' }}>
               {loading && <p className="py-12 text-gray-400 text-xl text-center">Loading…</p>}
@@ -451,10 +459,20 @@ export default function Dashboard({ role }) {
                 const { date, time } = splitDateTime(sale.dateAndTimeStr);
                 return (
                   <div key={sale.id} className="flex items-center bg-white rounded-xl border border-gray-200 shadow-sm px-5 py-3.5">
-                    <span className="w-[18%] pl-10 text-xl text-gray-700">{sale.transactionNumber || sale.id}</span>
-                    <span className="w-[40%] text-xl text-gray-700 text-center">{date}</span>
-                    <span className="w-[18%] text-xl text-gray-700 text-center">{time}</span>
-                    <div className="flex-1 flex justify-center">
+                    <span className="w-[18%] pl-5 text-xl text-gray-700 truncate">{sale.transactionNumber || sale.id}</span>
+                    <span className="w-[26%] text-xl text-gray-700 text-center">{date}</span>
+                    <span className="w-[16%] text-xl text-gray-700 text-center">{time}</span>
+                    <div className="w-[20%] flex justify-center">
+                      <span className={`text-xl font-medium ${
+                        sale.status === 'Returned' ? 'text-[#D97B39]' :
+                        sale.status === 'Refunded' ? 'text-[#C0392B]' :
+                        sale.status === 'Ongoing' ? 'text-yellow-600' :
+                        'text-green-600'
+                      }`}>
+                        {sale.status || 'Completed'}
+                      </span>
+                    </div>
+                    <div className="w-[20%] flex justify-center">
                       <button
                         onClick={() => setViewingSale(sale)}
                         className="bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white px-5 py-1.5 rounded-full text-xl transition-colors"
@@ -508,7 +526,7 @@ export default function Dashboard({ role }) {
                     </div>
                   ))
                   : ranked.length === 0
-                  ? <p className="text-xl text-gray-400 text-center py-8">No sales this week.</p>
+                  ? <p className="text-xl text-gray-400 text-center py-8">No valid sales this week.</p>
                   : ranked.slice(0, 5).map((item, idx) => (
                     <div
                       key={item.name}
@@ -651,7 +669,7 @@ export default function Dashboard({ role }) {
                       </div>
                     ))
                     : modalRanked.length === 0
-                    ? <p className="text-xl text-gray-400 text-center py-8">No sales for this period.</p>
+                    ? <p className="text-xl text-gray-400 text-center py-8">No valid sales for this period.</p>
                     : modalRanked.map((item, i) => (
                       <div key={item.name} className={`flex items-center px-5 py-3.5 ${i < modalRanked.length - 1 ? 'border-b border-gray-100' : ''}`}>
                         <span className="w-14 text-xl font-semibold text-gray-400 text-center">{item.rank}</span>
@@ -736,12 +754,22 @@ export default function Dashboard({ role }) {
                     ['Cashier Name',  viewingSale.cashierName],
                     ['Order Mode',    viewingSale.orderMode],
                     ['Payment Mode',  viewingSale.modeOfPayment],
+                    ['Status',        viewingSale.status || 'Completed'],
                   ];
                 })().map(([label, value]) => (
                   <div key={label} className="flex items-center gap-4">
                     <span className="text-xl text-gray-600 w-44 shrink-0 text-right">{label}</span>
-                    <div className="flex-1 border border-gray-300 rounded-lg px-4 py-2.5 text-xl text-gray-700 bg-gray-50 min-h-[48px]">
-                      {value || ''}
+                    <div className="flex-1 border border-gray-300 rounded-lg px-4 py-2.5 text-xl text-gray-700 bg-gray-50 min-h-[48px] flex items-center">
+                      <span className={`${
+                        label === 'Status' 
+                          ? value === 'Returned' ? 'text-[#D97B39] font-medium' :
+                            value === 'Refunded' ? 'text-[#C0392B] font-medium' :
+                            value === 'Ongoing' ? 'text-yellow-600 font-medium' :
+                            'text-green-600 font-medium'
+                          : ''
+                      }`}>
+                        {value || ''}
+                      </span>
                     </div>
                   </div>
                 ))}
