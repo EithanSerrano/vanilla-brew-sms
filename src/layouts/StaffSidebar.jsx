@@ -90,7 +90,7 @@ export default function StaffSidebar() {
 
   return (
     <aside
-      className="w-[15%] flex flex-col shrink-0 h-full rounded-r-2xl"
+      className="w-[20%] flex flex-col shrink-0 h-full rounded-r-2xl"
       style={{ backgroundColor: '#614033' }}
     >
       {/* Welcome header */}
