@@ -988,7 +988,7 @@ export default function Inventory() {
                   <div className="flex items-center gap-5">
                     <label className="text-xl text-gray-600 w-48 shrink-0">Expiration Date for current batch:</label>
                     <input type="date" value={ingExpDate} onChange={e => setIngExpDate(e.target.value)}
-                      className="flex-1 border border-gray-300 rounded-lg px-4 py-3 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]" />
+                      className="flex-1 border border-gray-300 rounded-lg px-4 py-4 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]" />
                   </div>
                   <div className="flex items-center gap-5">
                     <label className="text-xl text-gray-600 w-48 shrink-0">Batch quantity:</label>
@@ -1269,7 +1269,7 @@ export default function Inventory() {
                   <div className="flex flex-col gap-2 flex-1 min-w-[220px]">
                     <label className="text-xl text-gray-600">Expiration Date for current batch:</label>
                     <input type="date" value={retIngExpDate} onChange={e => setRetIngExpDate(e.target.value)}
-                      className="border border-gray-300 rounded-lg px-4 py-3 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]" />
+                      className="border border-gray-300 rounded-lg px-4 py-4 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]" />
                   </div>
                   <div className="flex flex-col gap-2 flex-1 min-w-[180px]">
                     <label className="text-xl text-gray-600">Batch quantity:</label>
@@ -1415,26 +1415,25 @@ export default function Inventory() {
               ) : (
                 <>
                   <div>
-                    <p className="text-xl font-semibold text-gray-700 mb-5">New Batch Expiration Date</p>
-                    <div className="flex items-center gap-8">
-                      <div className="flex items-center gap-4 flex-1">
-                        <label className="text-xl text-gray-600 shrink-0">Expiration Date for current batch:</label>
+                    <p className="text-xl font-semibold text-gray-700 mb-5">New Batch Details</p>
+                    <div className="flex flex-col gap-4">
+                      <div className="flex items-center gap-5">
+                        <label className="text-xl text-gray-600 w-52 shrink-0">Expiration Date:</label>
                         <input type="date" value={resupIngExpDate} onChange={e => setResupIngExpDate(e.target.value)}
-                          className="flex-1 border border-gray-300 rounded-lg px-4 py-3 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]" />
+                          className="flex-1 border border-gray-300 rounded-lg px-4 py-4 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]" />
                       </div>
-                      <div className="flex flex-col gap-1">
-                        <div className="flex items-center gap-4">
-                          <label className="text-xl text-gray-600 shrink-0">Batch quantity:</label>
-                          <input type="number" min="0" value={resupIngQty} onChange={e => setResupIngQty(e.target.value)}
-                            className="w-40 border border-gray-300 rounded-lg px-4 py-3 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]" />
+                      <div className="flex items-center gap-5">
+                        <label className="text-xl text-gray-600 w-52 shrink-0">Batch quantity:</label>
+                        <input type="number" min="0" value={resupIngQty} onChange={e => setResupIngQty(e.target.value)}
+                          className="flex-1 border border-gray-300 rounded-lg px-4 py-4 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]" />
+                        <span className="text-xl text-gray-500 shrink-0">{resupIngRow.raw.unit || 'units'}</span>
+                      </div>
+                      {resupIngRow.raw.maxLimit > 0 && (resupIngRow.raw.batches || []).reduce((s, b) => s + (b.quantity || 0), 0) + (parseInt(resupIngQty) || 0) > resupIngRow.raw.maxLimit && (
+                        <div className="flex items-center gap-3 bg-orange-50 border border-orange-200 rounded-xl px-4 py-3">
+                          <AlertTriangle size={16} className="text-orange-500 shrink-0" />
+                          <p className="text-lg text-orange-600">New total exceeds the limit of {resupIngRow.raw.maxLimit} {resupIngRow.raw.unit || 'units'}.</p>
                         </div>
-                        {resupIngRow.raw.maxLimit > 0 && (resupIngRow.raw.batches || []).reduce((s, b) => s + (b.quantity || 0), 0) + (parseInt(resupIngQty) || 0) > resupIngRow.raw.maxLimit && (
-                          <div className="flex items-center gap-3 bg-orange-50 border border-orange-200 rounded-xl px-3 py-2 mt-1">
-                            <AlertTriangle size={16} className="text-orange-500 shrink-0" />
-                            <p className="text-lg text-orange-600">New total exceeds the limit of {resupIngRow.raw.maxLimit} {resupIngRow.raw.unit || 'units'}.</p>
-                          </div>
-                        )}
-                      </div>
+                      )}
                     </div>
                   </div>
                   <div className="text-center px-4">

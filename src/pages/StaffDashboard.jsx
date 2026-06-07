@@ -332,7 +332,7 @@ export default function StaffDashboard() {
                       type="date" 
                       value={startDate}
                       onChange={(e) => setStartDate(e.target.value)}
-                      className="bg-[#5a5a5a] text-white py-2 px-4 rounded-full text-center text-xl focus:outline-none w-full border border-transparent focus:border-[#3ca4c7]"
+                      className="bg-[#5a5a5a] text-white py-4 px-4 rounded-full text-center text-xl focus:outline-none w-full border border-transparent focus:border-[#3ca4c7]"
                     />
                   </div>
                   <div>
@@ -341,7 +341,7 @@ export default function StaffDashboard() {
                       type="date" 
                       value={endDate}
                       onChange={(e) => setEndDate(e.target.value)}
-                      className="bg-[#5a5a5a] text-white py-2 px-4 rounded-full text-center text-xl focus:outline-none w-full border border-transparent focus:border-[#3ca4c7]"
+                      className="bg-[#5a5a5a] text-white py-4 px-4 rounded-full text-center text-xl focus:outline-none w-full border border-transparent focus:border-[#3ca4c7]"
                     />
                   </div>
                   <button 

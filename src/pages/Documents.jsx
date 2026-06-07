@@ -776,7 +776,7 @@ export default function Documents() {
                   type="date"
                   value={filterDate}
                   onChange={e => setFilterDate(e.target.value)}
-                  className="border border-gray-300 rounded-lg px-3 py-2 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]"
+                  className="border border-gray-300 rounded-lg px-3 py-4 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]"
                 />
               </div>
 
@@ -799,7 +799,7 @@ export default function Documents() {
                     value={filterRangeEnd}
                     onChange={e => setFilterRangeEnd(e.target.value)}
                     min={filterDate}
-                    className="border border-gray-300 rounded-lg px-3 py-2 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]"
+                    className="border border-gray-300 rounded-lg px-3 py-4 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]"
                   />
                 </div>
               )}
@@ -902,7 +902,7 @@ export default function Documents() {
                   value={dateFrom}
                   onChange={e => setDateFrom(e.target.value)}
                   disabled={generating}
-                  className="flex-1 border border-gray-300 rounded-lg px-4 py-3 text-xl text-gray-700 outline-none focus:border-[#3ca4c7] disabled:opacity-60"
+                  className="flex-1 border border-gray-300 rounded-lg px-4 py-4 text-xl text-gray-700 outline-none focus:border-[#3ca4c7] disabled:opacity-60"
                 />
               </div>
 
@@ -917,7 +917,7 @@ export default function Documents() {
                   onChange={e => setDateTo(e.target.value)}
                   min={dateFrom}
                   disabled={generating}
-                  className="flex-1 border border-gray-300 rounded-lg px-4 py-3 text-xl text-gray-700 outline-none focus:border-[#3ca4c7] disabled:opacity-60"
+                  className="flex-1 border border-gray-300 rounded-lg px-4 py-4 text-xl text-gray-700 outline-none focus:border-[#3ca4c7] disabled:opacity-60"
                 />
               </div>
 
@@ -1053,7 +1053,7 @@ export default function Documents() {
                         value={docFilters.performedBy || ''}
                         onChange={e => setDocFilters(f => ({ ...f, performedBy: e.target.value }))}
                         disabled={generating}
-                        className="flex-1 border border-gray-300 rounded-lg px-4 py-3 text-xl text-gray-700 outline-none focus:border-[#3ca4c7] disabled:opacity-60"
+                        className="flex-1 border border-gray-300 rounded-lg px-4 py-4 text-xl text-gray-700 outline-none focus:border-[#3ca4c7] disabled:opacity-60"
                       />
                     </div>
                   </div>

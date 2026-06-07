@@ -482,12 +482,12 @@ export default function BackupRecovery() {
                     <div className="flex flex-col gap-2 flex-1">
                       <label className="text-xl text-gray-500">From</label>
                       <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
-                        className="border border-gray-300 rounded-lg px-4 py-3 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]" />
+                        className="border border-gray-300 rounded-lg px-4 py-4 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]" />
                     </div>
                     <div className="flex flex-col gap-2 flex-1">
                       <label className="text-xl text-gray-500">To</label>
                       <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} min={dateFrom}
-                        className="border border-gray-300 rounded-lg px-4 py-3 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]" />
+                        className="border border-gray-300 rounded-lg px-4 py-4 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]" />
                     </div>
                   </div>
                 </div>

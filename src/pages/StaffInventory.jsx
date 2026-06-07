@@ -551,22 +551,22 @@ export default function StaffInventory() {
             ) : (
               <>
                 <div className="flex items-center gap-4">
+                  <label className="text-xl text-gray-600 w-44 shrink-0">Expiration Date</label>
+                  <input type="date" value={resupIngExpDate} onChange={e => setResupIngExpDate(e.target.value)}
+                    className="flex-1 border border-gray-300 rounded-lg px-4 py-4 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]" />
+                </div>
+                <div className="flex items-center gap-4">
                   <label className="text-xl text-gray-600 w-44 shrink-0">New Batch Quantity</label>
                   <input type="number" min="0" value={resupIngQty} onChange={e => setResupIngQty(e.target.value)}
-                    className="flex-1 border border-gray-300 rounded-lg px-4 py-3 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]" />
+                    className="flex-1 border border-gray-300 rounded-lg px-4 py-4 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]" />
                   <span className="text-xl text-gray-500 shrink-0">{resupIngRow.displayUnit}</span>
                 </div>
                 {resupIngRow.raw.maxLimit > 0 && (resupIngRow.raw.batches || []).reduce((s, b) => s + (b.quantity || 0), 0) + (parseInt(resupIngQty) || 0) > resupIngRow.raw.maxLimit && (
-                  <div className="flex items-center gap-2 text-red-500">
-                    <AlertTriangle size={16} />
-                    <span className="text-lg">Maximum limit of {resupIngRow.raw.maxLimit} {resupIngRow.raw.unit || 'units'} reached.</span>
+                  <div className="flex items-center gap-3 bg-orange-50 border border-orange-200 rounded-xl px-4 py-3">
+                    <AlertTriangle size={16} className="text-orange-500 shrink-0" />
+                    <span className="text-lg text-orange-600">New total exceeds the limit of {resupIngRow.raw.maxLimit} {resupIngRow.raw.unit || 'units'}.</span>
                   </div>
                 )}
-                <div className="flex items-center gap-4">
-                  <label className="text-xl text-gray-600 w-44 shrink-0">Expiration Date</label>
-                  <input type="date" value={resupIngExpDate} onChange={e => setResupIngExpDate(e.target.value)}
-                    className="flex-1 border border-gray-300 rounded-lg px-4 py-3 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]" />
-                </div>
                 <div className="flex gap-3 justify-end mt-2">
                   <button onClick={closeResupIng} className="px-6 py-2 rounded-full border border-gray-300 text-xl text-gray-600 hover:bg-gray-50 transition-colors">Cancel</button>
                   <button
