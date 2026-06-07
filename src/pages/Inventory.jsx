@@ -146,6 +146,8 @@ export default function Inventory() {
   const [showResupMatConf, setShowResupMatConf] = useState(false);
   const [showResupMatOk,   setShowResupMatOk]   = useState(false);
   const [showResupMatDisc, setShowResupMatDisc] = useState(false);
+  const [resupMatSaving,   setResupMatSaving]   = useState(false);
+  const resupMatSavingRef = useRef(false);
 
   // ── Resupply Ingredient ──
   const [resupIngRow,      setResupIngRow]      = useState(null);
@@ -155,6 +157,8 @@ export default function Inventory() {
   const [showResupIngConf, setShowResupIngConf] = useState(false);
   const [showResupIngOk,   setShowResupIngOk]   = useState(false);
   const [showResupIngDisc, setShowResupIngDisc] = useState(false);
+  const [resupIngSaving,   setResupIngSaving]   = useState(false);
+  const resupIngSavingRef = useRef(false);
 
   // ── View Batches ──
   const [viewBatchRow, setViewBatchRow] = useState(null);
@@ -482,14 +486,25 @@ export default function Inventory() {
   const handleResupMat = row => { setResupMatRow(row); setResupMatAmount(''); setShowResupMatForm(true); };
   const closeResupMat  = () => { resupMatAmount !== '' ? setShowResupMatDisc(true) : (setShowResupMatForm(false), setResupMatRow(null)); };
   const handleConfirmResupMat = async () => {
-    const previousStock = resupMatRow.raw.stock || 0;
+    if (!resupMatRow || resupMatSavingRef.current) return;
     const amountAdded = parseInt(resupMatAmount) || 0;
-    const newStock = previousStock + amountAdded;
-    await updateDoc(doc(db, 'materials', resupMatRow._docId), { stock: newStock, lastUpdated: new Date() });
-    await logAudit('RESUPPLY', 'material', resupMatRow.displayId, resupMatRow.displayName, {
-      previousStock, amountAdded, newStock,
-    });
-    await loadData(); setShowResupMatConf(false); setShowResupMatOk(true);
+    if (amountAdded <= 0) return;
+    resupMatSavingRef.current = true;
+    setResupMatSaving(true);
+    try {
+      const previousStock = resupMatRow.raw.stock || 0;
+      const newStock = previousStock + amountAdded;
+      await updateDoc(doc(db, 'materials', resupMatRow._docId), { stock: newStock, lastUpdated: new Date() });
+      await logAudit('RESUPPLY', 'material', resupMatRow.displayId, resupMatRow.displayName, {
+        previousStock, amountAdded, newStock,
+      });
+      await loadData();
+      setShowResupMatConf(false);
+      setShowResupMatOk(true);
+    } finally {
+      resupMatSavingRef.current = false;
+      setResupMatSaving(false);
+    }
   };
 
   // ════════════════════════════════════
@@ -498,14 +513,26 @@ export default function Inventory() {
   const handleResupIng = row => { setResupIngRow(row); setResupIngExpDate(''); setResupIngQty(''); setShowResupIngForm(true); };
   const closeResupIng  = () => { (resupIngExpDate !== '' || resupIngQty !== '') ? setShowResupIngDisc(true) : (setShowResupIngForm(false), setResupIngRow(null)); };
   const handleConfirmResupIng = async () => {
-    const existing = resupIngRow.raw.batches || [];
-    const batchId  = genBatchId(resupIngExpDate, existing.length);
-    const newBatch = { batchId, expirationDate: new Date(resupIngExpDate), quantity: parseInt(resupIngQty) || 0, createdAt: new Date() };
-    await updateDoc(doc(db, 'ingredients', resupIngRow._docId), { batches: [...existing, newBatch], lastUpdated: new Date() });
-    await logAudit('RESUPPLY', 'ingredient', resupIngRow.displayId, resupIngRow.displayName, {
-      batchId, expirationDate: resupIngExpDate, quantity: parseInt(resupIngQty) || 0,
-    });
-    await loadData(); setShowResupIngConf(false); setShowResupIngOk(true);
+    if (!resupIngRow || resupIngSavingRef.current) return;
+    const quantity = parseInt(resupIngQty) || 0;
+    if (!resupIngExpDate || quantity <= 0) return;
+    resupIngSavingRef.current = true;
+    setResupIngSaving(true);
+    try {
+      const existing = resupIngRow.raw.batches || [];
+      const batchId  = genBatchId(resupIngExpDate, existing.length);
+      const newBatch = { batchId, expirationDate: new Date(resupIngExpDate), quantity, createdAt: new Date() };
+      await updateDoc(doc(db, 'ingredients', resupIngRow._docId), { batches: [...existing, newBatch], lastUpdated: new Date() });
+      await logAudit('RESUPPLY', 'ingredient', resupIngRow.displayId, resupIngRow.displayName, {
+        batchId, expirationDate: resupIngExpDate, quantity,
+      });
+      await loadData();
+      setShowResupIngConf(false);
+      setShowResupIngOk(true);
+    } finally {
+      resupIngSavingRef.current = false;
+      setResupIngSaving(false);
+    }
   };
 
   // ════════════════════════════════════
@@ -1333,8 +1360,11 @@ export default function Inventory() {
                     : 'No maximum limit is set for this material. You may set one via the Edit action.'}
                 </p>
               </div>
-              <button onClick={() => setShowResupMatConf(true)}
-                className="w-full bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white py-3.5 rounded-xl text-xl font-semibold transition-colors">Confirm</button>
+              <button
+                onClick={() => { if ((parseInt(resupMatAmount) || 0) > 0) setShowResupMatConf(true); }}
+                disabled={(parseInt(resupMatAmount) || 0) <= 0}
+                className="w-full bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white py-3.5 rounded-xl text-xl font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >Confirm</button>
             </div>
           </div>
         </div>
@@ -1349,8 +1379,8 @@ export default function Inventory() {
               <p className="text-xl text-gray-700">New stock: <span className="font-semibold">{(resupMatRow.raw.stock || 0) + (parseInt(resupMatAmount) || 0)} units</span></p>
             </div>
             <div className="flex gap-3 justify-end mt-1">
-              <button onClick={() => setShowResupMatConf(false)} className="px-6 py-2 rounded-full border border-gray-300 text-xl text-gray-600 hover:bg-gray-50 transition-colors">Cancel</button>
-              <button onClick={handleConfirmResupMat} className="px-6 py-2 rounded-full bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white text-xl transition-colors">Confirm</button>
+              <button onClick={() => setShowResupMatConf(false)} disabled={resupMatSaving} className="px-6 py-2 rounded-full border border-gray-300 text-xl text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50">Cancel</button>
+              <button onClick={handleConfirmResupMat} disabled={resupMatSaving} className={`px-6 py-2 rounded-full text-xl transition-colors ${resupMatSaving ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white'}`}>{resupMatSaving ? 'Saving...' : 'Confirm'}</button>
             </div>
           </div>
         </div>
@@ -1420,8 +1450,11 @@ export default function Inventory() {
                         : 'No maximum limit is set.'}
                     </p>
                   </div>
-                  <button onClick={() => setShowResupIngConf(true)}
-                    className="w-full bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white py-3.5 rounded-xl text-xl font-semibold transition-colors">Confirm</button>
+                  <button
+                    onClick={() => { if (resupIngExpDate && (parseInt(resupIngQty) || 0) > 0) setShowResupIngConf(true); }}
+                    disabled={!resupIngExpDate || (parseInt(resupIngQty) || 0) <= 0}
+                    className="w-full bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white py-3.5 rounded-xl text-xl font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  >Confirm</button>
                 </>
               )}
             </div>
@@ -1439,8 +1472,8 @@ export default function Inventory() {
               <p className="text-xl text-gray-700">Quantity: <span className="font-semibold">{resupIngQty || 0} {resupIngRow.raw.unit || 'units'}</span></p>
             </div>
             <div className="flex gap-3 justify-end mt-1">
-              <button onClick={() => setShowResupIngConf(false)} className="px-6 py-2 rounded-full border border-gray-300 text-xl text-gray-600 hover:bg-gray-50 transition-colors">Cancel</button>
-              <button onClick={handleConfirmResupIng} className="px-6 py-2 rounded-full bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white text-xl transition-colors">Confirm</button>
+              <button onClick={() => setShowResupIngConf(false)} disabled={resupIngSaving} className="px-6 py-2 rounded-full border border-gray-300 text-xl text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50">Cancel</button>
+              <button onClick={handleConfirmResupIng} disabled={resupIngSaving} className={`px-6 py-2 rounded-full text-xl transition-colors ${resupIngSaving ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white'}`}>{resupIngSaving ? 'Saving...' : 'Confirm'}</button>
             </div>
           </div>
         </div>
