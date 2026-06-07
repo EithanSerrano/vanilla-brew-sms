@@ -547,11 +547,9 @@ export default function Documents() {
     return () => document.removeEventListener('click', handler);
   }, []);
 
-  const getPerformedBy = async () => {
-    const currentUser = auth.currentUser;
-    if (!currentUser) return 'Unknown';
-    const snap = await getDoc(doc(db, 'users', currentUser.uid));
-    return snap.exists() ? (snap.data().name || 'Unknown') : 'Unknown';
+  const getPerformedBy = () => {
+    const session = JSON.parse(sessionStorage.getItem('sessionUser') || '{}');
+    return session.name || 'Unknown';
   };
 
   const buildMeta = (docId, docType, performedBy, now, df, dt) => ({
@@ -577,7 +575,7 @@ export default function Documents() {
     if (!newDocType || !dateFrom) return;
     setGenerating(true);
     try {
-      const performedBy = await getPerformedBy();
+      const performedBy = getPerformedBy();
       const now     = new Date();
       const docId   = await generateNextDocId(TYPE_CODE[newDocType], dateFrom);
       const df      = dateFrom;

@@ -142,6 +142,13 @@ export default function Login() {
           return;
         }
 
+        sessionStorage.setItem('sessionUser', JSON.stringify({
+          uid:   user.uid,
+          name:  userData.name  || '',
+          email: user.email     || '',
+          role:  userData.role  || '',
+        }));
+
         if (userData.mustChangePassword) {
           setForcePwUser(user);
           setForcePwDest(destination);

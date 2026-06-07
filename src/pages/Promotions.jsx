@@ -169,12 +169,8 @@ export default function Promotions() {
   // ── Audit log ──
   const logAudit = async (action, itemId, itemName, details = {}) => {
     try {
-      let performedBy = 'Unknown';
-      const user = auth.currentUser;
-      if (user) {
-        const snap = await getDoc(doc(db, 'users', user.uid));
-        if (snap.exists()) performedBy = snap.data().name || 'Unknown';
-      }
+      const session = JSON.parse(sessionStorage.getItem('sessionUser') || '{}');
+      const performedBy = session.name || 'Unknown';
       await addDoc(collection(db, 'auditlog'), {
         action, itemType: 'promo', itemId, itemName, details, performedBy, timestamp: new Date(),
       });
