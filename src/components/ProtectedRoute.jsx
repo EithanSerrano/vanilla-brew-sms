@@ -14,7 +14,7 @@ export default function ProtectedRoute() {
 
   const forceSignOut = useCallback(async () => {
     try {
-      const session = JSON.parse(sessionStorage.getItem('sessionUser') || '{}');
+      const session = JSON.parse(localStorage.getItem('sessionUser') || '{}');
       const uid = session.uid;
       if (uid) {
         await Promise.all([
@@ -33,7 +33,7 @@ export default function ProtectedRoute() {
     } catch {
       // best-effort; sign out regardless
     }
-    sessionStorage.removeItem('sessionUser');
+    localStorage.removeItem('sessionUser');
     await signOut(auth);
     navigate('/login', { replace: true, state: { reason: 'inactivity' } });
   }, [navigate]);

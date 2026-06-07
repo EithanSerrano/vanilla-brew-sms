@@ -143,7 +143,7 @@ export default function StaffInventory() {
   // ── Audit log ──
   const logAudit = async (action, itemType, itemId, itemName, details = {}) => {
     try {
-      const session = JSON.parse(sessionStorage.getItem('sessionUser') || '{}');
+      const session = JSON.parse(localStorage.getItem('sessionUser') || '{}');
       const performedBy = session.name || 'Unknown';
       await addDoc(collection(db, 'auditlog'), {
         action, itemType, itemId, itemName, details, performedBy, timestamp: new Date(),

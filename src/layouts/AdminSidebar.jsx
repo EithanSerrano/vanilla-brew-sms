@@ -55,7 +55,7 @@ export default function AdminSidebar() {
   const [clock, setClock] = useState(new Date());
 
   useEffect(() => {
-    const session = JSON.parse(sessionStorage.getItem('sessionUser') || '{}');
+    const session = JSON.parse(localStorage.getItem('sessionUser') || '{}');
     setUserName(session.name || '');
   }, []);
 
@@ -80,7 +80,7 @@ export default function AdminSidebar() {
   const handleLogout = async () => {
     setIsLoggingOut(true);
     try {
-      const session = JSON.parse(sessionStorage.getItem('sessionUser') || '{}');
+      const session = JSON.parse(localStorage.getItem('sessionUser') || '{}');
       const uid = session.uid;
       if (uid) {
         await addDoc(collection(db, 'auditlog'), {
@@ -94,7 +94,7 @@ export default function AdminSidebar() {
         });
         await updateDoc(doc(db, 'users', uid), { isOnline: false });
       }
-      sessionStorage.removeItem('sessionUser');
+      localStorage.removeItem('sessionUser');
       await signOut(auth);
       navigate('/login');
     } catch (err) {

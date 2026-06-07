@@ -169,7 +169,7 @@ export default function Promotions() {
   // ── Audit log ──
   const logAudit = async (action, itemId, itemName, details = {}) => {
     try {
-      const session = JSON.parse(sessionStorage.getItem('sessionUser') || '{}');
+      const session = JSON.parse(localStorage.getItem('sessionUser') || '{}');
       const performedBy = session.name || 'Unknown';
       await addDoc(collection(db, 'auditlog'), {
         action, itemType: 'promo', itemId, itemName, details, performedBy, timestamp: new Date(),

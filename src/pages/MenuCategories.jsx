@@ -173,12 +173,8 @@ export default function MenuCategories() {
   // ── Audit log ──
   const logAudit = async (action, itemId, itemName, details = {}) => {
     try {
-      let performedBy = 'Unknown';
-      const currentUser = auth.currentUser;
-      if (currentUser) {
-        const snap = await getDoc(doc(db, 'users', currentUser.uid));
-        if (snap.exists()) performedBy = snap.data().name || 'Unknown';
-      }
+      const session = JSON.parse(sessionStorage.getItem('sessionUser') || '{}');
+      const performedBy = session.name || 'Unknown';
       await addDoc(collection(db, 'auditlog'), {
         action, itemType: 'category', itemId, itemName, details, performedBy, timestamp: new Date(),
       });

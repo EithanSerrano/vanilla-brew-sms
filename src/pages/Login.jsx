@@ -1,6 +1,6 @@
 ﻿import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { signInWithEmailAndPassword, sendPasswordResetEmail, signOut, updatePassword, setPersistence, browserSessionPersistence } from 'firebase/auth';
+import { signInWithEmailAndPassword, sendPasswordResetEmail, signOut, updatePassword, setPersistence, browserLocalPersistence, onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc, collection, query, where, getDocs, updateDoc, addDoc, serverTimestamp, limit } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 import { Eye, EyeOff, Lock } from 'lucide-react';
@@ -59,6 +59,24 @@ export default function Login() {
   const [showForcePwNew, setShowForcePwNew] = useState(false);
   const [showForcePwCfm, setShowForcePwCfm] = useState(false);
 
+  // Redirect already-authenticated users away from the login page
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (!user) return;
+      try {
+        const userDocSnap = await getDoc(doc(db, 'users', user.uid));
+        if (userDocSnap.exists()) {
+          const { role } = userDocSnap.data();
+          const destination = role === 'admin' ? '/admin' : role === 'staff' ? '/staff' : null;
+          if (destination) navigate(destination, { replace: true });
+        }
+      } catch {
+        // stay on login page if Firestore read fails
+      }
+    });
+    return unsubscribe;
+  }, [navigate]);
+
   // Handle Lockout Countdown
   useEffect(() => {
     let interval;
@@ -106,7 +124,7 @@ export default function Login() {
 
     setIsLoggingIn(true);
     try {
-      await setPersistence(auth, browserSessionPersistence);
+      await setPersistence(auth, browserLocalPersistence);
       const userCredential = await signInWithEmailAndPassword(auth, trimmedUsername, credentials.password);
       const user = userCredential.user;
 
@@ -143,7 +161,7 @@ export default function Login() {
           return;
         }
 
-        sessionStorage.setItem('sessionUser', JSON.stringify({
+        localStorage.setItem('sessionUser', JSON.stringify({
           uid:   user.uid,
           name:  userData.name  || '',
           email: user.email     || '',
