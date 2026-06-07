@@ -21,6 +21,14 @@ const AUDIT_ACTION_LABELS = {
   ADJUST: 'Adjust Stock', EDIT: 'Edit Item',
   CREATE_ACCOUNT: 'Create Account', DEACTIVATE_ACCOUNT: 'Deactivate Account',
   REACTIVATE_ACCOUNT: 'Reactivate Account', EDIT_ACCOUNT: 'Edit Account',
+  ADD_MENU_ITEM: 'Add Menu Item', EDIT_MENU_ITEM: 'Edit Menu Item',
+  HIDE_MENU_ITEM: 'Hide Menu Item', RETRIEVE_MENU_ITEM: 'Retrieve Menu Item',
+  SET_AVAILABLE: 'Set Available', SET_UNAVAILABLE: 'Set Unavailable',
+  ADD_CATEGORY: 'Add Category', EDIT_CATEGORY: 'Edit Category',
+  HIDE_CATEGORY: 'Hide Category', RETRIEVE_CATEGORY: 'Retrieve Category',
+  ADD_SUBCATEGORY: 'Add Subcategory',
+  ADD_PROMO: 'Add Promotion', EDIT_PROMO: 'Edit Promotion',
+  ARCHIVE_PROMO: 'Archive Promotion', RETRIEVE_PROMO: 'Retrieve Promotion',
 };
 
 function splitTimestamp(ts) {
