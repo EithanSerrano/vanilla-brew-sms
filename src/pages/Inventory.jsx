@@ -800,7 +800,7 @@ export default function Inventory() {
                   className="flex items-center bg-white rounded-xl border border-gray-200 shadow-sm px-5 py-3.5"
                 >
                   <span className="w-[9%] text-xl text-gray-700 text-center">{row.displayId}</span>
-                  <span className="w-[14%] text-xl text-gray-700 text-center">{row.displayName}</span>
+                  <span className="w-[14%] text-xl text-gray-700 text-center truncate" title={row.displayName}>{row.displayName}</span>
                   <span className="w-[12%] text-xl text-gray-700 text-center">{row.displayCat}</span>
                   {showInactive ? (
                     <>
@@ -862,7 +862,7 @@ export default function Inventory() {
                 <p className="text-xl font-semibold text-gray-700 mb-5">General Information</p>
                 <div className="flex items-center gap-5">
                   <label className="text-xl text-gray-600 w-44 shrink-0">Material Name</label>
-                  <input type="text" value={matName} onChange={e => setMatName(e.target.value)}
+                  <input type="text" value={matName} onChange={e => setMatName(e.target.value)} maxLength={30}
                     className="flex-1 border border-gray-300 rounded-lg px-4 py-3 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]" />
                 </div>
               </div>
@@ -915,7 +915,7 @@ export default function Inventory() {
                 <div className="flex flex-col gap-5">
                   <div className="flex items-center gap-5">
                     <label className="text-xl text-gray-600 w-48 shrink-0">Ingredient Name</label>
-                    <input type="text" value={ingName} onChange={e => setIngName(e.target.value)}
+                    <input type="text" value={ingName} onChange={e => setIngName(e.target.value)} maxLength={30}
                       className="flex-1 border border-gray-300 rounded-lg px-4 py-3 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]" />
                   </div>
                   <div className="flex items-center gap-5">
@@ -997,7 +997,7 @@ export default function Inventory() {
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[60]">
           <div className="bg-white rounded-2xl shadow-2xl w-[500px] px-8 py-6 flex flex-col gap-4">
             <h3 className="text-2xl font-semibold text-gray-800">Save New Material?</h3>
-            <p className="text-xl text-gray-600">Material: <span className="font-semibold">{pendingMat.name}</span></p>
+            <p className="text-xl text-gray-600 flex gap-1">Material: <span className="font-semibold truncate" title={pendingMat.name}>{pendingMat.name}</span></p>
             <div className="border border-gray-100 rounded-lg p-3 bg-gray-50 flex flex-col gap-1">
               {pendingMat.entries.map(e => <p key={e.matId} className="text-xl text-gray-700">{e.matId} — Starting Qty: {e.qty}</p>)}
             </div>
@@ -1012,9 +1012,9 @@ export default function Inventory() {
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[60]">
           <div className="bg-white rounded-2xl shadow-2xl w-[500px] px-8 py-6 flex flex-col gap-4">
             <h3 className="text-2xl font-semibold text-gray-800">New Material Saved!</h3>
-            <p className="text-xl text-gray-600">Material: <span className="font-semibold">{pendingMat.name}</span></p>
+            <p className="text-xl text-gray-600 flex gap-1">Material: <span className="font-semibold truncate" title={pendingMat.name}>{pendingMat.name}</span></p>
             <div className="border border-gray-100 rounded-lg p-3 bg-gray-50 flex flex-col gap-1">
-              {pendingMat.entries.map(e => <p key={e.matId} className="text-xl text-gray-700">{e.matId} — {pendingMat.name}</p>)}
+              {pendingMat.entries.map(e => <p key={e.matId} className="text-xl text-gray-700 truncate" title={`${e.matId} — ${pendingMat.name}`}>{e.matId} — {pendingMat.name}</p>)}
             </div>
             <div className="flex justify-end mt-1">
               <button onClick={() => { setShowMatOk(false); setShowNewMat(false); resetMat(); }} className="px-6 py-2 rounded-full bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white text-xl transition-colors">Confirm</button>
@@ -1033,7 +1033,7 @@ export default function Inventory() {
             <h3 className="text-2xl font-semibold text-gray-800">Save New Ingredient?</h3>
             <div className="border border-gray-100 rounded-lg p-3 bg-gray-50 flex flex-col gap-1">
               <p className="text-xl text-gray-700">ID: <span className="font-semibold">{pendingIng.ingredientId}</span></p>
-              <p className="text-xl text-gray-700">Name: <span className="font-semibold">{pendingIng.name}</span></p>
+              <p className="text-xl text-gray-700 flex gap-1">Name: <span className="font-semibold truncate" title={pendingIng.name}>{pendingIng.name}</span></p>
               <p className="text-xl text-gray-700">Batch: {pendingIng.batchId} — Qty: {pendingIng.quantity} {pendingIng.unit}</p>
             </div>
             <div className="flex gap-3 justify-end mt-1">
@@ -1048,7 +1048,7 @@ export default function Inventory() {
           <div className="bg-white rounded-2xl shadow-2xl w-[500px] px-8 py-6 flex flex-col gap-4">
             <h3 className="text-2xl font-semibold text-gray-800">New Ingredient Saved!</h3>
             <div className="border border-gray-100 rounded-lg p-3 bg-gray-50 flex flex-col gap-1">
-              <p className="text-xl text-gray-700">{pendingIng.ingredientId} — {pendingIng.name}</p>
+              <p className="text-xl text-gray-700 truncate" title={`${pendingIng.ingredientId} — ${pendingIng.name}`}>{pendingIng.ingredientId} — {pendingIng.name}</p>
               <p className="text-xl text-gray-700">Batch: {pendingIng.batchId}</p>
             </div>
             <div className="flex justify-end mt-1">
@@ -1064,7 +1064,7 @@ export default function Inventory() {
       ══════════════════════════════════════════ */}
       {showHideConf && hideRow && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[60]">
-          <div className="bg-white rounded-2xl shadow-2xl w-[600px] max-h-[85vh] overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-2xl w-[95vw] max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between px-10 py-6 border-b border-gray-200">
               <h3 className="text-2xl font-semibold text-gray-800">Hide {hideRow.displayName}?</h3>
               <button onClick={() => { setShowHideConf(false); setHideRow(null); setConnectedItems([]); setConflictActions({}); setShowConflictList(false); }} className="text-gray-400 hover:text-gray-600 transition-colors"><X size={22} /></button>
@@ -1587,7 +1587,7 @@ export default function Inventory() {
                 <label className="text-xl font-semibold text-gray-700">Reason <span className="font-normal text-gray-400">(for logs)</span></label>
                 <textarea
                   value={adjReason} onChange={e => setAdjReason(e.target.value)}
-                  rows={3} placeholder="Enter reason for adjustment..."
+                  rows={3} placeholder="Enter reason for adjustment..." maxLength={30}
                   className="w-full border border-gray-300 rounded-lg px-4 py-3 text-xl text-gray-700 outline-none focus:border-[#3ca4c7] resize-none"
                 />
               </div>
@@ -1647,7 +1647,7 @@ export default function Inventory() {
                 <div className="flex flex-col gap-5">
                   <div className="flex items-center gap-5">
                     <label className="text-xl text-gray-600 w-52 shrink-0">{editRow._type === 'material' ? 'Material' : 'Ingredient'} Name</label>
-                    <input type="text" value={editName} onChange={e => setEditName(e.target.value)}
+                    <input type="text" value={editName} onChange={e => setEditName(e.target.value)} maxLength={30}
                       className="flex-1 border border-gray-300 rounded-lg px-4 py-3 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]" />
                   </div>
                   {editRow._type === 'ingredient' && (

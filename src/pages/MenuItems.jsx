@@ -404,8 +404,12 @@ export default function MenuItems() {
 
   const logAudit = async (action, itemId, itemName, details = {}) => {
     try {
-      const session = JSON.parse(sessionStorage.getItem('sessionUser') || '{}');
-      const performedBy = session.name || 'Unknown';
+      let performedBy = 'Unknown';
+      const currentUser = auth.currentUser;
+      if (currentUser) {
+        const snap = await getDoc(doc(db, 'users', currentUser.uid));
+        if (snap.exists()) performedBy = snap.data().name || 'Unknown';
+      }
       await addDoc(collection(db, 'auditlog'), {
         action, itemType: 'menuItem', itemId, itemName, details, performedBy, timestamp: new Date(),
       });
@@ -1036,12 +1040,12 @@ export default function MenuItems() {
               {isEditMode ? 'Save Changes?' : 'Save New Menu Item?'}
             </h3>
             <div className="border border-gray-100 rounded-lg p-4 bg-gray-50 flex flex-col gap-2">
-              <p className="text-xl text-gray-700">ID: <span className="font-semibold">{pendingMenu.menuItemId}</span></p>
-              <p className="text-xl text-gray-700">Name: <span className="font-semibold">{pendingMenu.name}</span></p>
-              <p className="text-xl text-gray-700">Category: <span className="font-semibold">{pendingMenu.category}</span></p>
+              <p className="text-xl text-gray-700 flex items-baseline gap-1 min-w-0">ID: <span className="font-semibold truncate block max-w-[360px]">{pendingMenu.menuItemId}</span></p>
+              <p className="text-xl text-gray-700 flex items-baseline gap-1 min-w-0">Name: <span className="font-semibold truncate block max-w-[340px]">{pendingMenu.name}</span></p>
+              <p className="text-xl text-gray-700 flex items-baseline gap-1 min-w-0">Category: <span className="font-semibold truncate block max-w-[320px]">{pendingMenu.category}</span></p>
               <p className="text-xl text-gray-700 mt-1 font-semibold">Variants:</p>
               {pendingMenu.variants.map((v, i) => (
-                <p key={i} className="text-xl text-gray-600 pl-4">
+                <p key={i} className="text-xl text-gray-600 pl-4 truncate">
                   {v.name} — ₱{v.price}
                   {v.connections.length > 0 && ` (${v.connections.length} connection${v.connections.length > 1 ? 's' : ''})`}
                 </p>
@@ -1078,8 +1082,8 @@ export default function MenuItems() {
               {isEditMode ? 'Menu Item Updated!' : 'New Menu Item Saved!'}
             </h3>
             <div className="border border-gray-100 rounded-lg p-4 bg-gray-50">
-              <p className="text-xl text-gray-700">{pendingMenu.menuItemId} — {pendingMenu.name}</p>
-              <p className="text-xl text-gray-500">{pendingMenu.category}</p>
+              <p className="text-xl text-gray-700 truncate">{pendingMenu.menuItemId} — {pendingMenu.name}</p>
+              <p className="text-xl text-gray-500 truncate">{pendingMenu.category}</p>
             </div>
             <div className="flex justify-end mt-1">
               <button
@@ -1108,8 +1112,8 @@ export default function MenuItems() {
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[60]">
           <div className="bg-white rounded-2xl shadow-2xl w-[460px] px-8 py-6 flex flex-col gap-4">
             <h3 className="text-2xl font-semibold text-gray-800">Hide this item?</h3>
-            <p className="text-xl text-gray-600">
-              <span className="font-semibold">{hideRow.name}</span> will be moved to the inactive list.
+            <p className="text-xl text-gray-600 flex items-baseline gap-1 min-w-0">
+              <span className="font-semibold truncate block max-w-[340px]">{hideRow.name}</span> will be moved to the inactive list.
             </p>
             <div className="flex gap-3 justify-end mt-1">
               <button
@@ -1136,8 +1140,8 @@ export default function MenuItems() {
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[60]">
           <div className="bg-white rounded-2xl shadow-2xl w-[460px] px-8 py-6 flex flex-col gap-4">
             <h3 className="text-2xl font-semibold text-gray-800">Retrieve Menu Item?</h3>
-            <p className="text-xl text-gray-600">
-              <span className="font-semibold">{retrieveRow.name}</span> will be moved back to the active list.
+            <p className="text-xl text-gray-600 flex items-baseline gap-1 min-w-0">
+              <span className="font-semibold truncate block max-w-[340px]">{retrieveRow.name}</span> will be moved back to the active list.
             </p>
             <div className="flex gap-3 justify-end mt-1">
               <button

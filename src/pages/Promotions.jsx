@@ -169,8 +169,12 @@ export default function Promotions() {
   // ── Audit log ──
   const logAudit = async (action, itemId, itemName, details = {}) => {
     try {
-      const session = JSON.parse(localStorage.getItem('sessionUser') || '{}');
-      const performedBy = session.name || 'Unknown';
+      let performedBy = 'Unknown';
+      const user = auth.currentUser;
+      if (user) {
+        const snap = await getDoc(doc(db, 'users', user.uid));
+        if (snap.exists()) performedBy = snap.data().name || 'Unknown';
+      }
       await addDoc(collection(db, 'auditlog'), {
         action, itemType: 'promo', itemId, itemName, details, performedBy, timestamp: new Date(),
       });
@@ -458,7 +462,7 @@ export default function Promotions() {
               return (
                 <div key={promo.id} className="flex items-center bg-white rounded-xl border border-gray-200 shadow-sm px-5 py-3.5">
                   <span className="w-[10%] text-xl text-gray-700 text-center">{promo.promoId}</span>
-                  <span className="w-[22%] text-xl text-gray-700 text-center">{promo.name}</span>
+                  <span className="w-[22%] text-xl text-gray-700 text-center truncate" title={promo.name}>{promo.name}</span>
                   <span className="w-[11%] text-center">
                     <span className={`text-lg font-medium px-2.5 py-1 rounded-full ${
                       isCatPromo
@@ -551,7 +555,7 @@ export default function Promotions() {
                 </label>
                 <input
                   type="text" value={promoName} onChange={e => setPromoName(e.target.value)}
-                  placeholder="e.g. 2-cup deal"
+                  placeholder="e.g. 2-cup deal" maxLength={30}
                   className="flex-1 border border-gray-300 rounded-lg px-4 py-3 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]"
                 />
               </div>
