@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { collection, getDocs, doc, addDoc, updateDoc, getDoc } from 'firebase/firestore';
 import { db, auth } from '../firebase';
 import { Search, Filter, X, RefreshCw, MoreVertical, AlertTriangle } from 'lucide-react';
@@ -95,9 +95,6 @@ export default function StaffInventory() {
   const [showResupMatConf, setShowResupMatConf] = useState(false);
   const [showResupMatOk,   setShowResupMatOk]   = useState(false);
   const [showResupMatDisc, setShowResupMatDisc] = useState(false);
-  const [resupMatSaving,   setResupMatSaving]   = useState(false);
-  const [resupMatError,    setResupMatError]    = useState('');
-  const resupMatSavingRef = useRef(false);
 
   // ── Resupply Ingredient ──
   const [resupIngRow,      setResupIngRow]      = useState(null);
@@ -107,9 +104,6 @@ export default function StaffInventory() {
   const [showResupIngConf, setShowResupIngConf] = useState(false);
   const [showResupIngOk,   setShowResupIngOk]   = useState(false);
   const [showResupIngDisc, setShowResupIngDisc] = useState(false);
-  const [resupIngSaving,   setResupIngSaving]   = useState(false);
-  const [resupIngError,    setResupIngError]    = useState('');
-  const resupIngSavingRef = useRef(false);
 
   // ── Adjust ──
   const [adjRow,        setAdjRow]        = useState(null);
@@ -121,6 +115,9 @@ export default function StaffInventory() {
   const [showAdjConf,   setShowAdjConf]   = useState(false);
   const [showAdjOk,     setShowAdjOk]     = useState(false);
   const [showAdjDisc,   setShowAdjDisc]   = useState(false);
+  const [adjError,      setAdjError]      = useState('');
+  const [resupMatError, setResupMatError] = useState('');
+  const [resupIngError, setResupIngError] = useState('');
 
   // ── Load ──
   const loadData = async () => {
@@ -143,8 +140,12 @@ export default function StaffInventory() {
   // ── Audit log ──
   const logAudit = async (action, itemType, itemId, itemName, details = {}) => {
     try {
-      const session = JSON.parse(localStorage.getItem('sessionUser') || '{}');
-      const performedBy = session.name || 'Unknown';
+      let performedBy = 'Unknown';
+      const currentUser = auth.currentUser;
+      if (currentUser) {
+        const snap = await getDoc(doc(db, 'users', currentUser.uid));
+        if (snap.exists()) performedBy = snap.data().name || 'Unknown';
+      }
       await addDoc(collection(db, 'auditlog'), {
         action, itemType, itemId, itemName, details, performedBy, timestamp: new Date(),
       });
@@ -193,58 +194,33 @@ export default function StaffInventory() {
     .filter(r => !filterStatus || r.status === filterStatus);
 
   // ── Resupply Material ──
-  const handleResupMat = row => { setResupMatRow(row); setResupMatAmount(''); setResupMatError(''); setShowResupMatForm(true); };
+  const handleResupMat = row => { setResupMatRow(row); setResupMatAmount(''); setShowResupMatForm(true); };
   const closeResupMat  = () => { resupMatAmount !== '' ? setShowResupMatDisc(true) : (setShowResupMatForm(false), setResupMatRow(null)); };
   const handleConfirmResupMat = async () => {
-    if (!resupMatRow || resupMatSavingRef.current) return;
-    const amountAdded = parseInt(resupMatAmount) || 0;
-    if (amountAdded <= 0) return;
-    resupMatSavingRef.current = true;
-    setResupMatSaving(true);
-    setResupMatError('');
     try {
+      setResupMatError('');
       const previousStock = resupMatRow.raw.stock || 0;
+      const amountAdded   = parseInt(resupMatAmount) || 0;
       const newStock      = previousStock + amountAdded;
       await updateDoc(doc(db, 'materials', resupMatRow._docId), { stock: newStock, lastUpdated: new Date() });
       await logAudit('RESUPPLY', 'material', resupMatRow.displayId, resupMatRow.displayName, { previousStock, amountAdded, newStock });
-      await loadData();
-      setShowResupMatConf(false);
-      setShowResupMatOk(true);
-    } catch (err) {
-      console.error('Resupply material error:', err);
-      setResupMatError('Failed to save. Please try again.');
-    } finally {
-      resupMatSavingRef.current = false;
-      setResupMatSaving(false);
-    }
+    } catch (e) { console.error('ResupMat error:', e); setResupMatError('Failed to save. Please try again.'); return; }
+    await loadData(); setShowResupMatConf(false); setShowResupMatOk(true);
   };
 
   // ── Resupply Ingredient ──
-  const handleResupIng = row => { setResupIngRow(row); setResupIngExpDate(''); setResupIngQty(''); setResupIngError(''); setShowResupIngForm(true); };
+  const handleResupIng = row => { setResupIngRow(row); setResupIngExpDate(''); setResupIngQty(''); setShowResupIngForm(true); };
   const closeResupIng  = () => { (resupIngExpDate !== '' || resupIngQty !== '') ? setShowResupIngDisc(true) : (setShowResupIngForm(false), setResupIngRow(null)); };
   const handleConfirmResupIng = async () => {
-    if (!resupIngRow || resupIngSavingRef.current) return;
-    const quantity = parseInt(resupIngQty) || 0;
-    if (!resupIngExpDate || quantity <= 0) return;
-    resupIngSavingRef.current = true;
-    setResupIngSaving(true);
-    setResupIngError('');
     try {
+      setResupIngError('');
       const existing = resupIngRow.raw.batches || [];
       const batchId  = genBatchId(resupIngExpDate, existing.length);
-      const newBatch = { batchId, expirationDate: new Date(resupIngExpDate), quantity, createdAt: new Date() };
+      const newBatch = { batchId, expirationDate: new Date(resupIngExpDate), quantity: parseInt(resupIngQty) || 0, createdAt: new Date() };
       await updateDoc(doc(db, 'ingredients', resupIngRow._docId), { batches: [...existing, newBatch], lastUpdated: new Date() });
-      await logAudit('RESUPPLY', 'ingredient', resupIngRow.displayId, resupIngRow.displayName, { batchId, expirationDate: resupIngExpDate, quantity });
-      await loadData();
-      setShowResupIngConf(false);
-      setShowResupIngOk(true);
-    } catch (err) {
-      console.error('Resupply ingredient error:', err);
-      setResupIngError('Failed to save. Please try again.');
-    } finally {
-      resupIngSavingRef.current = false;
-      setResupIngSaving(false);
-    }
+      await logAudit('RESUPPLY', 'ingredient', resupIngRow.displayId, resupIngRow.displayName, { batchId, expirationDate: resupIngExpDate, quantity: parseInt(resupIngQty) || 0 });
+    } catch (e) { console.error('ResupIng error:', e); setResupIngError('Failed to save. Please try again.'); return; }
+    await loadData(); setShowResupIngConf(false); setShowResupIngOk(true);
   };
 
   // ── Adjust ──
@@ -266,19 +242,22 @@ export default function StaffInventory() {
   const closeAdj = () => { adjHasChanges() ? setShowAdjDisc(true) : (setShowAdjForm(false), setAdjRow(null)); };
   const handleConfirmAdj = async () => {
     if (!adjRow) return;
-    if (adjRow._type === 'material') {
-      const previousQty = adjRow.raw.stock ?? 0;
-      const newQty      = parseInt(adjMatQty) || 0;
-      await updateDoc(doc(db, 'materials', adjRow._docId), { stock: newQty, lastUpdated: new Date() });
-      await logAudit('ADJUST', 'material', adjRow.displayId, adjRow.displayName, { previousQty, newQty, reason: adjReason || null });
-    } else {
-      const updated     = adjIngBatches.map(b => ({ ...b, quantity: parseInt(b.newQty) || 0 }));
-      await updateDoc(doc(db, 'ingredients', adjRow._docId), { batches: updated, lastUpdated: new Date() });
-      const batchChanges = adjIngBatches.map((b, i) => ({
-        batchId: b.batchId, previousQty: adjRow.raw.batches?.[i]?.quantity ?? 0, newQty: parseInt(b.newQty) || 0,
-      }));
-      await logAudit('ADJUST', 'ingredient', adjRow.displayId, adjRow.displayName, { batches: batchChanges, reason: adjReason || null });
-    }
+    try {
+      setAdjError('');
+      if (adjRow._type === 'material') {
+        const previousQty = adjRow.raw.stock ?? 0;
+        const newQty      = parseInt(adjMatQty) || 0;
+        await updateDoc(doc(db, 'materials', adjRow._docId), { stock: newQty, lastUpdated: new Date() });
+        await logAudit('ADJUST', 'material', adjRow.displayId, adjRow.displayName, { previousQty, newQty, reason: adjReason || null });
+      } else {
+        const updated     = adjIngBatches.map(b => ({ ...b, quantity: parseInt(b.newQty) || 0 }));
+        await updateDoc(doc(db, 'ingredients', adjRow._docId), { batches: updated, lastUpdated: new Date() });
+        const batchChanges = adjIngBatches.map((b, i) => ({
+          batchId: b.batchId, previousQty: adjRow.raw.batches?.[i]?.quantity ?? 0, newQty: parseInt(b.newQty) || 0,
+        }));
+        await logAudit('ADJUST', 'ingredient', adjRow.displayId, adjRow.displayName, { batches: batchChanges, reason: adjReason || null });
+      }
+    } catch (e) { console.error('Adj error:', e); setAdjError('Failed to save. Please try again.'); return; }
     await loadData(); setShowAdjConf(false); setShowAdjOk(true);
   };
 
@@ -373,13 +352,13 @@ export default function StaffInventory() {
         {/* List */}
         <div className="flex-1 rounded-xl border border-gray-200 overflow-hidden flex flex-col min-h-0">
           {/* Column headers */}
-          <div className="flex items-center pl-9 pr-5 py-3 bg-white border-b border-gray-200 shrink-0">
+          <div className="flex items-center px-5 py-3 bg-white border-b border-gray-200 shrink-0">
             <span className="w-[9%]  text-xl font-semibold text-gray-800 text-center">ID</span>
             <span className="w-[14%] text-xl font-semibold text-gray-800 text-center">Name</span>
             <span className="w-[12%] text-xl font-semibold text-gray-800 text-center">Category</span>
-            <span className="w-[16%] text-xl font-semibold text-gray-800 text-center">Stock</span>
-            <span className="w-[18%] text-xl font-semibold text-gray-800 text-center">Status</span>
-            <span className="w-[10%] text-xl font-semibold text-gray-800 text-center">Last Updated</span>
+            <span className="w-[17%] text-xl font-semibold text-gray-800 text-center">Stock</span>
+            <span className="w-[17%] text-xl font-semibold text-gray-800 text-center">Status</span>
+            <span className="w-[12%] text-xl font-semibold text-gray-800 text-center">Last Updated</span>
             <span className="flex-1   text-xl font-semibold text-gray-800 text-center">Actions</span>
           </div>
 
@@ -409,8 +388,7 @@ export default function StaffInventory() {
                       className="bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white px-3 py-1.5 rounded-full text-xl transition-colors"
                     >Resupply</button>
 
-                    {/* View Batches for ingredients only */}
-                    {row._type === 'ingredient' && (
+                    {row._type === 'ingredient' ? (
                       <div className="relative">
                         <button
                           onClick={e => { e.stopPropagation(); setOpenDropdownId(openDropdownId === row._docId ? null : row._docId); }}
@@ -428,6 +406,8 @@ export default function StaffInventory() {
                           </div>
                         )}
                       </div>
+                    ) : (
+                      <div className="w-[29px] shrink-0" /> 
                     )}
                   </div>
                 </div>
@@ -500,11 +480,9 @@ export default function StaffInventory() {
             )}
             <div className="flex gap-3 justify-end mt-2">
               <button onClick={closeResupMat} className="px-6 py-2 rounded-full border border-gray-300 text-xl text-gray-600 hover:bg-gray-50 transition-colors">Cancel</button>
-              <button
-                onClick={() => { if ((parseInt(resupMatAmount) || 0) > 0) setShowResupMatConf(true); }}
-                disabled={(parseInt(resupMatAmount) || 0) <= 0 || (resupMatRow.raw.maxLimit > 0 && (resupMatRow.raw.stock || 0) + (parseInt(resupMatAmount) || 0) > resupMatRow.raw.maxLimit)}
-                className="px-6 py-2 rounded-full bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white text-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >Confirm</button>
+              <button onClick={() => setShowResupMatConf(true)}
+                disabled={resupMatRow.raw.maxLimit > 0 && (resupMatRow.raw.stock || 0) + (parseInt(resupMatAmount) || 0) > resupMatRow.raw.maxLimit}
+                className="px-6 py-2 rounded-full bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white text-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed">Confirm</button>
             </div>
           </div>
         </div>
@@ -514,10 +492,10 @@ export default function StaffInventory() {
           <div className="bg-white rounded-2xl shadow-2xl w-[460px] px-8 py-6 flex flex-col gap-4">
             <h3 className="text-2xl font-semibold text-gray-800">Confirm Resupply?</h3>
             <p className="text-xl text-gray-600">Add <span className="font-semibold">{resupMatAmount} units</span> to {resupMatRow.displayName}. New stock: <span className="font-semibold">{(resupMatRow.raw.stock || 0) + (parseInt(resupMatAmount) || 0)} units</span>.</p>
-            {resupMatError && <p className="text-xl text-red-500">{resupMatError}</p>}
+            {resupMatError && <p className="text-lg text-red-500">{resupMatError}</p>}
             <div className="flex gap-3 justify-end mt-1">
-              <button onClick={() => setShowResupMatConf(false)} disabled={resupMatSaving} className="px-6 py-2 rounded-full border border-gray-300 text-xl text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50">Cancel</button>
-              <button onClick={handleConfirmResupMat} disabled={resupMatSaving} className={`px-6 py-2 rounded-full text-xl transition-colors ${resupMatSaving ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white'}`}>{resupMatSaving ? 'Saving...' : 'Confirm'}</button>
+              <button onClick={() => { setShowResupMatConf(false); setResupMatError(''); }} className="px-6 py-2 rounded-full border border-gray-300 text-xl text-gray-600 hover:bg-gray-50 transition-colors">Cancel</button>
+              <button onClick={handleConfirmResupMat} className="px-6 py-2 rounded-full bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white text-xl transition-colors">Confirm</button>
             </div>
           </div>
         </div>
@@ -551,33 +529,27 @@ export default function StaffInventory() {
             ) : (
               <>
                 <div className="flex items-center gap-4">
-                  <label className="text-xl text-gray-600 w-44 shrink-0">Expiration Date</label>
-                  <input type="date" value={resupIngExpDate} onChange={e => setResupIngExpDate(e.target.value)}
-                    className="flex-1 border border-gray-300 rounded-lg px-4 py-4 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]" />
-                </div>
-                <div className="flex items-center gap-4">
                   <label className="text-xl text-gray-600 w-44 shrink-0">New Batch Quantity</label>
                   <input type="number" min="0" value={resupIngQty} onChange={e => setResupIngQty(e.target.value)}
-                    className="flex-1 border border-gray-300 rounded-lg px-4 py-4 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]" />
+                    className="flex-1 border border-gray-300 rounded-lg px-4 py-3 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]" />
                   <span className="text-xl text-gray-500 shrink-0">{resupIngRow.displayUnit}</span>
                 </div>
                 {resupIngRow.raw.maxLimit > 0 && (resupIngRow.raw.batches || []).reduce((s, b) => s + (b.quantity || 0), 0) + (parseInt(resupIngQty) || 0) > resupIngRow.raw.maxLimit && (
-                  <div className="flex items-center gap-3 bg-orange-50 border border-orange-200 rounded-xl px-4 py-3">
-                    <AlertTriangle size={16} className="text-orange-500 shrink-0" />
-                    <span className="text-lg text-orange-600">New total exceeds the limit of {resupIngRow.raw.maxLimit} {resupIngRow.raw.unit || 'units'}.</span>
+                  <div className="flex items-center gap-2 text-red-500">
+                    <AlertTriangle size={16} />
+                    <span className="text-lg">Maximum limit of {resupIngRow.raw.maxLimit} {resupIngRow.raw.unit || 'units'} reached.</span>
                   </div>
                 )}
+                <div className="flex items-center gap-4">
+                  <label className="text-xl text-gray-600 w-44 shrink-0">Expiration Date</label>
+                  <input type="date" value={resupIngExpDate} onChange={e => setResupIngExpDate(e.target.value)}
+                    className="flex-1 border border-gray-300 rounded-lg px-4 py-3 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]" />
+                </div>
                 <div className="flex gap-3 justify-end mt-2">
                   <button onClick={closeResupIng} className="px-6 py-2 rounded-full border border-gray-300 text-xl text-gray-600 hover:bg-gray-50 transition-colors">Cancel</button>
-                  <button
-                    onClick={() => { if (resupIngExpDate && (parseInt(resupIngQty) || 0) > 0) setShowResupIngConf(true); }}
-                    disabled={
-                      !resupIngExpDate ||
-                      (parseInt(resupIngQty) || 0) <= 0 ||
-                      (resupIngRow.raw.maxLimit > 0 && (resupIngRow.raw.batches || []).reduce((s, b) => s + (b.quantity || 0), 0) + (parseInt(resupIngQty) || 0) > resupIngRow.raw.maxLimit)
-                    }
-                    className="px-6 py-2 rounded-full bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white text-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >Confirm</button>
+                  <button onClick={() => setShowResupIngConf(true)}
+                    disabled={resupIngRow.raw.maxLimit > 0 && (resupIngRow.raw.batches || []).reduce((s, b) => s + (b.quantity || 0), 0) + (parseInt(resupIngQty) || 0) > resupIngRow.raw.maxLimit}
+                    className="px-6 py-2 rounded-full bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white text-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed">Confirm</button>
                 </div>
               </>
             )}
@@ -589,10 +561,10 @@ export default function StaffInventory() {
           <div className="bg-white rounded-2xl shadow-2xl w-[460px] px-8 py-6 flex flex-col gap-4">
             <h3 className="text-2xl font-semibold text-gray-800">Confirm Resupply?</h3>
             <p className="text-xl text-gray-600">Add a new batch of <span className="font-semibold">{resupIngQty} {resupIngRow.displayUnit}</span> expiring on <span className="font-semibold">{resupIngExpDate}</span>.</p>
-            {resupIngError && <p className="text-xl text-red-500">{resupIngError}</p>}
+            {resupIngError && <p className="text-lg text-red-500">{resupIngError}</p>}
             <div className="flex gap-3 justify-end mt-1">
-              <button onClick={() => setShowResupIngConf(false)} disabled={resupIngSaving} className="px-6 py-2 rounded-full border border-gray-300 text-xl text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50">Cancel</button>
-              <button onClick={handleConfirmResupIng} disabled={resupIngSaving} className={`px-6 py-2 rounded-full text-xl transition-colors ${resupIngSaving ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white'}`}>{resupIngSaving ? 'Saving...' : 'Confirm'}</button>
+              <button onClick={() => { setShowResupIngConf(false); setResupIngError(''); }} className="px-6 py-2 rounded-full border border-gray-300 text-xl text-gray-600 hover:bg-gray-50 transition-colors">Cancel</button>
+              <button onClick={handleConfirmResupIng} className="px-6 py-2 rounded-full bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white text-xl transition-colors">Confirm</button>
             </div>
           </div>
         </div>
@@ -712,8 +684,9 @@ export default function StaffInventory() {
           <div className="bg-white rounded-2xl shadow-2xl w-[460px] px-8 py-6 flex flex-col gap-4">
             <h3 className="text-2xl font-semibold text-gray-800">Confirm Adjustment?</h3>
             <p className="text-xl text-gray-600">Save changes to <span className="font-semibold">{adjRow.displayName}</span>?</p>
+            {adjError && <p className="text-lg text-red-500">{adjError}</p>}
             <div className="flex gap-3 justify-end mt-1">
-              <button onClick={() => setShowAdjConf(false)} className="px-6 py-2 rounded-full border border-gray-300 text-xl text-gray-600 hover:bg-gray-50 transition-colors">Cancel</button>
+              <button onClick={() => { setShowAdjConf(false); setAdjError(''); }} className="px-6 py-2 rounded-full border border-gray-300 text-xl text-gray-600 hover:bg-gray-50 transition-colors">Cancel</button>
               <button onClick={handleConfirmAdj} className="px-6 py-2 rounded-full bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white text-xl transition-colors">Confirm</button>
             </div>
           </div>
