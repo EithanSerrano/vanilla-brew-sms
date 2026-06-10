@@ -394,7 +394,7 @@ export default function Inventory() {
       const snap = await getDocs(collection(db, 'menuItems'));
       const all = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(m => m.menuItemId);
       const connected = all.filter(m =>
-        (m.sizes || []).some(sz => (sz.connections || []).some(c => c.refId === row._docId))
+        (m.variants || m.sizes || []).some(sz => (sz.connections || []).some(c => c.refId === row._docId))
       );
       setConnectedItems(connected);
       setConflictActions({});
@@ -411,11 +411,12 @@ export default function Inventory() {
       if (action === 'unavailable') {
         await updateDoc(doc(db, 'menuItems', item.id), { isAvailable: false });
       } else {
-        const updatedSizes = (item.sizes || []).map(sz => ({
+        const variantField = item.variants ? 'variants' : 'sizes';
+        const updatedVariants = (item[variantField] || []).map(sz => ({
           ...sz,
           connections: (sz.connections || []).filter(c => c.refId !== hideRow._docId),
         }));
-        await updateDoc(doc(db, 'menuItems', item.id), { sizes: updatedSizes });
+        await updateDoc(doc(db, 'menuItems', item.id), { [variantField]: updatedVariants });
       }
     }
     const coll   = hideRow._type === 'material' ? 'materials' : 'ingredients';
