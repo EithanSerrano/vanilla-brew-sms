@@ -1,7 +1,7 @@
 ﻿import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { signInWithEmailAndPassword, sendPasswordResetEmail, signOut, updatePassword, setPersistence, browserLocalPersistence, onAuthStateChanged } from 'firebase/auth';
-import { doc, getDoc, collection, query, where, getDocs, updateDoc, addDoc, serverTimestamp, limit } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, addDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 import { Eye, EyeOff, Lock } from 'lucide-react';
 
@@ -292,19 +292,8 @@ export default function Login() {
     setIsSubmitting(true);
    
     try {
-      const usersRef = collection(db, 'users');
-      // Added limit(1) to the query to satisfy Firebase security rules
-      const q = query(usersRef, where("email", "==", resetEmail.trim()), limit(1));
-      const querySnapshot = await getDocs(q);
-
-      if (querySnapshot.empty) {
-        alert("There is no registered staff member with this email.");
-        setResetError(true);
-        setIsSubmitting(false);
-        return;
-      }
-
       // 1. Ask the backend API to generate the secure Firebase link
+      // (it returns an error if the email is not registered in Auth)
       const response = await fetch('/api/send-reset', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
