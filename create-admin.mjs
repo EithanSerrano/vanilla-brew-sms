@@ -1,5 +1,3 @@
-
-
 import admin from 'firebase-admin';
 
 const serviceAccount = {
@@ -31,6 +29,9 @@ async function createAdmin() {
   try {
     userRecord = await auth.getUserByEmail(ADMIN_EMAIL);
     console.log('Auth user already exists, UID:', userRecord.uid);
+    // Force-set the password so we know exactly what it is
+    await auth.updateUser(userRecord.uid, { password: ADMIN_PASSWORD });
+    console.log('Password updated to:', ADMIN_PASSWORD);
   } catch {
     console.log(`Creating auth user: ${ADMIN_EMAIL}`);
     userRecord = await auth.createUser({
