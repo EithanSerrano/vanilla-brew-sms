@@ -13,9 +13,9 @@ const serviceAccount = {
 
 // ── Set your admin credentials here ──────────────────────────────────────────
 const ADMIN_EMAIL        = 'vnlbrew0719@gmail.com';
-const ADMIN_PASSWORD     = 'ADMINACCOUNTACCESS';            
-const ADMIN_FULL_NAME    = 'Administrator';            
-const ADMIN_DISPLAY_NAME = 'Admin';                    
+const ADMIN_PASSWORD     = 'VNLBREWADMIN';
+const ADMIN_FULL_NAME    = 'Administrator';
+const ADMIN_DISPLAY_NAME = 'Admin';
 // ─────────────────────────────────────────────────────────────────────────────
 
 admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
@@ -23,30 +23,42 @@ admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
 const db   = admin.firestore();
 const auth = admin.auth();
 
-async function createAdmin() {
-  // Look up existing Auth user; create only if not found
-  let userRecord;
-  try {
-    userRecord = await auth.getUserByEmail(ADMIN_EMAIL);
-    console.log('Auth user already exists, UID:', userRecord.uid);
-    // Force-set the password so we know exactly what it is
-    await auth.updateUser(userRecord.uid, { password: ADMIN_PASSWORD });
-    console.log('Password updated to:', ADMIN_PASSWORD);
-  } catch {
-    console.log(`Creating auth user: ${ADMIN_EMAIL}`);
-    userRecord = await auth.createUser({
-      email: ADMIN_EMAIL,
-      password: ADMIN_PASSWORD,
-      displayName: ADMIN_DISPLAY_NAME,
-    });
-    console.log('Auth user created, UID:', userRecord.uid);
-  }
+async function deleteAllAuthUsers() {
+  let pageToken;
+  let total = 0;
+  do {
+    const result = await auth.listUsers(1000, pageToken);
+    if (result.users.length) {
+      await auth.deleteUsers(result.users.map(u => u.uid));
+      total += result.users.length;
+    }
+    pageToken = result.pageToken;
+  } while (pageToken);
+  console.log(`Deleted ${total} Auth user(s).`);
+}
 
-  const usersSnap = await db.collection('users').get();
-  const empId = `EMP${String(usersSnap.size + 1).padStart(3, '0')}`;
+async function deleteAllFirestoreUsers() {
+  const snap = await db.collection('users').get();
+  const batch = db.batch();
+  snap.docs.forEach(d => batch.delete(d.ref));
+  if (!snap.empty) await batch.commit();
+  console.log(`Deleted ${snap.size} Firestore user document(s).`);
+}
+
+async function resetAndCreateAdmin() {
+  await deleteAllAuthUsers();
+  await deleteAllFirestoreUsers();
+
+  console.log(`Creating auth user: ${ADMIN_EMAIL}`);
+  const userRecord = await auth.createUser({
+    email: ADMIN_EMAIL,
+    password: ADMIN_PASSWORD,
+    displayName: ADMIN_DISPLAY_NAME,
+  });
+  console.log('Auth user created, UID:', userRecord.uid);
 
   await db.collection('users').doc(userRecord.uid).set({
-    empId,
+    empId: 'EMP001',
     fullName: ADMIN_FULL_NAME,
     name: ADMIN_DISPLAY_NAME,
     email: ADMIN_EMAIL,
@@ -57,14 +69,14 @@ async function createAdmin() {
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
   });
 
-  console.log(`\nAdmin account created!`);
-  console.log(`  empId: ${empId}`);
+  console.log(`\nReset complete. Admin account created!`);
+  console.log(`  empId: EMP001`);
   console.log(`  Email: ${ADMIN_EMAIL}`);
   console.log(`  Pass:  ${ADMIN_PASSWORD}`);
   console.log(`\nLog in now, then delete this file.`);
 }
 
-createAdmin().catch(err => {
+resetAndCreateAdmin().catch(err => {
   console.error('Failed:', err.message);
   process.exit(1);
 });
