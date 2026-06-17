@@ -101,7 +101,7 @@ export default function AdminRegistration() {
   const logAudit = async (action, itemId, itemName, details = {}) => {
     try {
       const session = JSON.parse(localStorage.getItem('sessionUser') || '{}');
-      const performedBy = session.name || 'Unknown';
+      const performedBy = session.name || session.email || 'Unknown';
       await addDoc(collection(db, 'auditlog'), {
         action, itemType: 'account', itemId, itemName, details, performedBy, timestamp: new Date(),
       });

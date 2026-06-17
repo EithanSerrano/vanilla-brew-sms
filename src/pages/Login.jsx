@@ -1,7 +1,7 @@
 ﻿import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { signInWithEmailAndPassword, sendPasswordResetEmail, signOut, updatePassword, setPersistence, browserLocalPersistence, onAuthStateChanged } from 'firebase/auth';
-import { doc, getDoc, updateDoc, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, getDoc, updateDoc, addDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 import { Eye, EyeOff, Lock } from 'lucide-react';
 
@@ -163,7 +163,7 @@ export default function Login() {
 
         localStorage.setItem('sessionUser', JSON.stringify({
           uid:   user.uid,
-          name:  userData.name  || '',
+          name:  userData.name || userData.fullName || '',
           email: user.email     || '',
           role:  userData.role  || '',
         }));
