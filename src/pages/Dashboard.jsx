@@ -283,11 +283,16 @@ export default function Dashboard({ role }) {
     const itemsHtml = (sale.orders || []).map(o => `
       <div class="item">
         <div class="item-row">
-          <span class="item-name">${o.qty}x ${o.name}${o.size ? ` ${o.size}` : ''}</span>
+          <span class="item-name">${o.qty}x ${o.size ? `${o.size} ` : ''}${o.name}</span>
           <span class="item-price">&#8369;${Number(o.totalPrice || 0).toFixed(2)}</span>
         </div>
         ${o.addons ? `<div class="addons">&#42; ${o.addons}</div>` : ''}
       </div>`).join('');
+
+    const promoSavings  = Number(sale.promoSavings  || 0);
+    const cashTendered  = Number(sale.cashTendered  || 0);
+    const changeAmount  = Number(sale.change        || 0);
+    const isCash = (sale.modeOfPayment || '').toLowerCase() === 'cash';
 
     const html = `<!DOCTYPE html>
 <html>
@@ -303,21 +308,22 @@ export default function Dashboard({ role }) {
       width: 52mm;
       color: #000;
     }
-    .center { text-align: center; }
     .shop-name { font-size: 15px; font-weight: bold; text-align: center; letter-spacing: 2px; margin-bottom: 1px; }
     .shop-sub  { font-size: 8.5px; text-align: center; color: #333; margin-bottom: 3px; }
     .dash { border: none; border-top: 1px dashed #000; margin: 4px 0; }
     .trans-num { font-size: 10.5px; font-weight: bold; text-align: center; margin: 3px 0 4px; }
-    .info-row  { font-size: 9px; margin: 1.5px 0; }
+    .info-row  { font-size: 9px; margin: 1.5px 0; color: #614033; }
     .section-title { font-weight: bold; font-size: 9.5px; margin: 3px 0 2px; }
     .item { margin: 3px 0; }
     .item-row  { display: flex; justify-content: space-between; font-weight: bold; }
     .item-name { flex: 1; padding-right: 4px; word-break: break-word; }
     .item-price { white-space: nowrap; }
     .addons { font-size: 8px; color: #555; padding-left: 10px; line-height: 1.3; }
-    .sub-row  { display: flex; justify-content: space-between; font-size: 9px; margin: 2px 0; }
+    .sub-row   { display: flex; justify-content: space-between; font-size: 9px; margin: 2px 0; }
+    .promo-row { display: flex; justify-content: space-between; font-size: 9px; margin: 2px 0; }
     .total-row { display: flex; justify-content: space-between; font-size: 11px; font-weight: bold; margin: 3px 0; }
-    .footer { text-align: center; font-size: 8.5px; margin: 2px 0; }
+    .cash-row  { display: flex; justify-content: space-between; font-size: 9px; margin: 2px 0; color: #614033; }
+    .footer { text-align: center; font-size: 8.5px; margin: 2px 0; color: #614033; }
   </style>
 </head>
 <body>
@@ -331,13 +337,16 @@ export default function Dashboard({ role }) {
   ${sale.customerType ? `<div class="info-row">Type: ${sale.customerType}</div>` : ''}
   <div class="info-row">Mode: ${sale.orderMode || '&#8212;'}</div>
   <div class="info-row">Payment: ${sale.modeOfPayment || '&#8212;'}</div>
-  <div class="info-row">Status: ${sale.status || 'Completed'}</div>
   <hr class="dash">
   <div class="section-title">ORDER ITEMS</div>
   ${itemsHtml}
   <hr class="dash">
   <div class="sub-row"><span>Subtotal:</span><span>&#8369;${Number(sale.totalAmount || 0).toFixed(2)}</span></div>
+  ${promoSavings > 0 ? `<div class="promo-row"><span>Promo Savings:</span><span>-&#8369;${promoSavings.toFixed(2)}</span></div>` : ''}
   <div class="total-row"><span>TOTAL:</span><span>&#8369;${Number(sale.totalAmount || 0).toFixed(2)}</span></div>
+  ${isCash ? `
+  <div class="cash-row"><span>Cash Tendered:</span><span>&#8369;${cashTendered.toFixed(2)}</span></div>
+  <div class="cash-row"><span>Change:</span><span>&#8369;${changeAmount.toFixed(2)}</span></div>` : ''}
   <hr class="dash">
   <div class="footer">Thank you for your purchase!</div>
   <div class="footer">Please come again.</div>
