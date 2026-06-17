@@ -87,7 +87,7 @@ export default function Account({ role }) {
     const snap = await getDoc(doc(db, 'users', user.uid));
     const userData = snap.exists() ? snap.data() : {};
     await addDoc(collection(db, 'auditlog'), {
-      action, performedBy: user.email, userId: user.uid,
+      action, performedBy: userData.name || userData.fullName || user.email, userId: user.uid,
       userName: userData.name || '', role: role || '',
       details, timestamp: serverTimestamp(),
     });

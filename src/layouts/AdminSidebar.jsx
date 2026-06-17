@@ -85,7 +85,7 @@ export default function AdminSidebar() {
       if (uid) {
         await addDoc(collection(db, 'auditlog'), {
           action: 'Logout',
-          performedBy: session.email || '',
+          performedBy: session.name || session.email || '',
           userId: uid,
           userName: session.name || '',
           role: 'admin',

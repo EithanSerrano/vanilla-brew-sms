@@ -20,7 +20,7 @@ export default function ProtectedRoute() {
         await Promise.all([
           addDoc(collection(db, 'auditlog'), {
             action: 'Auto Logout',
-            performedBy: session.email || '',
+            performedBy: session.name || session.email || '',
             userId: uid,
             userName: session.name || '',
             role: session.role || '',

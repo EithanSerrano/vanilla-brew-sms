@@ -146,7 +146,7 @@ export default function Login() {
 
         await addDoc(collection(db, 'auditlog'), {
           action: 'Login',
-          performedBy: user.email,
+          performedBy: userData.name || userData.fullName || user.email,
           userId: user.uid,
           userName: userData.name || '',
           role: userData.role || '',
