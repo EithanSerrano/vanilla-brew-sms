@@ -321,21 +321,26 @@ export default function Login() {
       }
 
       // 2. Pass the generated link to EmailJS to handle the delivery
-      await fetch('https://api.emailjs.com/api/v1.0/email/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          service_id: import.meta.env.VITE_EMAILJS_SERVICE_WELCOME,
-          template_id: import.meta.env.VITE_EMAILJS_TEMPLATE_RESET,
-          user_id: import.meta.env.VITE_EMAILJS_PUBLIC_KEY_WELCOME,
-          template_params: {
-            email: resetEmail.trim(), 
-            link: data.link,          
-          }
-        }),
-      });
+      const emailRes = await fetch('https://api.emailjs.com/api/v1.0/email/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        service_id: import.meta.env.VITE_EMAILJS_SERVICE_WELCOME,
+        template_id: import.meta.env.VITE_EMAILJS_TEMPLATE_RESET,
+        user_id: import.meta.env.VITE_EMAILJS_PUBLIC_KEY_WELCOME,
+        template_params: {
+          email: resetEmail.trim(),
+          link: data.link,
+        }
+      }),
+    });
 
-      setSuccessMessage(true);
+    if (!emailRes.ok) {
+      const emailErr = await emailRes.text();
+      throw new Error(`Failed to send email: ${emailErr}`);
+    }
+
+    setSuccessMessage(true);
 
     } catch (error) {
       console.error("Custom Reset Error:", error);
