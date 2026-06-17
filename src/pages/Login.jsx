@@ -66,7 +66,9 @@ export default function Login() {
       try {
         const userDocSnap = await getDoc(doc(db, 'users', user.uid));
         if (userDocSnap.exists()) {
-          const { role } = userDocSnap.data();
+          const { role, mustChangePassword } = userDocSnap.data();
+          // Let handleLogin manage the flow for first-time logins
+          if (mustChangePassword) return;
           const destination = role === 'admin' ? '/admin' : role === 'staff' ? '/staff' : null;
           if (destination) navigate(destination, { replace: true });
         }
