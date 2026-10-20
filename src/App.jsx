@@ -2,6 +2,8 @@ import { useEffect } from "react";
 import { createBrowserRouter, RouterProvider, Navigate, Outlet } from "react-router-dom";
 import { startSalesInventoryListener } from "./utils/inventoryDeduction";
 import ProtectedRoute from "./components/ProtectedRoute";
+import RoleRoute from "./components/RoleRoute";
+import { ACCESS } from "./constants/roles";
 
 // Pages
 import Login from "./pages/Login";
@@ -18,6 +20,7 @@ import MenuItems from "./pages/MenuItems";
 import MenuCategories from "./pages/MenuCategories";
 import Promotions from "./pages/Promotions";
 import AdminHelp from "./pages/AdminHelp";
+import Analytics from "./pages/Analytics";
 
 // Staff Pages
 import StaffHome from "./pages/StaffHome";
@@ -60,31 +63,49 @@ const router = createBrowserRouter([
       {
         element: <ProtectedRoute />,
         children: [
-          // Admin routes
-          { path: "/admin",             element: <AdminHome /> },
-          { path: "/admin-dashboard",   element: <Dashboard role="admin" /> },
-          { path: "/inventory",         element: <Inventory /> },
-          { path: "/menu-items",        element: <MenuItems /> },
-          { path: "/menu-categories",   element: <MenuCategories /> },
-          { path: "/promotions",        element: <Promotions /> },
-          { path: "/registration",      element: <AdminRegistration /> },
-          { path: "/admin-maintenance", element: <Maintenance role="admin" /> },
-          { path: "/documents",         element: <Documents /> },
-          { path: "/admin-help",        element: <AdminHelp /> },
-          { path: "/admin-about",       element: <About role="admin" /> },
-          { path: "/admin-settings",    element: <Settings role="admin" /> },
-          { path: "/admin-account",     element: <Account role="admin" /> },
-          { path: "/payment-qr",        element: <PaymentQR /> },
-          { path: "/backup-recovery",   element: <BackupRecovery /> },
+          // Admin + manager routes
+          {
+            element: <RoleRoute allow={ACCESS.adminArea} />,
+            children: [
+              { path: "/admin",             element: <AdminHome /> },
+              { path: "/admin-dashboard",   element: <Dashboard role="admin" /> },
+              { path: "/analytics",         element: <Analytics /> },
+              { path: "/inventory",         element: <Inventory /> },
+              { path: "/menu-items",        element: <MenuItems /> },
+              { path: "/menu-categories",   element: <MenuCategories /> },
+              { path: "/promotions",        element: <Promotions /> },
+              { path: "/documents",         element: <Documents /> },
+              { path: "/admin-help",        element: <AdminHelp /> },
+              { path: "/admin-about",       element: <About role="admin" /> },
+              { path: "/admin-settings",    element: <Settings role="admin" /> },
+              { path: "/admin-account",     element: <Account role="admin" /> },
+            ],
+          },
+
+          // Admin-only routes
+          {
+            element: <RoleRoute allow={ACCESS.accounts} />,
+            children: [
+              { path: "/registration",      element: <AdminRegistration /> },
+              { path: "/admin-maintenance", element: <Maintenance role="admin" /> },
+              { path: "/payment-qr",        element: <PaymentQR /> },
+              { path: "/backup-recovery",   element: <BackupRecovery /> },
+            ],
+          },
 
           // Staff routes
-          { path: "/staff",             element: <StaffHome /> },
-          { path: "/staff-dashboard",   element: <Dashboard role="staff" /> },
-          { path: "/staff-inventory",   element: <StaffInventory /> },
-          { path: "/staff-help",        element: <StaffHelp /> },
-          { path: "/staff-about",       element: <About role="staff" /> },
-          { path: "/staff-settings",    element: <Settings role="staff" /> },
-          { path: "/staff-account",     element: <Account role="staff" /> },
+          {
+            element: <RoleRoute allow={ACCESS.staffArea} />,
+            children: [
+              { path: "/staff",             element: <StaffHome /> },
+              { path: "/staff-dashboard",   element: <Dashboard role="staff" /> },
+              { path: "/staff-inventory",   element: <StaffInventory /> },
+              { path: "/staff-help",        element: <StaffHelp /> },
+              { path: "/staff-about",       element: <About role="staff" /> },
+              { path: "/staff-settings",    element: <Settings role="staff" /> },
+              { path: "/staff-account",     element: <Account role="staff" /> },
+            ],
+          },
         ],
       },
 

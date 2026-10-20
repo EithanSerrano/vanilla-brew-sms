@@ -54,6 +54,7 @@ export default function AdminRegistration() {
   const [fullName, setFullName] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
+  const [newRole, setNewRole] = useState('staff');
   const [pendingAccount, setPendingAccount] = useState(null);
   const [showConfirm, setShowConfirm] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
@@ -77,6 +78,7 @@ export default function AdminRegistration() {
   const [editRow, setEditRow] = useState(null);
   const [editFullName, setEditFullName] = useState('');
   const [editDisplayName, setEditDisplayName] = useState('');
+  const [editRole, setEditRole] = useState('staff');
   const [showEditForm, setShowEditForm] = useState(false);
   const [showEditConfirm, setShowEditConfirm] = useState(false);
   const [showEditOk, setShowEditOk] = useState(false);
@@ -122,7 +124,7 @@ export default function AdminRegistration() {
 
   // ── New account flow ──
   const formHasData = () => fullName.trim() !== '' || displayName.trim() !== '' || email.trim() !== '';
-  const resetForm = () => { setFullName(''); setDisplayName(''); setEmail(''); setPendingAccount(null); setGeneratedPassword(''); };
+  const resetForm = () => { setFullName(''); setDisplayName(''); setEmail(''); setNewRole('staff'); setPendingAccount(null); setGeneratedPassword(''); };
 
 
   const closeForm = () => {
@@ -134,7 +136,7 @@ export default function AdminRegistration() {
   const handleSaveAccount = async () => {
     if (!fullName.trim() || !displayName.trim() || !email.trim()) return;
     const empId = await generateNextEmpId();
-    setPendingAccount({ fullName: fullName.trim(), displayName: displayName.trim(), email: email.trim(), empId });
+    setPendingAccount({ fullName: fullName.trim(), displayName: displayName.trim(), email: email.trim(), role: newRole, empId });
     setShowConfirm(true);
   };
 
@@ -156,7 +158,7 @@ export default function AdminRegistration() {
         fullName: pendingAccount.fullName,
         name: pendingAccount.displayName,
         email: pendingAccount.email,
-        role: 'staff',
+        role: pendingAccount.role || 'staff',
         status: 'Active',
         isOnline: false,
         createdAt: new Date(),
@@ -166,6 +168,7 @@ export default function AdminRegistration() {
       await logAudit('CREATE_ACCOUNT', pendingAccount.empId, pendingAccount.displayName, {
         fullName: pendingAccount.fullName,
         email: pendingAccount.email,
+        role: pendingAccount.role || 'staff',
       });
 
 
@@ -234,11 +237,13 @@ export default function AdminRegistration() {
     setEditRow(acc);
     setEditFullName(acc.fullName || acc.name || '');
     setEditDisplayName(acc.name || '');
+    setEditRole(acc.role || 'staff');
     setShowEditForm(true);
   };
   const editHasChanges = () => {
     if (!editRow) return false;
-    return editFullName !== (editRow.fullName || editRow.name || '') || editDisplayName !== (editRow.name || '');
+    return editFullName !== (editRow.fullName || editRow.name || '') || editDisplayName !== (editRow.name || '')
+      || editRole !== (editRow.role || 'staff');
   };
   const closeEditForm = () => {
     if (editHasChanges()) setShowEditDiscard(true);
@@ -249,12 +254,15 @@ export default function AdminRegistration() {
     await updateDoc(doc(db, 'users', editRow.id), {
       fullName: editFullName.trim(),
       name: editDisplayName.trim(),
+      ...(editRow.role !== 'admin' && { role: editRole }),
     });
     await logAudit('EDIT_ACCOUNT', editRow.empId, editDisplayName.trim(), {
       previousFullName: editRow.fullName || editRow.name,
       newFullName: editFullName.trim(),
       previousDisplayName: editRow.name,
       newDisplayName: editDisplayName.trim(),
+      previousRole: editRow.role || 'staff',
+      newRole: editRow.role === 'admin' ? 'admin' : editRole,
     });
     await loadData();
     setShowEditConfirm(false);
@@ -471,6 +479,17 @@ export default function AdminRegistration() {
                   className="flex-1 border border-gray-300 rounded-lg px-4 py-3 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]"
                 />
               </div>
+              <div className="flex items-center gap-5">
+                <label className="text-xl text-gray-600 w-44 shrink-0">Role</label>
+                <select
+                  value={newRole}
+                  onChange={e => setNewRole(e.target.value)}
+                  className="flex-1 border border-gray-300 rounded-lg px-4 py-3 text-xl text-gray-700 outline-none focus:border-[#3ca4c7] bg-white"
+                >
+                  <option value="staff">Staff</option>
+                  <option value="manager">Manager</option>
+                </select>
+              </div>
               <button
                 onClick={handleSaveAccount}
                 className="w-full bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white py-3.5 rounded-full text-xl font-semibold transition-colors mt-2"
@@ -590,6 +609,19 @@ export default function AdminRegistration() {
                   className="flex-1 border border-gray-300 rounded-lg px-4 py-3 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]"
                 />
               </div>
+              {editRow.role !== 'admin' && (
+                <div className="flex items-center gap-5">
+                  <label className="text-xl text-gray-600 w-44 shrink-0">Role</label>
+                  <select
+                    value={editRole}
+                    onChange={e => setEditRole(e.target.value)}
+                    className="flex-1 border border-gray-300 rounded-lg px-4 py-3 text-xl text-gray-700 outline-none focus:border-[#3ca4c7] bg-white"
+                  >
+                    <option value="staff">Staff</option>
+                    <option value="manager">Manager</option>
+                  </select>
+                </div>
+              )}
               <button
                 onClick={() => setShowEditConfirm(true)}
                 className="w-full bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white py-3.5 rounded-full text-xl font-semibold transition-colors"

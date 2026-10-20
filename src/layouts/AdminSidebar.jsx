@@ -7,8 +7,9 @@ import {
   LayoutGrid, Package, FolderCog, Coffee, Users, Tag,
   FileText, ScrollText, Settings, Info,
   HelpCircle, LogOut, ChevronDown, ChevronUp,
-  QrCode, UserCircle, Percent, Database,
+  QrCode, UserCircle, Percent, Database, BarChart3,
 } from 'lucide-react';
+import { can, getSessionRole } from '../constants/roles';
 
 function NavItem({ to, icon, label, end = false }) {
   return (
@@ -46,6 +47,7 @@ function SubNavItem({ to, icon, label }) {
 export default function AdminSidebar() {
   const navigate = useNavigate();
   const [userName, setUserName] = useState('');
+  const role = getSessionRole();
   const [adminOpen, setAdminOpen] = useState(true);
   const [maintenanceOpen, setMaintenanceOpen] = useState(true);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -88,7 +90,7 @@ export default function AdminSidebar() {
           performedBy: session.name || session.email || '',
           userId: uid,
           userName: session.name || '',
-          role: 'admin',
+          role: session.role || role || 'admin',
           details: `${session.name || session.email} logged out.`,
           timestamp: serverTimestamp(),
         });
@@ -125,6 +127,7 @@ export default function AdminSidebar() {
       {/* Nav items */}
       <nav className="flex-1 px-3 flex flex-col gap-0.5 overflow-y-auto pb-2">
         <NavItem to="/admin-dashboard" icon={<LayoutGrid size={17} />} label="Dashboard" />
+        {can(role, 'analytics') && <NavItem to="/analytics" icon={<BarChart3 size={17} />} label="Analytics" />}
         <NavItem to="/inventory" icon={<Package size={17} />} label="Inventory" />
 
         {/* Administrative accordion */}
@@ -143,7 +146,7 @@ export default function AdminSidebar() {
             <SubNavItem to="/menu-items" icon={<Coffee size={15} />} label="Menu Items" />
             <SubNavItem to="/menu-categories" icon={<Tag size={15} />} label="Menu Categories" />
             <SubNavItem to="/promotions" icon={<Percent size={15} />} label="Promotions" />
-            <SubNavItem to="/registration" icon={<Users size={15} />} label="Manage Accounts" />
+            {can(role, 'accounts') && <SubNavItem to="/registration" icon={<Users size={15} />} label="Manage Accounts" />}
           </div>
         )}
 
@@ -160,10 +163,10 @@ export default function AdminSidebar() {
         </button>
         {maintenanceOpen && (
           <div className="flex flex-col gap-0.5">
-            <SubNavItem to="/admin-maintenance" icon={<ScrollText size={15} />} label="Audit Logs" />
+            {can(role, 'auditLogs') && <SubNavItem to="/admin-maintenance" icon={<ScrollText size={15} />} label="Audit Logs" />}
             <SubNavItem to="/documents" icon={<FileText size={15} />} label="Reports" />
-            <SubNavItem to="/payment-qr" icon={<QrCode size={15} />} label="Payment QR" />
-            <SubNavItem to="/backup-recovery" icon={<Database size={15} />} label="Backup & Recovery" />
+            {can(role, 'paymentQR') && <SubNavItem to="/payment-qr" icon={<QrCode size={15} />} label="Payment QR" />}
+            {can(role, 'backup') && <SubNavItem to="/backup-recovery" icon={<Database size={15} />} label="Backup & Recovery" />}
           </div>
         )}
 
