@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import {
-  collection, getDocs, addDoc, doc, getDoc, query, orderBy,
+  collection, getDocs, addDoc, doc, getDoc, query, orderBy, where,
 } from 'firebase/firestore';
 import { db, auth } from '../firebase';
 import {
@@ -9,6 +9,7 @@ import {
 import AdminSidebar from '../layouts/AdminSidebar';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { computeAnalytics, hourLabel, pctChange, phpText, toOrder } from '../utils/analytics';
 
 const DOC_TYPES = ['Sales Log', 'Inventory Log', 'Sales Analytics', 'Audit Log'];
 const TYPE_CODE = { 'Sales Log': 'SL', 'Inventory Log': 'IL', 'Sales Analytics': 'SA', 'Audit Log': 'AL' };
@@ -322,38 +323,58 @@ function addChartLegend(pdoc, slices, x, startY) {
 
 // ── Sales Analytics PDF ────────────────────────────────────────────────────────
 
+// Simple bar chart drawn with jsPDF rectangles (no canvas needed).
+function pdfBarChart(pdoc, data, x, y, w, h, gs = false) {
+  const max = Math.max(...data.map(d => d.value), 0);
+  const slot = w / data.length;
+  const barW = slot * 0.7;
+  data.forEach((d, i) => {
+    const bh = max > 0 ? Math.max((d.value / max) * h, d.value > 0 ? 0.4 : 0) : 0;
+    const color = d.highlight ? (gs ? [30, 30, 30] : [10, 90, 58]) : (gs ? [130, 130, 130] : [184, 112, 80]);
+    pdoc.setFillColor(...color);
+    pdoc.rect(x + i * slot + (slot - barW) / 2, y + h - bh, barW, bh, 'F');
+    if (d.label) {
+      pdoc.setFontSize(5.5);
+      pdoc.setTextColor(110, 110, 110);
+      pdoc.text(d.label, x + i * slot + slot / 2, y + h + 3.5, { align: 'center' });
+    }
+  });
+  pdoc.setDrawColor(200, 200, 200);
+  pdoc.setLineWidth(0.2);
+  pdoc.line(x, y + h, x + w, y + h);
+  pdoc.setTextColor(0, 0, 0);
+}
+
 async function buildSalesAnalyticsPdf(meta, dateFrom, dateTo, filters = {}, gs = false) {
-  const fsnap = await getDocs(collection(db, 'salestransaction'));
   const start = new Date(dateFrom + 'T00:00:00');
   const end   = new Date((dateTo || dateFrom) + 'T23:59:59');
+  const days  = Math.round((new Date(dateTo || dateFrom) - new Date(dateFrom)) / 86400000) + 1;
+  const prevStart = new Date(start);
+  prevStart.setDate(prevStart.getDate() - days);
 
-  const filtered = fsnap.docs.map(dc => ({ id: dc.id, ...dc.data() })).filter(s => {
-    const d = s.createdAt?.toDate?.() || (s.dateAndTimeStr ? new Date(s.dateAndTimeStr) : null);
-    if (!d || d < start || d > end) return false;
-    if (filters.orderMode && s.orderMode !== filters.orderMode) return false;
-    if (filters.paymentMethod && s.modeOfPayment !== filters.paymentMethod) return false;
+  // One query covers the selected period and the same-length period before it.
+  const fsnap = await getDocs(query(collection(db, 'salestransaction'), where('createdAt', '>=', prevStart)));
+  const orders = fsnap.docs.map(dc => toOrder(dc.data())).filter(o => {
+    if (o.date > end) return false;
+    if (filters.orderMode && o.orderMode !== filters.orderMode) return false;
+    if (filters.paymentMethod && o.payment !== filters.paymentMethod) return false;
     return true;
   });
+  const a = computeAnalytics(orders, start, end, prevStart);
 
   const orderModes = {};
   const payments   = {};
-  const tally      = {};
-  filtered.forEach(s => {
-    if (s.orderMode)      orderModes[s.orderMode]   = (orderModes[s.orderMode]   || 0) + 1;
-    if (s.modeOfPayment)  payments[s.modeOfPayment] = (payments[s.modeOfPayment] || 0) + 1;
-    (s.orders || []).forEach(o => {
-      const name = o.name || 'Unknown';
-      tally[name] = (tally[name] || 0) + (Number(o.qty) || 1);
-    });
+  orders.forEach(o => {
+    if (o.date < start || o.status === 'Returned' || o.status === 'Refunded') return;
+    orderModes[o.orderMode] = (orderModes[o.orderMode] || 0) + 1;
+    payments[o.payment]     = (payments[o.payment]     || 0) + 1;
   });
-  const ranked = Object.entries(tally).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count);
 
   const toSlices = (obj) => Object.entries(obj).map(([label, value], i) => ({ label, value, color: CHART_COLORS[i % CHART_COLORS.length] }));
   const noData   = [{ label: 'No data', value: 1, color: '#e5e7eb' }];
-
   const orderModeSlices = toSlices(orderModes);
   const paymentSlices   = toSlices(payments);
-  const topItemSlices   = ranked.slice(0, 8).map(({ name, count }, i) => ({ label: name, value: count, color: CHART_COLORS[i % CHART_COLORS.length] }));
+  const topItemSlices   = a.topItems.map(({ label, qty }, i) => ({ label, value: qty, color: CHART_COLORS[i % CHART_COLORS.length] }));
 
   const pdoc = new jsPDF('p', 'mm', 'a4');
   pdfHeader(pdoc, gs);
@@ -363,25 +384,66 @@ async function buildSalesAnalyticsPdf(meta, dateFrom, dateTo, filters = {}, gs =
   const headFill  = gs ? [70, 70, 70]   : [97, 64, 51];
   const labelFill = gs ? [215, 215, 215] : [245, 242, 240];
   const altFill   = gs ? [240, 240, 240] : [252, 250, 249];
+  const prevText  = days === 1 ? 'yesterday' : 'previous period';
+  const delta = (cur, prev) => {
+    const c = pctChange(cur, prev);
+    return c === null ? `no data ${prevText}` : `${c >= 0 ? '+' : '-'}${Math.abs(c).toFixed(0)}% vs ${prevText}`;
+  };
 
-  pdfSectionTitle(pdoc, 'Summary', contentY + 2, gs);
-  autoTable(pdoc, {
-    startY: contentY + 6,
-    body: [
-      [{ content: 'Total Transactions', styles: { fontStyle: 'bold', fillColor: labelFill } }, filtered.length.toString()],
-    ],
-    theme: 'grid',
-    styles: { fontSize: 8, cellPadding: 2 },
-    columnStyles: { 0: { cellWidth: 80 }, 1: { cellWidth: 110 } },
-    margin: { left: 10, right: 10 },
-  });
+  // Section helpers: keep each block on one page, tables flow across pages.
+  let y = contentY + 2;
+  const ensure = (h) => { if (y + h > 280) { pdoc.addPage(); y = 15; } };
+  const section = (title, height = 20) => { ensure(height); pdfSectionTitle(pdoc, title, y, gs); y += 4; };
+  const table = (head, body, columnStyles = {}) => {
+    autoTable(pdoc, {
+      startY: y,
+      head: head ? [head] : undefined,
+      body,
+      theme: 'grid',
+      headStyles: { fillColor: headFill, textColor: 255, fontSize: 7 },
+      styles: { fontSize: 8, cellPadding: 2 },
+      columnStyles,
+      margin: { left: 10, right: 10 },
+      alternateRowStyles: head ? { fillColor: altFill } : undefined,
+    });
+    y = pdoc.lastAutoTable.finalY + 8;
+  };
+  const labelRows = (rows) => rows.map(([l, v]) => [{ content: l, styles: { fontStyle: 'bold', fillColor: labelFill } }, v]);
+  const none = (msg) => {
+    pdoc.setFontSize(8);
+    pdoc.setTextColor(150, 150, 150);
+    pdoc.text(msg, 10, y + 4);
+    pdoc.setTextColor(0, 0, 0);
+    y += 12;
+  };
 
-  let y = pdoc.lastAutoTable.finalY + 8;
+  // ── Summary ──
+  section('Summary');
+  table(null, labelRows([
+    ['Revenue',          `${phpText(a.k.revenue)}   (${delta(a.k.revenue, a.pk.revenue)})`],
+    ['Orders',           `${a.k.count}   (${delta(a.k.count, a.pk.count)})`],
+    ['Avg Order Value',  `${phpText(a.k.aov)}   (${delta(a.k.aov, a.pk.aov)})`],
+    ['Items Sold',       `${a.k.items}   (${delta(a.k.items, a.pk.items)})`],
+  ]), { 0: { cellWidth: 60 }, 1: { cellWidth: 130 } });
+
+  // ── Sales trend + peak hours (bar charts) ──
+  section(days === 1 ? 'Sales Trend (yesterday vs today)' : 'Sales Trend (daily revenue)', 50);
+  if (a.trend.some(d => d.value > 0)) {
+    pdfBarChart(pdoc, a.trend, 10, y, 190, 30, gs);
+    y += 40;
+  } else none('No sales in this period.');
+
+  section('Peak Hours', 50);
+  if (a.peak.value > 0) {
+    pdoc.setFontSize(8);
+    pdoc.text(`Busiest hour: ${hourLabel(a.peak.hour)} - ${phpText(a.peak.value)} from ${a.peak.orders} orders`, 10, y + 2);
+    pdfBarChart(pdoc, a.hours, 10, y + 6, 190, 30, gs);
+    y += 46;
+  } else none('No sales in this period.');
 
   // ── Order Types + Payment Methods — side by side ──
   const colW = 38, colH = 38;
-  if (y + colH + 14 > 275) { pdoc.addPage(); y = 15; }
-
+  ensure(colH + 20);
   pdoc.setFontSize(9);
   pdoc.setFont('helvetica', 'bold');
   pdoc.setTextColor(...(gs ? [80, 80, 80] : [97, 64, 51]));
@@ -389,54 +451,91 @@ async function buildSalesAnalyticsPdf(meta, dateFrom, dateTo, filters = {}, gs =
   pdoc.text('Payment Methods', 107, y);
   pdoc.setTextColor(0, 0, 0);
   y += 4;
-
   const leftSlices  = orderModeSlices.length ? orderModeSlices : noData;
   const rightSlices = paymentSlices.length   ? paymentSlices   : noData;
   const leftCanvas  = makePieCanvas(leftSlices);
   const rightCanvas = makePieCanvas(rightSlices);
   if (leftCanvas)  pdoc.addImage(leftCanvas,  'PNG', 10,  y, colW, colH);
   if (rightCanvas) pdoc.addImage(rightCanvas, 'PNG', 107, y, colW, colH);
-
   const leftLegY  = addChartLegend(pdoc, leftSlices,  10  + colW + 3, y + 4);
   const rightLegY = addChartLegend(pdoc, rightSlices, 107 + colW + 3, y + 4);
   y += Math.max(colH, leftLegY - y, rightLegY - y) + 10;
 
+  // ── Payment revenue ──
+  section('Revenue by Payment Method');
+  if (a.payments.length) {
+    table(['Payment Method', 'Orders', 'Revenue'],
+      a.payments.map(r => [r.label, r.count, phpText(r.value)]),
+      { 1: { halign: 'right', cellWidth: 30 }, 2: { halign: 'right', cellWidth: 50 } });
+  } else none('No sales in this period.');
+
   // ── Top Selling Items ──
-  pdfSectionTitle(pdoc, 'Top Selling Items', y, gs);
-  y += 4;
-  if (topItemSlices.length) {
-    if (y + 55 + 10 > 275) { pdoc.addPage(); y = 15; }
+  section('Top Selling Items', 65);
+  if (topItemSlices.length && !gs) {
+    ensure(60);
     const canvas = makePieCanvas(topItemSlices);
     if (canvas) pdoc.addImage(canvas, 'PNG', 10, y, 55, 55);
     const legendEndY = addChartLegend(pdoc, topItemSlices, 69, y + 6);
     y += Math.max(55, legendEndY - y) + 10;
-  } else {
-    pdoc.setFontSize(8);
-    pdoc.setTextColor(150, 150, 150);
-    pdoc.text('No sales data for the selected date range.', 10, y + 6);
-    pdoc.setTextColor(0, 0, 0);
-    y += 16;
+  } else if (!topItemSlices.length) none('No sales data for the selected date range.');
+
+  if (a.topItems.length) {
+    table(['Rank', 'Item', 'Qty Sold', 'Revenue'],
+      a.topItems.map((r, i) => [i + 1, r.label, r.qty, phpText(r.revenue)]),
+      { 0: { cellWidth: 16, halign: 'center' }, 2: { cellWidth: 28, halign: 'right' }, 3: { cellWidth: 45, halign: 'right' } });
   }
 
-  // ── Top Items Ranking Table ──
-  if (ranked.length) {
-    pdoc.addPage();
-    pdfSectionTitle(pdoc, 'Top Items Ranking', 15, gs);
-    autoTable(pdoc, {
-      startY: 20,
-      head: [['Rank', 'Item Name', 'Qty Sold']],
-      body: ranked.slice(0, 20).map((x, i) => [i + 1, x.name, x.count]),
-      headStyles: { fillColor: headFill, textColor: 255, fontSize: 7 },
-      styles: { fontSize: 7, cellPadding: 2 },
-      columnStyles: {
-        0: { cellWidth: 20, halign: 'center' },
-        1: { cellWidth: 'auto' },
-        2: { cellWidth: 35, halign: 'right' },
-      },
-      margin: { left: 10, right: 10 },
-      alternateRowStyles: { fillColor: altFill },
-    });
+  section('Slowest Items');
+  if (a.bottomItems.length) {
+    table(['Item', 'Qty Sold', 'Revenue'],
+      a.bottomItems.map(r => [r.label, r.qty, phpText(r.revenue)]),
+      { 1: { cellWidth: 28, halign: 'right' }, 2: { cellWidth: 45, halign: 'right' } });
+  } else none('No sales data for the selected date range.');
+
+  // ── Cashier performance ──
+  section('Cashier Performance');
+  if (a.cashiers.length) {
+    table(['Cashier', 'Orders', 'Revenue'],
+      a.cashiers.map(r => [r.label, r.count, phpText(r.value)]),
+      { 1: { halign: 'right', cellWidth: 30 }, 2: { halign: 'right', cellWidth: 50 } });
+  } else none('No sales in this period.');
+
+  // ── Returns & refunds ──
+  section('Returns & Refunds');
+  const rt = a.returns;
+  table(null, labelRows([
+    ['Returned orders',    String(rt.returned)],
+    ['Refunded orders',    String(rt.refunded)],
+    ['Value lost',         `${phpText(rt.amount)}${rt.amountChange === null ? '' : `   (${rt.amountChange >= 0 ? '+' : '-'}${Math.abs(rt.amountChange).toFixed(0)}% vs ${prevText})`}`],
+    ['Return/refund rate', `${rt.rate.toFixed(1)}%`],
+  ]), { 0: { cellWidth: 60 }, 1: { cellWidth: 130 } });
+  if (rt.items.length) {
+    table(['Most Returned Items', 'Units', 'Value'],
+      rt.items.map(r => [r.label, r.value, phpText(r.amount)]),
+      { 1: { halign: 'right', cellWidth: 28 }, 2: { halign: 'right', cellWidth: 45 } });
   }
+  if (rt.recent.length) {
+    table(['Date', 'Cashier', 'Status', 'Amount'],
+      rt.recent.map(o => [o.date.toLocaleDateString('en-US'), o.cashier, o.status, phpText(o.total)]),
+      { 3: { halign: 'right', cellWidth: 40 } });
+  }
+
+  // ── Discounts & promotions ──
+  section('Discounts & Promotions');
+  table(null, labelRows([
+    [`Senior/PWD discounts (${a.seniorPwdCount} orders)`, phpText(a.discountTotal)],
+    ['Promo savings given', phpText(a.promoTotal)],
+    ['Avg order: with promo vs without', a.hasPromoOrders ? `${phpText(a.promoAov)} vs ${phpText(a.noPromoAov)}` : '-'],
+  ]), { 0: { cellWidth: 90 }, 1: { cellWidth: 100 } });
+  if (a.promos.length) {
+    table(['Most Used Promos', 'Uses', 'Saved'],
+      a.promos.map(r => [r.label, r.value, phpText(r.saved)]),
+      { 1: { halign: 'right', cellWidth: 28 }, 2: { halign: 'right', cellWidth: 45 } });
+  }
+
+  pdoc.setFontSize(7);
+  pdoc.setTextColor(150, 150, 150);
+  pdoc.text('Sales figures exclude returned and refunded orders; those are reported under Returns & Refunds.', 10, Math.min(y, 288));
 
   return pdoc;
 }

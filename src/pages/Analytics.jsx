@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { collection, getDocs, orderBy, query, where } from 'firebase/firestore';
-import { jsPDF } from 'jspdf';
-import autoTable from 'jspdf-autotable';
-import { Download, RefreshCw, Banknote, Receipt, Tag, Coffee } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { FileText, RefreshCw, Banknote, Receipt, Tag, Coffee } from 'lucide-react';
 import { db } from '../firebase';
 import AdminSidebar from '../layouts/AdminSidebar';
+import { computeAnalytics, endOfDay, hourLabel, pctChange, peso, startOfDay, toOrder } from '../utils/analytics';
 
 const RANGES = [
   { key: 'today', label: 'Today',   days: 1 },
@@ -15,28 +15,6 @@ const RANGES = [
 
 const ACCENT = '#b87050';
 const HIGHLIGHT = '#0A5A3A';
-
-const peso = (n) => `₱${(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-const startOfDay = (d) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; };
-const hourLabel = (h) => `${h % 12 === 0 ? 12 : h % 12}${h < 12 ? 'a' : 'p'}`;
-const pctChange = (cur, prev) => (prev > 0 ? ((cur - prev) / prev) * 100 : null);
-
-const toDate = (v) => {
-  if (!v) return null;
-  if (typeof v.toDate === 'function') return v.toDate();
-  if (v.seconds) return new Date(v.seconds * 1000);
-  const d = new Date(v);
-  return isNaN(d.getTime()) ? null : d;
-};
-
-// Revenue only counts orders that were actually sold.
-const isSold = (o) => o.status !== 'Returned' && o.status !== 'Refunded';
-
-const summarize = (orders) => {
-  const revenue = orders.reduce((sum, o) => sum + o.total, 0);
-  const items = orders.reduce((sum, o) => sum + o.items.reduce((q, i) => q + i.qty, 0), 0);
-  return { revenue, count: orders.length, items, aov: orders.length ? revenue / orders.length : 0 };
-};
 
 function Card({ title, sub, children, className = '' }) {
   return (
@@ -135,25 +113,7 @@ export default function Analytics() {
     getDocs(query(collection(db, 'salestransaction'), where('createdAt', '>=', prevStart), orderBy('createdAt', 'desc')))
       .then((snap) => {
         if (cancelled) return;
-        setOrders(snap.docs.map((d) => {
-          const data = d.data();
-          return {
-            date: toDate(data.createdAt) || new Date(),
-            status: data.status || 'Completed',
-            total: Number(data.totalAmount) || 0,
-            payment: data.modeOfPayment || 'Cash',
-            customerType: data.customerType || 'Regular',
-            cashier: data.cashierName || 'Unknown Cashier',
-            discount: Number(data.discountAmount) || 0,
-            promoDiscount: Number(data.promoDiscountAmount) || 0,
-            promos: data.appliedPromotions || [],
-            items: (data.orders || []).map((o) => ({
-              name: o.name || 'Item',
-              qty: Number(o.qty) || 1,
-              price: Number(o.effectivePrice ?? o.totalPrice) || 0,
-            })),
-          };
-        }));
+        setOrders(snap.docs.map((d) => toOrder(d.data())));
       })
       .catch((e) => {
         console.error('Analytics load error:', e);
@@ -163,107 +123,10 @@ export default function Analytics() {
     return () => { cancelled = true; };
   }, [prevStart, reloadKey]);
 
-  const data = useMemo(() => {
-    const sold = orders.filter(isSold);
-    const cur = sold.filter((o) => o.date >= start);
-    const prev = sold.filter((o) => o.date < start);
-    const k = summarize(cur);
-    const pk = summarize(prev);
-
-    // Returns & refunds are reported separately from sales figures.
-    const lost = orders.filter((o) => !isSold(o));
-    const lostCur = lost.filter((o) => o.date >= start);
-    const lostAmount = lostCur.reduce((sum, o) => sum + o.total, 0);
-    const lostPrevAmount = lost.filter((o) => o.date < start).reduce((sum, o) => sum + o.total, 0);
-    const totalCurOrders = orders.filter((o) => o.date >= start).length;
-    const lostItemMap = {};
-    lostCur.forEach((o) => o.items.forEach((i) => {
-      lostItemMap[i.name] = lostItemMap[i.name] || { label: i.name, value: 0, amount: 0 };
-      lostItemMap[i.name].value += i.qty;
-      lostItemMap[i.name].amount += i.price;
-    }));
-    const returns = {
-      returned: lostCur.filter((o) => o.status === 'Returned').length,
-      refunded: lostCur.filter((o) => o.status === 'Refunded').length,
-      amount: lostAmount,
-      amountChange: pctChange(lostAmount, lostPrevAmount),
-      rate: totalCurOrders ? (lostCur.length / totalCurOrders) * 100 : 0,
-      items: Object.values(lostItemMap).sort((a, b) => b.value - a.value).slice(0, 5),
-      recent: [...lostCur].sort((a, b) => b.date - a.date).slice(0, 8),
-    };
-
-    // Trend: daily revenue (a single day compares today with yesterday).
-    const trendDays = range.days === 1 ? 2 : range.days;
-    const trendStart = range.days === 1 ? prevStart : start;
-    const bucketSize = trendDays > 31 ? 7 : 1;
-    const bucketCount = Math.ceil(trendDays / bucketSize);
-    const trend = Array.from({ length: bucketCount }, (_, i) => {
-      const d = new Date(trendStart);
-      d.setDate(d.getDate() + i * bucketSize);
-      const md = `${d.getMonth() + 1}/${d.getDate()}`;
-      return { label: bucketSize === 1 && trendDays > 10 ? (i % 5 === 0 ? md : '') : md, md, value: 0 };
-    });
-    sold.forEach((o) => {
-      if (o.date < trendStart) return;
-      const idx = Math.floor((startOfDay(o.date) - trendStart) / 86400000 / bucketSize);
-      if (trend[idx]) trend[idx].value += o.total;
-    });
-    trend.forEach((t) => { t.tip = `${t.md}: ${peso(t.value)}`; });
-
-    // Peak hours
-    const hours = Array.from({ length: 24 }, (_, h) => ({ label: h % 3 === 0 ? hourLabel(h) : '', value: 0, orders: 0, hour: h }));
-    cur.forEach((o) => { hours[o.date.getHours()].value += o.total; hours[o.date.getHours()].orders += 1; });
-    const peak = hours.reduce((a, b) => (b.value > a.value ? b : a), hours[0]);
-    hours.forEach((h) => { h.highlight = peak.value > 0 && h.hour === peak.hour; h.tip = `${hourLabel(h.hour)}: ${peso(h.value)} · ${h.orders} orders`; });
-
-    // Items
-    const itemMap = {};
-    cur.forEach((o) => o.items.forEach((i) => {
-      itemMap[i.name] = itemMap[i.name] || { label: i.name, qty: 0, revenue: 0 };
-      itemMap[i.name].qty += i.qty;
-      itemMap[i.name].revenue += i.price;
-    }));
-    const itemList = Object.values(itemMap).map((i) => ({ ...i, value: i.qty }));
-    const topItems = [...itemList].sort((a, b) => b.qty - a.qty).slice(0, 8);
-    const bottomItems = [...itemList].sort((a, b) => a.qty - b.qty).slice(0, 5);
-
-    // Payments and cashiers
-    const group = (keyFn) => {
-      const map = {};
-      cur.forEach((o) => {
-        const key = keyFn(o);
-        map[key] = map[key] || { label: key, value: 0, count: 0 };
-        map[key].value += o.total;
-        map[key].count += 1;
-      });
-      return Object.values(map).sort((a, b) => b.value - a.value);
-    };
-    const payments = group((o) => o.payment);
-    const cashiers = group((o) => o.cashier);
-
-    // Discounts & promos
-    const seniorPwd = cur.filter((o) => o.customerType === 'Senior' || o.customerType === 'PWD');
-    const promoMap = {};
-    cur.forEach((o) => o.promos.forEach((p) => {
-      const name = p.promoName || 'Promo';
-      promoMap[name] = promoMap[name] || { label: name, saved: 0, value: 0 };
-      promoMap[name].saved += Number(p.savings) || 0;
-      promoMap[name].value += 1;
-    }));
-    const promos = Object.values(promoMap).sort((a, b) => b.value - a.value).slice(0, 5);
-    const withPromo = cur.filter((o) => o.promos.length > 0);
-    const withoutPromo = cur.filter((o) => o.promos.length === 0);
-
-    return {
-      k, pk, trend, hours, peak, topItems, bottomItems, payments, cashiers, returns, promos,
-      seniorPwdCount: seniorPwd.length,
-      discountTotal: cur.reduce((sum, o) => sum + o.discount, 0),
-      promoTotal: cur.reduce((sum, o) => sum + o.promoDiscount, 0),
-      promoAov: summarize(withPromo).aov,
-      noPromoAov: summarize(withoutPromo).aov,
-      hasPromoOrders: withPromo.length > 0,
-    };
-  }, [orders, start, prevStart, range.days]);
+  const data = useMemo(
+    () => computeAnalytics(orders, start, endOfDay(new Date()), prevStart),
+    [orders, start, prevStart]
+  );
 
   const prevLabel = range.days === 1 ? 'yesterday' : 'prev. period';
   const kpis = [
@@ -272,47 +135,6 @@ export default function Analytics() {
     { label: 'Avg Order Value', value: peso(data.k.aov),     delta: pctChange(data.k.aov, data.pk.aov),         Icon: Tag },
     { label: 'Items Sold',      value: String(data.k.items), delta: pctChange(data.k.items, data.pk.items),     Icon: Coffee },
   ];
-
-  const exportPdf = () => {
-    const pdoc = new jsPDF('p', 'mm', 'a4');
-    pdoc.setFontSize(18);
-    pdoc.text('Sales Analytics', 14, 16);
-    pdoc.setFontSize(10);
-    pdoc.text(`${range.label} · ${start.toLocaleDateString('en-US')} - ${new Date().toLocaleDateString('en-US')}`, 14, 22);
-    // jsPDF's built-in font has no peso sign, so the report uses "PHP".
-    const money = (n) => `PHP ${(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-    const section = (title, head, body) => {
-      autoTable(pdoc, {
-        startY: (pdoc.lastAutoTable?.finalY ?? 22) + 8,
-        head: [[title, ...head]],
-        body: body.length ? body : [['No data']],
-        headStyles: { fillColor: [97, 64, 51] },
-        styles: { fontSize: 9 },
-      });
-    };
-    section('Summary', ['Value'], [
-      ['Revenue', money(data.k.revenue)],
-      ['Orders', String(data.k.count)],
-      ['Average order value', money(data.k.aov)],
-      ['Items sold', String(data.k.items)],
-      ['Peak hour', data.peak.value > 0 ? `${hourLabel(data.peak.hour)} (${money(data.peak.value)}, ${data.peak.orders} orders)` : '-'],
-    ]);
-    section('Top items', ['Qty', 'Revenue'], data.topItems.map((r) => [r.label, r.qty, money(r.revenue)]));
-    section('Payment methods', ['Revenue', 'Orders'], data.payments.map((r) => [r.label, money(r.value), r.count]));
-    section('Cashier performance', ['Revenue', 'Orders'], data.cashiers.map((r) => [r.label, money(r.value), r.count]));
-    section('Returns & refunds', ['Value'], [
-      ['Returned orders', String(data.returns.returned)],
-      ['Refunded orders', String(data.returns.refunded)],
-      ['Value lost', money(data.returns.amount)],
-      ['Return/refund rate', `${data.returns.rate.toFixed(1)}%`],
-    ]);
-    section('Discounts & promotions', ['Value'], [
-      [`Senior/PWD discounts (${data.seniorPwdCount} orders)`, money(data.discountTotal)],
-      ['Promo savings given', money(data.promoTotal)],
-    ]);
-    section('Most used promos', ['Uses', 'Saved'], data.promos.map((r) => [r.label, r.value, money(r.saved)]));
-    pdoc.save(`sales-analytics-${range.key}-${new Date().toISOString().split('T')[0]}.pdf`);
-  };
 
   return (
     <div className="flex w-full h-full">
@@ -329,13 +151,13 @@ export default function Analytics() {
             >
               <RefreshCw size={20} className={loading ? 'animate-spin' : ''} />
             </button>
-            <button
-              onClick={exportPdf}
-              disabled={loading || !!error}
-              className="flex items-center gap-2 bg-[#3ca4c7] hover:bg-[#2b8aa8] disabled:opacity-50 text-white px-5 py-2 rounded-full text-lg font-medium transition-colors"
+            <Link
+              to="/documents"
+              className="flex items-center gap-2 bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white px-5 py-2 rounded-full text-lg font-medium transition-colors"
+              title="Generate a Sales Analytics PDF on the Reports page"
             >
-              <Download size={18} /> Export PDF
-            </button>
+              <FileText size={18} /> Generate Report
+            </Link>
           </div>
         </div>
 
