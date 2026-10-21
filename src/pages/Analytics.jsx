@@ -4,6 +4,8 @@ import { Link } from 'react-router-dom';
 import { FileText, RefreshCw, Banknote, Receipt, Tag, Coffee } from 'lucide-react';
 import { db } from '../firebase';
 import AdminSidebar from '../layouts/AdminSidebar';
+import { getSessionRole } from '../constants/roles';
+import { countMockOrders, removeMockOrders, seedMockOrders } from '../utils/mockData';
 import { computeAnalytics, endOfDay, hourLabel, pctChange, peso, startOfDay, toOrder } from '../utils/analytics';
 
 const RANGES = [
@@ -89,6 +91,58 @@ function Stat({ value, label, color }) {
   );
 }
 
+// Local-development helper (admin only, never included in production builds):
+// fills the last 90 days with tagged mock orders so the charts have something to show.
+function MockDataPanel({ onChange }) {
+  const [busy, setBusy] = useState('');
+  const [count, setCount] = useState(null);
+  const [message, setMessage] = useState('');
+
+  useEffect(() => {
+    countMockOrders().then(setCount).catch(() => setCount(null));
+  }, []);
+
+  const run = async (label, fn) => {
+    setBusy(label);
+    setMessage('');
+    try {
+      const n = await fn();
+      setMessage(`${label === 'seed' ? 'Added' : 'Removed'} ${n} mock orders.`);
+      setCount(await countMockOrders());
+      onChange();
+    } catch (e) {
+      console.error('Mock data error:', e);
+      setMessage('Something went wrong. See the browser console.');
+    } finally {
+      setBusy('');
+    }
+  };
+
+  return (
+    <div className="mb-6 flex flex-wrap items-center gap-3 rounded-xl border border-dashed border-amber-400 bg-amber-50 px-5 py-3">
+      <span className="text-lg font-semibold text-amber-800">Dev tools · Mock data</span>
+      <span className="text-base text-amber-700">{count === null ? '' : `${count} mock orders in the database`}</span>
+      <div className="ml-auto flex items-center gap-2">
+        {message && <span className="text-base text-amber-800">{message}</span>}
+        <button
+          onClick={() => run('seed', () => seedMockOrders(90))}
+          disabled={!!busy}
+          className="rounded-full bg-amber-600 px-4 py-1.5 text-base text-white hover:bg-amber-700 disabled:opacity-50"
+        >
+          {busy === 'seed' ? 'Adding…' : 'Add 90 days of mock data'}
+        </button>
+        <button
+          onClick={() => run('remove', removeMockOrders)}
+          disabled={!!busy || count === 0}
+          className="rounded-full border border-amber-600 px-4 py-1.5 text-base text-amber-800 hover:bg-amber-100 disabled:opacity-50"
+        >
+          {busy === 'remove' ? 'Removing…' : 'Remove mock data'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function Analytics() {
   const [rangeKey, setRangeKey] = useState('7d');
   const [loading, setLoading] = useState(true);
@@ -160,6 +214,10 @@ export default function Analytics() {
             </Link>
           </div>
         </div>
+
+        {import.meta.env.DEV && getSessionRole() === 'admin' && (
+          <MockDataPanel onChange={() => setReloadKey((n) => n + 1)} />
+        )}
 
         <div className="flex gap-2 mb-6 flex-wrap">
           {RANGES.map((r) => (
