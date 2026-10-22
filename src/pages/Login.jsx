@@ -4,6 +4,7 @@ import { signInWithEmailAndPassword, sendPasswordResetEmail, signOut, updatePass
 import { collection, doc, getDoc, updateDoc, addDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 import { Eye, EyeOff, Lock } from 'lucide-react';
+import { getHomeRoute } from '../constants/roles';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -69,7 +70,7 @@ export default function Login() {
           const { role, mustChangePassword } = userDocSnap.data();
           // Let handleLogin manage the flow for first-time logins
           if (mustChangePassword) return;
-          const destination = role === 'admin' ? '/admin' : role === 'staff' ? '/staff' : null;
+          const destination = getHomeRoute(role);
           if (destination) navigate(destination, { replace: true });
         }
       } catch {
@@ -156,7 +157,7 @@ export default function Login() {
           timestamp: serverTimestamp(),
         });
 
-        const destination = userData.role === 'admin' ? '/admin' : userData.role === 'staff' ? '/staff' : null;
+        const destination = getHomeRoute(userData.role);
         if (!destination) {
           setUsernameError("Unauthorized role");
           setIsLoggingIn(false);
