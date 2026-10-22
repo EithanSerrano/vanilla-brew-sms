@@ -14,7 +14,7 @@ export default function About({ role }) {
       <Sidebar activePage="about" />
 
 
-      <main className="flex-1 bg-white overflow-hidden flex flex-col p-8">
+      <main className="flex-1 bg-white overflow-y-auto flex flex-col p-8">
         <h1 className="text-4xl font-bold text-gray-900 mb-6 shrink-0">About</h1>
 
 
@@ -48,11 +48,11 @@ export default function About({ role }) {
 
 
         {/* Bottom row — full-width container */}
-        <div className="flex-1 border border-gray-200 rounded-xl overflow-hidden shadow-sm min-h-0">
+        <div className="border border-gray-200 rounded-xl overflow-hidden shadow-sm shrink-0">
           <div className="px-6 py-4 border-b border-gray-200">
             <h2 className="text-2xl font-semibold text-gray-800">Contacts and Addresses</h2>
           </div>
-          <div className="p-6 bg-gray-50 h-full text-gray-700 flex flex-col md:flex-row gap-8 text-lg">
+          <div className="p-6 bg-gray-50 text-gray-700 flex flex-col md:flex-row gap-8 text-lg">
             {/* Address Column */}
             <div className="flex-1 space-y-3">
               <h3 className="font-bold text-gray-900 text-xl border-b pb-2">Store Location</h3>
@@ -65,20 +65,29 @@ export default function About({ role }) {
             {/* Developers Column */}
             <div className="flex-1 space-y-4">
               <h3 className="font-bold text-gray-900 text-xl border-b pb-2">Development Team</h3>
-              <p className="text-base font-semibold text-gray-500 uppercase tracking-wider mb-1">3rd Year BSCS Students — TIP Quezon City</p>
+              <p className="text-base font-semibold text-gray-500 uppercase tracking-wider mb-1">4th Year BSCS Students — TIP Quezon City</p>
              
               <div className="flex flex-col gap-5">
                 {[
                   { photo: devAlcanzo,   name: 'Alcanzo, Renz A.',              email: 'qraalcanzo@tip.edu.ph'    },
                   { photo: devNueva,     name: 'Nueva, Carl Josef E.',           email: 'qcjenueva@tip.edu.ph'     },
                   { photo: devSarmiento, name: 'Sarmiento, Joaquín Reymond G.', email: 'qjrgsarmiento@tip.edu.ph' },
+                  { photo: null,         name: 'Serrano, Eithan Mckale L.',      email: 'qemlserrano@tip.edu.ph'   },
+                  { photo: null,         name: 'Santos, Isaac Marcus G.',        email: 'qimgsantos@tip.edu.ph'    },
+                  { photo: null,         name: 'Cerafica, Emmanuel F.',          email: 'qefcerafica@tip.edu.ph'   },
                 ].map(({ photo, name, email }) => (
                   <div key={email} className="flex items-center gap-4">
-                    <img
-                      src={photo}
-                      alt={name}
-                      className="w-20 h-20 rounded-full object-cover shrink-0 border-2 border-gray-200 shadow-sm"
-                    />
+                    {photo ? (
+                      <img
+                        src={photo}
+                        alt={name}
+                        className="w-20 h-20 rounded-full object-cover shrink-0 border-2 border-gray-200 shadow-sm"
+                      />
+                    ) : (
+                      <div className="w-20 h-20 rounded-full shrink-0 border-2 border-gray-200 shadow-sm bg-gray-200 text-gray-500 flex items-center justify-center text-2xl font-bold">
+                        {name.split(', ')[1]?.[0] ?? name[0]}
+                      </div>
+                    )}
                     <div>
                       <p className="font-semibold text-gray-800 text-xl">{name}</p>
                       <p className="text-blue-600 underline text-lg">{email}</p>

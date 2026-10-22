@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { collection, getDocs, orderBy, query, where } from 'firebase/firestore';
-import { Link } from 'react-router-dom';
-import { FileText, RefreshCw, Banknote, Receipt, Tag, Coffee } from 'lucide-react';
+import { RefreshCw, Banknote, Receipt, Tag, Coffee } from 'lucide-react';
 import { db } from '../firebase';
 import AdminSidebar from '../layouts/AdminSidebar';
 import { getSessionRole } from '../constants/roles';
@@ -205,13 +204,6 @@ export default function Analytics() {
             >
               <RefreshCw size={20} className={loading ? 'animate-spin' : ''} />
             </button>
-            <Link
-              to="/documents"
-              className="flex items-center gap-2 bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white px-5 py-2 rounded-full text-lg font-medium transition-colors"
-              title="Generate a Sales Analytics PDF on the Reports page"
-            >
-              <FileText size={18} /> Generate Report
-            </Link>
           </div>
         </div>
 
