@@ -51,8 +51,9 @@ function BarChart({ data, formatValue, height = 160 }) {
       </div>
       <div className="flex gap-[3px] mt-1">
         {data.map((d, i) => (
-          <div key={i} className="flex-1 min-w-0 relative h-4">
-            <span className="absolute left-1/2 -translate-x-1/2 whitespace-nowrap text-xs text-gray-500">{d.label}</span>
+          <div key={i} className="flex-1 min-w-0 relative h-5 border-t border-gray-200">
+            <span className={`absolute left-1/2 -translate-x-1/2 w-px bg-gray-300 top-0 ${d.label ? 'h-2' : 'h-1'}`} />
+            <span className="absolute top-1.5 left-1/2 -translate-x-1/2 whitespace-nowrap text-xs text-gray-500">{d.label}</span>
           </div>
         ))}
       </div>
