@@ -90,7 +90,7 @@ function Stat({ value, label, color }) {
   );
 }
 
-// Local-development helper (admin only, never included in production builds):
+// Demo helper (admin only; temporarily enabled in production builds):
 // fills the last 90 days with tagged mock orders so the charts have something to show.
 function MockDataPanel({ onChange }) {
   const [busy, setBusy] = useState('');
@@ -207,7 +207,7 @@ export default function Analytics() {
           </div>
         </div>
 
-        {import.meta.env.DEV && getSessionRole() === 'admin' && (
+        {getSessionRole() === 'admin' && (
           <MockDataPanel onChange={() => setReloadKey((n) => n + 1)} />
         )}
 
