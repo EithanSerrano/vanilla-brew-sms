@@ -40,7 +40,7 @@ export const toOrder = (data) => ({
 });
 
 // Revenue only counts orders that were actually sold.
-const isSold = (o) => o.status !== 'Returned' && o.status !== 'Refunded';
+const isSold = (o) => o.status !== 'Returned' && o.status !== 'Refunded' && o.status !== 'Canceled';
 
 const summarize = (orders) => {
   const revenue = orders.reduce((sum, o) => sum + o.total, 0);

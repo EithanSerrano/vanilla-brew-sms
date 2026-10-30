@@ -378,7 +378,7 @@ export default function MenuCategories() {
                 <span className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-all ${showInactive ? 'left-6' : 'left-1'}`} />
               </button>
               <span className="text-xl text-gray-600 shrink-0">
-                {showInactive ? 'Showing Inactive List' : 'Showing Active List'}
+                {showInactive ? 'Showing Archived List' : 'Showing Active List'}
               </span>
             </div>
 
@@ -514,7 +514,7 @@ export default function MenuCategories() {
             <span className="w-[40%] text-xl font-semibold text-gray-800 text-center">Category Name</span>
             <span className="w-[24%] text-xl font-semibold text-gray-800 text-center">Variants / Sizes</span>
             <span className="w-[11%] text-xl font-semibold text-gray-800 text-center">
-              {showInactive ? 'Date Hidden' : 'Menu Items'}
+              {showInactive ? 'Date Archived' : 'Menu Items'}
             </span>
             <span className="w-[22%] text-xl font-semibold text-gray-800 text-center">Actions</span>
           </div>
@@ -569,7 +569,7 @@ export default function MenuCategories() {
                         <button
                           onClick={() => { setRetrieveTarget(cat); setShowRetrieveConf(true); }}
                           className="bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white px-3 py-1.5 rounded-full text-xl transition-colors"
-                        >Retrieve</button>
+                        >Restore</button>
                       ) : (
                         <>
                           <button
@@ -579,7 +579,7 @@ export default function MenuCategories() {
                           <button
                             onClick={() => { setHideTarget(cat); setShowHideConf(true); }}
                             className="bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white px-3 py-1.5 rounded-full text-xl transition-colors"
-                          >Hide</button>
+                          >Archive</button>
                         </>
                       )}
                     </div>
@@ -878,9 +878,9 @@ export default function MenuCategories() {
       {showHideConf && hideTarget && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[60]">
           <div className="bg-white rounded-2xl shadow-2xl w-[460px] px-8 py-6 flex flex-col gap-4">
-            <h3 className="text-2xl font-semibold text-gray-800">Hide Category?</h3>
+            <h3 className="text-2xl font-semibold text-gray-800">Archive Category?</h3>
             <p className="text-xl text-gray-600">
-              <span className="font-semibold">{hideTarget.name}</span> will be moved to the inactive list. You can retrieve it later.
+              <span className="font-semibold">{hideTarget.name}</span> will be moved to the archived list. You can restore it later.
             </p>
             {menuItems.filter(m => m.category === hideTarget.name).length > 0 && (
               <div className="flex flex-col gap-2">
@@ -899,7 +899,7 @@ export default function MenuCategories() {
                 className="px-6 py-2 rounded-full border border-gray-300 text-xl text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50">Cancel</button>
               <button onClick={handleConfirmHide} disabled={hideSaving}
                 className={`flex items-center gap-2 px-6 py-2 rounded-full text-xl transition-colors ${hideSaving ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-red-400 hover:bg-red-500 text-white'}`}>
-                {hideSaving ? <><Loader size={18} className="animate-spin" /> Hiding…</> : 'Hide'}
+                {hideSaving ? <><Loader size={18} className="animate-spin" /> Archiving…</> : 'Archive'}
               </button>
             </div>
           </div>
@@ -912,7 +912,7 @@ export default function MenuCategories() {
       {showRetrieveConf && retrieveTarget && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[60]">
           <div className="bg-white rounded-2xl shadow-2xl w-[460px] px-8 py-6 flex flex-col gap-4">
-            <h3 className="text-2xl font-semibold text-gray-800">Retrieve Category?</h3>
+            <h3 className="text-2xl font-semibold text-gray-800">Restore Category?</h3>
             <p className="text-xl text-gray-600">
               <span className="font-semibold">{retrieveTarget.name}</span> will be restored to the active list.
             </p>
@@ -921,7 +921,7 @@ export default function MenuCategories() {
                 className="px-6 py-2 rounded-full border border-gray-300 text-xl text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50">Cancel</button>
               <button onClick={handleConfirmRetrieve} disabled={retrieveSaving}
                 className={`flex items-center gap-2 px-6 py-2 rounded-full text-xl transition-colors ${retrieveSaving ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white'}`}>
-                {retrieveSaving ? <><Loader size={18} className="animate-spin" /> Retrieving…</> : 'Retrieve'}
+                {retrieveSaving ? <><Loader size={18} className="animate-spin" /> Restoring…</> : 'Restore'}
               </button>
             </div>
           </div>

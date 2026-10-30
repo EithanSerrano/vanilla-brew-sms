@@ -1,10 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { collection, getDocs, doc, getDoc, addDoc, updateDoc, query, orderBy } from 'firebase/firestore';
 import { db, auth } from '../firebase';
 import {
   Search, Filter, Plus, X, RefreshCw, AlignJustify,
-  ChevronLeft, ChevronRight, ChevronsLeft, Trash2, Loader,
+  ChevronLeft, ChevronRight, ChevronsLeft, Trash2, Loader, FileText,
 } from 'lucide-react';
+import { ID_PREFIX, nextId } from '../utils/idFormats';
+import { computeServings, LOW_SERVINGS, variantsOf, syncMenuAvailability } from '../utils/menuAvailability';
 import AdminSidebar from '../layouts/AdminSidebar';
 
 const EXPIRING_DAYS = 7;
@@ -39,8 +42,18 @@ function computeIngStatus(ing) {
   return isExp ? 'expiring' : 'normal';
 }
 
+function priceRange(item) {
+  const prices = variantsOf(item).map(v => Number(v.price)).filter(p => p > 0);
+  if (!prices.length) return '—';
+  const lo = Math.min(...prices); const hi = Math.max(...prices);
+  return lo === hi ? `₱${lo}` : `₱${lo}–${hi}`;
+}
+
 function computeMenuStatus(item, allIngredients, allMaterials) {
-  if (item.isAvailable === false) return 'unavailable';
+  if (item.isAvailable === false) return item.autoUnavailable ? 'sold_out' : 'unavailable';
+  const servings = computeServings(item, allIngredients, allMaterials);
+  if (servings === 0) return 'sold_out';
+  if (servings !== null && servings < LOW_SERVINGS) return 'low_availability';
   for (const v of (item.variants || item.sizes || [])) {
     for (const conn of (v.connections || [])) {
       if (conn.type === 'ingredient') {
@@ -59,6 +72,8 @@ const STATUS_STYLES = {
   available:   { label: 'Available',   className: 'text-[#06BC2E]' },
   low_supply:  { label: 'Low Supply',  className: 'text-[#DF0C0C]' },
   unavailable: { label: 'Unavailable', className: 'text-gray-400'  },
+  sold_out:    { label: 'Sold Out',    className: 'text-[#DF0C0C]' },
+  low_availability: { label: 'Low Stock', className: 'text-orange-600' },
 };
 
 function DiscardDialog({ onCancel, onConfirm }) {
@@ -120,7 +135,7 @@ export default function MenuItems() {
   const [showRetrieveConf, setShowRetrieveConf] = useState(false);
 
   // ── Load ──
-  const loadData = async () => {
+  const loadData = async (skipSync = false) => {
     try {
       const [ms, is, mats, cats] = await Promise.all([
         getDocs(collection(db, 'menuItems')),
@@ -128,9 +143,16 @@ export default function MenuItems() {
         getDocs(collection(db, 'materials')),
         getDocs(query(collection(db, 'categories'), orderBy('name'))),
       ]);
-      setMenuItems(ms.docs.map(d => ({ id: d.id, ...d.data() })).filter(d => d.menuItemId));
-      setIngredients(is.docs.map(d => ({ id: d.id, ...d.data() })));
-      setMaterials(mats.docs.map(d => ({ id: d.id, ...d.data() })));
+      const rawMenu = ms.docs.map(d => ({ id: d.id, ...d.data() }));
+      const ings = is.docs.map(d => ({ id: d.id, ...d.data() }));
+      const matList = mats.docs.map(d => ({ id: d.id, ...d.data() }));
+      setMenuItems(rawMenu.filter(d => d.menuItemId));
+      setIngredients(ings);
+      setMaterials(matList);
+      if (!skipSync) {
+        syncMenuAvailability({ menuItems: rawMenu, ingredients: ings, materials: matList })
+          .then(changed => { if (changed > 0) loadData(true); });
+      }
       const catDocs = cats.docs.map(d => ({ id: d.id, ...d.data() }));
       setCategories(catDocs);
       setMenuCategory(prev => prev || catDocs.find(c => !c.parentId)?.name || catDocs[0]?.name || '');
@@ -358,12 +380,7 @@ export default function MenuItems() {
       menuItemId = editingItem.menuItemId;
     } else {
       const snap = await getDocs(collection(db, 'menuItems'));
-      const nums = snap.docs
-        .map(d => d.data().menuItemId || '')
-        .filter(id => /^MNT\d+$/.test(id))
-        .map(id => parseInt(id.slice(3)));
-      const base = nums.length ? Math.max(...nums) : 0;
-      menuItemId = `MNT${String(base + 1).padStart(3, '0')}`;
+      menuItemId = nextId(ID_PREFIX.menuItem, snap.docs.map(d => d.data().menuItemId));
     }
 
     setPendingMenu({
@@ -397,6 +414,7 @@ export default function MenuItems() {
     setShowMenuConf(true);
   };
 
+  const navigate = useNavigate();
   const menuSavingRef = useRef(false);
   const [menuSaving,     setMenuSaving]     = useState(false);
   const [hideSaving,     setHideSaving]     = useState(false);
@@ -463,7 +481,7 @@ export default function MenuItems() {
   // ── AVAILABILITY TOGGLE ──
   const handleToggleAvailability = async item => {
     const newAvail = item.isAvailable === false;
-    await updateDoc(doc(db, 'menuItems', item.id), { isAvailable: newAvail });
+    await updateDoc(doc(db, 'menuItems', item.id), { isAvailable: newAvail, autoUnavailable: false });
     await logAudit(
       newAvail ? 'SET_AVAILABLE' : 'SET_UNAVAILABLE',
       item.menuItemId || item.id, item.name,
@@ -516,7 +534,7 @@ export default function MenuItems() {
                 <span className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-all ${showInactive ? 'left-6' : 'left-1'}`} />
               </button>
               <span className="text-xl text-gray-600 shrink-0">
-                {showInactive ? 'Showing Inactive List' : 'Showing Active List'}
+                {showInactive ? 'Showing Archived List' : 'Showing Active List'}
               </span>
             </div>
             <div className="flex items-center gap-3">
@@ -623,6 +641,13 @@ export default function MenuItems() {
                   </div>
                 )}
               </div>
+              <button
+                onClick={() => navigate('/documents?type=Product%20List')}
+                className="flex items-center gap-1.5 bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-full text-xl transition-colors shrink-0"
+                title="Print or save the product list as a PDF report"
+              >
+                <FileText size={16} /> Product List
+              </button>
               {!showInactive && (
                 <button
                   onClick={() => { resetAll(); setShowStep1(true); }}
@@ -670,11 +695,12 @@ export default function MenuItems() {
         {/* List */}
         <div className="flex-1 rounded-xl border border-gray-200 overflow-hidden flex flex-col min-h-0">
           <div className="flex items-center px-5 py-3 bg-white border-b border-gray-200 shrink-0">
-            <span className="w-[16%] text-xl font-semibold text-gray-800 text-center">ID</span>
+            <span className="w-[11%] text-xl font-semibold text-gray-800 text-center">ID</span>
             <span className="w-[17%] text-xl font-semibold text-gray-800 text-center">Name</span>
-            <span className="w-[15%] text-xl font-semibold text-gray-800 text-center">Category</span>
-            <span className="w-[11%] text-xl font-semibold text-gray-800 text-center">
-              {showInactive ? 'Date Hidden' : 'Status'}
+            <span className="w-[12%] text-xl font-semibold text-gray-800 text-center">Category</span>
+            <span className="w-[11%] text-xl font-semibold text-gray-800 text-center">Price</span>
+            <span className="w-[15%] text-xl font-semibold text-gray-800 text-center">
+              {showInactive ? 'Date Archived' : 'Status'}
             </span>
             <span className="flex-1 text-xl font-semibold text-gray-800 text-center">Actions</span>
           </div>
@@ -690,12 +716,15 @@ export default function MenuItems() {
                   key={item.id}
                   className="flex items-center bg-white rounded-xl border border-gray-200 shadow-sm px-5 py-3.5"
                 >
-                  <span className="w-[14%] text-xl text-gray-700 text-center">{item.menuItemId}</span>
-                  <span className="w-[20%] text-xl text-gray-700 text-center">{item.name}</span>
-                  <span className="w-[13%] text-xl text-gray-700 text-center">{item.category}</span>
+                  <span className="w-[11%] text-xl text-gray-700 text-center">{item.menuItemId}</span>
+                  <span className="w-[17%] text-xl text-gray-700 text-center truncate" title={item.name}>{item.name}</span>
+                  <span className="w-[12%] text-xl text-gray-700 text-center truncate">{item.category}</span>
+                  <span className="w-[11%] text-xl text-gray-700 text-center">{priceRange(item)}</span>
                   {showInactive
-                    ? <span className="w-[14%] text-xl text-gray-700 text-center">{fmtDate(item.hiddenAt)}</span>
-                    : <span className={`w-[14%] text-xl font-medium text-center ${s.className}`}>{s.label}</span>
+                    ? <span className="w-[15%] text-xl text-gray-700 text-center">{fmtDate(item.hiddenAt)}</span>
+                    : <span className={`w-[15%] text-xl font-medium text-center ${s.className}`}>
+                        {status === 'low_availability' ? `Low · ${computeServings(item, ingredients, materials)} left` : s.label}
+                      </span>
                   }
                   <div className="flex-1 flex items-center justify-center gap-2">
                     {showInactive ? (
@@ -707,11 +736,13 @@ export default function MenuItems() {
                         <button
                           onClick={() => { setRetrieveRow(item); setShowRetrieveConf(true); }}
                           className="bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white px-4 py-1.5 rounded-full text-xl transition-colors"
-                        >Retrieve</button>
+                        >Restore</button>
                       </>
                     ) : (
                       <>
-                        {status !== 'unavailable'
+                        {status === 'sold_out'
+                          ? <span className="px-3 py-1.5 rounded-full text-xl bg-gray-200 text-gray-500 whitespace-nowrap" title="Becomes available again when stock is restored">Out of stock</span>
+                          : status !== 'unavailable'
                           ? <button
                               onClick={() => handleToggleAvailability(item)}
                               className="bg-[#c47a6a] hover:bg-[#b06050] text-white px-3 py-1.5 rounded-full text-xl transition-colors whitespace-nowrap"
@@ -732,7 +763,7 @@ export default function MenuItems() {
                         <button
                           onClick={() => { setHideRow(item); setShowHideConf(true); }}
                           className="bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white px-3 py-1.5 rounded-full text-xl transition-colors"
-                        >Hide</button>
+                        >Archive</button>
                       </>
                     )}
                   </div>
@@ -1111,9 +1142,9 @@ export default function MenuItems() {
       {showHideConf && hideRow && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[60]">
           <div className="bg-white rounded-2xl shadow-2xl w-[460px] px-8 py-6 flex flex-col gap-4">
-            <h3 className="text-2xl font-semibold text-gray-800">Hide this item?</h3>
+            <h3 className="text-2xl font-semibold text-gray-800">Archive this item?</h3>
             <p className="text-xl text-gray-600 flex items-baseline gap-1 min-w-0">
-              <span className="font-semibold truncate block max-w-[340px]">{hideRow.name}</span> will be moved to the inactive list.
+              <span className="font-semibold truncate block max-w-[340px]">{hideRow.name}</span> will be moved to the archived list. Its sales history is kept.
             </p>
             <div className="flex gap-3 justify-end mt-1">
               <button
@@ -1139,7 +1170,7 @@ export default function MenuItems() {
       {showRetrieveConf && retrieveRow && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[60]">
           <div className="bg-white rounded-2xl shadow-2xl w-[460px] px-8 py-6 flex flex-col gap-4">
-            <h3 className="text-2xl font-semibold text-gray-800">Retrieve Menu Item?</h3>
+            <h3 className="text-2xl font-semibold text-gray-800">Restore Menu Item?</h3>
             <p className="text-xl text-gray-600 flex items-baseline gap-1 min-w-0">
               <span className="font-semibold truncate block max-w-[340px]">{retrieveRow.name}</span> will be moved back to the active list.
             </p>

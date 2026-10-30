@@ -7,8 +7,8 @@ import AdminSidebar from '../layouts/AdminSidebar';
 const ACTION_LABELS = {
   ADD_MATERIAL:      'Add Material in Inventory',
   ADD_INGREDIENT:    'Add Ingredient in Inventory',
-  HIDE:              'Hide Item in Inventory',
-  RETRIEVE:          'Retrieve Item in Inventory',
+  HIDE:              'Archive Item in Inventory',
+  RETRIEVE:          'Restore Item in Inventory',
   RESUPPLY:          'Resupply in Inventory',
   ADJUST:            'Adjust Stock in Inventory',
   EDIT:              'Edit Item in Inventory',
@@ -21,6 +21,10 @@ const ACTION_LABELS = {
   DEACTIVATE_ACCOUNT:'Deactivate Employee Account',
   REACTIVATE_ACCOUNT:'Reactivate Employee Account',
   EDIT_ACCOUNT:      'Edit Employee Account',
+  CANCEL_ORDER:      'Cancel Order',
+  WASTAGE:           'Record Wastage',
+  CLOCK_IN:          'Clock In',
+  CLOCK_OUT:         'Clock Out',
 };
 
 function splitTimestamp(ts) {

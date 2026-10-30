@@ -5,6 +5,7 @@ import { initializeApp, getApps } from 'firebase/app';
 import { firebaseConfig } from '../firebase';
 import { auth, db } from '../firebase';
 import { Search, Plus, RefreshCw, X, AlignJustify } from 'lucide-react';
+import { ID_PREFIX, nextId } from '../utils/idFormats';
 import AdminSidebar from '../layouts/AdminSidebar';
 import emailjs from '@emailjs/browser';
 
@@ -113,12 +114,7 @@ export default function AdminRegistration() {
 
   const generateNextEmpId = async () => {
     const snap = await getDocs(collection(db, 'users'));
-    const nums = snap.docs
-      .map(d => d.data().empId || '')
-      .filter(id => /^EMP\d+$/.test(id))
-      .map(id => parseInt(id.slice(3)));
-    const base = nums.length ? Math.max(...nums) : 0;
-    return `EMP${String(base + 1).padStart(3, '0')}`;
+    return nextId(ID_PREFIX.employee, snap.docs.map(d => d.data().empId));
   };
 
 

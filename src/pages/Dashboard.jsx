@@ -1,7 +1,12 @@
 import { useState, useEffect } from 'react';
-import { collection, getDocs } from 'firebase/firestore';
+import { useNavigate } from 'react-router-dom';
+import { collection, getDocs, addDoc } from 'firebase/firestore';
 import { db } from '../firebase';
-import { Search, Filter, RefreshCw, Maximize2, X, Printer } from 'lucide-react';
+import { cancelOngoingSale } from '../utils/inventoryDeduction';
+import { usableStock, daysUntilExpiry, EXPIRING_DAYS } from '../utils/supply';
+import { menuInsights, moveSoonItems } from '../utils/menuAvailability';
+import { Search, Filter, RefreshCw, Maximize2, X, Printer, Ban } from 'lucide-react';
+import OnShiftCard from '../components/OnShiftCard';
 import AdminSidebar from '../layouts/AdminSidebar';
 import StaffSidebar from '../layouts/StaffSidebar';
 
@@ -64,10 +69,13 @@ function PieChart({ data, total }) {
 
 export default function Dashboard({ role }) {
   const Sidebar = role === 'admin' ? AdminSidebar : StaffSidebar;
+  const navigate = useNavigate();
 
   const [sales,              setSales]              = useState([]);
   const [ingredients,        setIngredients]        = useState([]);
   const [materials,          setMaterials]          = useState([]);
+  const [menuItems,          setMenuItems]          = useState([]);
+  const [watchTab,           setWatchTab]           = useState('stock');
   const [loading,            setLoading]            = useState(true);
   const [searchQuery,        setSearchQuery]        = useState('');
   const [viewingSale,        setViewingSale]        = useState(null);
@@ -85,6 +93,47 @@ export default function Dashboard({ role }) {
   const [filterOrderMode,  setFilterOrderMode]  = useState('');
 
   const [analyticsRefreshing, setAnalyticsRefreshing] = useState(false);
+
+  // ── Cancel order ──
+  const CANCEL_REASONS = ['Customer changed mind', 'Wrong order entered', 'Item unavailable', 'Long wait time', 'Other'];
+  const [cancelTarget,  setCancelTarget]  = useState(null);
+  const [cancelReason,  setCancelReason]  = useState('');
+  const [cancelNote,    setCancelNote]    = useState('');
+  const [canceling,     setCanceling]     = useState(false);
+  const [cancelError,   setCancelError]   = useState('');
+  const [cancelResult,  setCancelResult]  = useState(null);
+
+  const closeCancel = () => {
+    setCancelTarget(null); setCancelReason(''); setCancelNote(''); setCancelError(''); setCanceling(false);
+  };
+
+  const handleCancelOrder = async () => {
+    const reason = cancelReason === 'Other' ? cancelNote.trim() : cancelReason;
+    if (!reason) { setCancelError('Select a reason (or describe it for "Other").'); return; }
+    setCanceling(true);
+    setCancelError('');
+    try {
+      const session = JSON.parse(localStorage.getItem('sessionUser') || '{}');
+      const canceledBy = session.name || session.email || 'Unknown';
+      const result = await cancelOngoingSale(cancelTarget.id, { reason, canceledBy });
+      await addDoc(collection(db, 'auditlog'), {
+        action: 'CANCEL_ORDER', itemType: 'order',
+        itemId: cancelTarget.transactionNumber || cancelTarget.id,
+        itemName: cancelTarget.transactionNumber || cancelTarget.id,
+        details: { reason, stockRestored: result.stockRestored },
+        performedBy: canceledBy, timestamp: new Date(),
+      });
+      setCancelResult({ number: cancelTarget.transactionNumber || cancelTarget.id, ...result });
+      closeCancel();
+      setViewingSale(null);
+      await loadSales();
+      await loadStock();
+    } catch (err) {
+      console.error('Cancel order error:', err);
+      setCancelError(err.message || 'Could not cancel the order.');
+      setCanceling(false);
+    }
+  };
 
   const loadSales = async () => {
     setAnalyticsRefreshing(true);
@@ -107,12 +156,14 @@ export default function Dashboard({ role }) {
 
   const loadStock = async () => {
     try {
-      const [ingSnap, matSnap] = await Promise.all([
+      const [ingSnap, matSnap, menuSnap] = await Promise.all([
         getDocs(collection(db, 'ingredients')),
         getDocs(collection(db, 'materials')),
+        getDocs(collection(db, 'menuItems')),
       ]);
       setIngredients(ingSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       setMaterials(matSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setMenuItems(menuSnap.docs.map(d => ({ id: d.id, ...d.data() })).filter(m => m.menuItemId));
     } catch (err) {
       console.error('Stock load error:', err);
     }
@@ -121,10 +172,11 @@ export default function Dashboard({ role }) {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [transSnap, ingSnap, matSnap] = await Promise.all([
+      const [transSnap, ingSnap, matSnap, menuSnap] = await Promise.all([
         getDocs(collection(db, 'salestransaction')),
         getDocs(collection(db, 'ingredients')),
         getDocs(collection(db, 'materials')),
+        getDocs(collection(db, 'menuItems')),
       ]);
       const data = transSnap.docs.map(d => ({ id: d.id, ...d.data() }));
       const getTime = s => {
@@ -136,6 +188,7 @@ export default function Dashboard({ role }) {
       setSales(data);
       setIngredients(ingSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       setMaterials(matSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+      setMenuItems(menuSnap.docs.map(d => ({ id: d.id, ...d.data() })).filter(m => m.menuItemId));
     } catch (err) {
       console.error('Dashboard load error:', err);
     } finally {
@@ -190,7 +243,7 @@ export default function Dashboard({ role }) {
     ...ingredients
       .filter(i => i.isActive !== false && i.archived !== true && (i.maxLimit || 0) > 0)
       .map(i => {
-        const total = (i.batches || []).reduce((s, b) => s + (b.quantity || 0), 0);
+        const total = usableStock(i);
         return {
           id: i.id,
           displayId:   i.ingredientId || i.id,
@@ -210,7 +263,7 @@ export default function Dashboard({ role }) {
   const tally = {};
   sales.forEach(sale => {
     // Exclude returned/refunded items from the analytics
-    if (sale.status === 'Returned' || sale.status === 'Refunded') return;
+    if (['Returned', 'Refunded', 'Canceled'].includes(sale.status)) return;
     
     const d = parseSaleDate(sale);
     if (d && d < oneWeekAgo) return;
@@ -224,11 +277,46 @@ export default function Dashboard({ role }) {
     .sort((a, b) => b.count - a.count)
     .map((x, i) => ({ ...x, rank: i + 1 }));
 
+  // ── Top orders today ──
+  const todayTally = {};
+  let todayOrders = 0;
+  sales.forEach(sale => {
+    if (['Returned', 'Refunded', 'Canceled'].includes(sale.status)) return;
+    const d = parseSaleDate(sale);
+    if (!d || !isSameDay(d, new Date())) return;
+    todayOrders += 1;
+    (sale.orders || []).forEach(order => {
+      const name = order.name || 'Unknown';
+      todayTally[name] = (todayTally[name] || 0) + (Number(order.qty) || 1);
+    });
+  });
+  const topToday = Object.entries(todayTally)
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => b.count - a.count);
+
+  // ── Menu watch: availability, fast movers, items to push before ingredients expire ──
+  const insights = menuInsights({ menuItems, ingredients, materials, sales });
+  const stockWatch = insights.filter(i => i.soldOut || i.low)
+    .sort((a, b) => (a.servings ?? 0) - (b.servings ?? 0));
+  const fastWatch = insights.filter(i => i.perDay > 0 && i.daysLeft != null)
+    .sort((a, b) => a.daysLeft - b.daysLeft).slice(0, 8);
+  const pushWatch = moveSoonItems(menuItems, ingredients);
+  const watchCounts = { stock: stockWatch.length, fast: fastWatch.filter(i => i.fast).length, push: pushWatch.length };
+
+  // ── Expired / expiring stock ──
+  const expiryRows = ingredients
+    .flatMap(ing => (ing.batches || [])
+      .filter(b => (b.quantity || 0) > 0)
+      .map(b => ({ key: `${ing.id}:${b.batchId}`, name: ing.name, batchId: b.batchId, qty: b.quantity, unit: ing.unit || 'units', days: daysUntilExpiry(b) })))
+    .filter(r => r.days !== null && r.days <= EXPIRING_DAYS)
+    .sort((a, b) => a.days - b.days);
+  const expiredCount = expiryRows.filter(r => r.days < 0).length;
+
   // ── Modal tally (date-filtered) ──
   const modalTally = {};
   sales.forEach(sale => {
     // Exclude returned/refunded items from the analytics
-    if (sale.status === 'Returned' || sale.status === 'Refunded') return;
+    if (['Returned', 'Refunded', 'Canceled'].includes(sale.status)) return;
 
     const d = parseSaleDate(sale);
     if (!d) return;
@@ -370,7 +458,7 @@ export default function Dashboard({ role }) {
         <div className="flex gap-5 flex-1 min-h-0">
 
           {/* ── LEFT: Sales History ── */}
-          <div className="flex-[2] flex flex-col border border-gray-200 rounded-xl min-h-0 overflow-hidden shadow-md">
+          <div className="flex-[1] flex flex-col border border-gray-200 rounded-xl min-h-0 overflow-hidden shadow-md">
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 shrink-0">
               <h2 className="text-2xl font-semibold text-gray-800">Sales History</h2>
               <button onClick={loadData} className="text-gray-400 hover:text-gray-600 transition-colors" title="Refresh">
@@ -389,13 +477,14 @@ export default function Dashboard({ role }) {
               </div>
               <button
                 onClick={() => setShowFilterPanel(v => !v)}
-                className={`flex items-center gap-2 px-5 py-2 rounded-full text-xl transition-colors shrink-0 ${
+                title="Filter the list"
+                className={`flex items-center justify-center p-2.5 rounded-full text-xl transition-colors shrink-0 ${
                   isFiltered || showFilterPanel
                     ? 'bg-[#3ca4c7] text-white hover:bg-[#2b8aa8]'
                     : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
                 }`}
               >
-                <Filter size={16} /> Filter the List
+                <Filter size={16} />
               </button>
             </div>
             {/* Filter panel */}
@@ -451,44 +540,37 @@ export default function Dashboard({ role }) {
                 </div>
               </div>
             )}
-            {/* Column headers */}
-            <div className="flex items-center px-5 py-3 border-b border-gray-200 bg-white shrink-0">
-              <span className="w-[18%] pl-5 text-xl font-semibold text-gray-800 text-center">Sales ID</span>
-              <span className="w-[26%] text-xl font-semibold text-gray-800 text-center">Date</span>
-              <span className="w-[16%] text-xl font-semibold text-gray-800 text-center">Time</span>
-              <span className="w-[20%] text-xl font-semibold text-gray-800 text-center">Status</span>
-              <span className="w-[20%] text-xl font-semibold text-gray-800 text-center">Action</span>
-            </div>
             <div className="flex-1 overflow-y-auto px-4 py-3 flex flex-col gap-2" style={{ scrollbarGutter: 'stable' }}>
               {loading && <p className="py-12 text-gray-400 text-xl text-center">Loading…</p>}
               {!loading && filtered.length === 0 && (
                 <p className="py-12 text-gray-400 text-xl text-center">No sales records found.</p>
               )}
               {filtered.map(sale => {
-                const { date, time } = splitDateTime(sale.dateAndTimeStr);
+                const when = parseSaleDate(sale);
+                const whenText = when
+                  ? `${when.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} · ${when.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`
+                  : '—';
+                const status = sale.status || 'Completed';
                 return (
-                  <div key={sale.id} className="flex items-center bg-white rounded-xl border border-gray-200 shadow-sm px-5 py-3.5">
-                    <span className="w-[18%] pl-5 text-xl text-gray-700 truncate">{sale.transactionNumber || sale.id}</span>
-                    <span className="w-[26%] text-xl text-gray-700 text-center">{date}</span>
-                    <span className="w-[16%] text-xl text-gray-700 text-center">{time}</span>
-                    <div className="w-[20%] flex justify-center">
-                      <span className={`text-xl font-medium ${
-                        sale.status === 'Returned' ? 'text-[#D97B39]' :
-                        sale.status === 'Refunded' ? 'text-[#C0392B]' :
-                        sale.status === 'Ongoing' ? 'text-yellow-600' :
-                        'text-green-600'
-                      }`}>
-                        {sale.status || 'Completed'}
-                      </span>
+                  <div key={sale.id} className="flex items-center gap-3 bg-white rounded-xl border border-gray-200 shadow-sm px-4 py-2.5">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xl text-gray-800 font-medium truncate">{sale.transactionNumber || sale.id}</p>
+                      <p className="text-base text-gray-400 truncate">
+                        {whenText} · <span className={`font-medium ${
+                          status === 'Returned' ? 'text-[#D97B39]' :
+                          status === 'Refunded' ? 'text-[#C0392B]' :
+                          status === 'Canceled' ? 'text-gray-500' :
+                          status === 'Ongoing' ? 'text-yellow-600' :
+                          'text-green-600'
+                        }`}>{status}</span>
+                      </p>
                     </div>
-                    <div className="w-[20%] flex justify-center">
-                      <button
-                        onClick={() => setViewingSale(sale)}
-                        className="bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white px-5 py-1.5 rounded-full text-xl transition-colors"
-                      >
-                        View
-                      </button>
-                    </div>
+                    <button
+                      onClick={() => setViewingSale(sale)}
+                      className="bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white px-4 py-1 rounded-full text-lg transition-colors shrink-0"
+                    >
+                      View
+                    </button>
                   </div>
                 );
               })}
@@ -496,7 +578,34 @@ export default function Dashboard({ role }) {
           </div>
 
           {/* ── RIGHT: Analytics + Stock stacked ── */}
-          <div className="flex-[1] flex flex-col gap-5 min-h-0">
+          <div className="flex-[2] grid grid-cols-2 auto-rows-fr gap-5 min-h-0">
+
+            {/* Top Orders Today */}
+            <div className="flex flex-col border border-gray-200 rounded-xl overflow-hidden min-h-0 shadow-md">
+              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 shrink-0">
+                <div>
+                  <h2 className="text-2xl font-semibold text-gray-800">Top Orders Today</h2>
+                  <p className="text-base text-gray-400 mt-0.5">{todayOrders} order{todayOrders !== 1 ? 's' : ''} so far</p>
+                </div>
+                <RefreshCw size={18} className="cursor-pointer text-gray-400 hover:text-gray-600 transition-colors" onClick={loadSales} />
+              </div>
+              <div className="flex items-center px-5 py-2.5 border-b border-gray-100 bg-gray-50 shrink-0">
+                <span className="w-14 text-base font-semibold text-gray-600 text-center">Top</span>
+                <span className="flex-1 text-base font-semibold text-gray-600 pl-2">Menu Item</span>
+                <span className="w-20 text-base font-semibold text-gray-600 text-right">Sold</span>
+              </div>
+              <div className="flex-1 overflow-y-auto flex flex-col" style={{ scrollbarGutter: 'stable' }}>
+                {loading ? <p className="text-xl text-gray-400 text-center py-8">Loading…</p>
+                  : topToday.length === 0 ? <p className="text-xl text-gray-400 text-center py-8">No orders yet today.</p>
+                  : topToday.slice(0, 8).map((item, idx) => (
+                    <div key={item.name} className={`flex items-center px-5 py-3 ${idx < Math.min(topToday.length, 8) - 1 ? 'border-b border-gray-100' : ''}`}>
+                      <span className="w-14 text-xl font-semibold text-gray-400 text-center">{idx + 1}</span>
+                      <span className="flex-1 text-xl text-gray-700 pl-2 truncate">{item.name}</span>
+                      <span className="w-20 text-xl font-bold text-gray-800 text-right">{item.count}</span>
+                    </div>
+                  ))}
+              </div>
+            </div>
 
             {/* Sales Analytics */}
             <div className="flex-1 flex flex-col border border-gray-200 rounded-xl overflow-hidden min-h-0 shadow-md">
@@ -550,6 +659,103 @@ export default function Dashboard({ role }) {
               </div>
             </div>
 
+            {/* Menu Watch */}
+            <div className="flex flex-col border border-gray-200 rounded-xl overflow-hidden min-h-0 shadow-md">
+              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 shrink-0">
+                <div>
+                  <h2 className="text-2xl font-semibold text-gray-800">Menu Watch</h2>
+                  <p className="text-base text-gray-400 mt-0.5">Availability and what needs attention</p>
+                </div>
+                <RefreshCw size={18} className="cursor-pointer text-gray-400 hover:text-gray-600 transition-colors" onClick={loadData} />
+              </div>
+              <div className="flex gap-2 px-5 py-2.5 border-b border-gray-100 bg-gray-50 shrink-0">
+                {[['stock', 'Low / Sold Out'], ['fast', 'Fast Movers'], ['push', 'Move Soon']].map(([id, label]) => (
+                  <button
+                    key={id}
+                    onClick={() => setWatchTab(id)}
+                    className={`px-3 py-1 rounded-full text-base transition-colors ${watchTab === id ? 'bg-[#614033] text-white' : 'bg-white border border-gray-300 text-gray-600 hover:bg-gray-100'}`}
+                  >
+                    {label}{watchCounts[id] > 0 && <span className={`ml-1.5 font-semibold ${watchTab === id ? 'text-white' : 'text-red-500'}`}>{watchCounts[id]}</span>}
+                  </button>
+                ))}
+              </div>
+              <div className="flex-1 overflow-y-auto flex flex-col" style={{ scrollbarGutter: 'stable' }}>
+                {watchTab === 'stock' && (stockWatch.length === 0
+                  ? <p className="text-xl text-gray-400 text-center py-8">Everything can be made.</p>
+                  : stockWatch.map((r, idx) => (
+                    <div key={r.item.id} className={`flex items-center px-5 py-3 ${idx < stockWatch.length - 1 ? 'border-b border-gray-100' : ''}`}>
+                      <span className="flex-1 text-xl text-gray-700 truncate">{r.item.name}</span>
+                      <span className={`text-xl font-bold ${r.soldOut ? 'text-[#DF0C0C]' : 'text-orange-600'}`}>
+                        {r.soldOut ? 'Sold out' : `${r.servings} left`}
+                      </span>
+                    </div>
+                  )))}
+                {watchTab === 'fast' && (fastWatch.length === 0
+                  ? <p className="text-xl text-gray-400 text-center py-8">Not enough sales this week to forecast.</p>
+                  : fastWatch.map((r, idx) => (
+                    <div key={r.item.id} className={`flex items-center px-5 py-3 gap-3 ${idx < fastWatch.length - 1 ? 'border-b border-gray-100' : ''}`}>
+                      <span className="flex-1 min-w-0">
+                        <span className="block text-xl text-gray-700 truncate">{r.item.name}</span>
+                        <span className="block text-base text-gray-400">{Math.round(r.perDay * 10) / 10}/day · {r.servings} servings left</span>
+                      </span>
+                      <span className={`text-xl font-bold shrink-0 ${r.fast ? 'text-[#DF0C0C]' : 'text-gray-700'}`}>
+                        {r.daysLeft < 1 ? '< 1 day' : `~${Math.floor(r.daysLeft)}d left`}
+                      </span>
+                    </div>
+                  )))}
+                {watchTab === 'push' && (pushWatch.length === 0
+                  ? <p className="text-xl text-gray-400 text-center py-8">No products use ingredients that expire soon.</p>
+                  : pushWatch.map((r, idx) => (
+                    <div key={r.item.id} className={`flex items-center px-5 py-3 gap-3 ${idx < pushWatch.length - 1 ? 'border-b border-gray-100' : ''}`}>
+                      <span className="flex-1 min-w-0">
+                        <span className="block text-xl text-gray-700 truncate">{r.item.name}</span>
+                        <span className="block text-base text-gray-400 truncate">uses {r.ingredient} ({r.qty} {r.unit})</span>
+                      </span>
+                      <span className="text-xl font-bold text-orange-600 shrink-0">{r.days === 0 ? 'Today' : `${r.days}d left`}</span>
+                    </div>
+                  )))}
+              </div>
+            </div>
+
+            {/* Expired Stock */}
+            <div className="flex flex-col border border-gray-200 rounded-xl overflow-hidden min-h-0 shadow-md">
+              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 shrink-0">
+                <div>
+                  <h2 className="text-2xl font-semibold text-gray-800">Expired Stock</h2>
+                  <p className="text-base text-gray-400 mt-0.5">{expiredCount} expired · {expiryRows.length - expiredCount} expiring in {EXPIRING_DAYS} days</p>
+                </div>
+                <div className="flex items-center gap-3 text-gray-400">
+                  {role === 'admin' && (
+                    <button onClick={() => navigate('/supply')} title="Open Supply">
+                      <Maximize2 size={18} className="cursor-pointer hover:text-gray-600 transition-colors" />
+                    </button>
+                  )}
+                  <RefreshCw size={18} className="cursor-pointer hover:text-gray-600 transition-colors" onClick={loadStock} />
+                </div>
+              </div>
+              <div className="flex items-center px-5 py-2.5 border-b border-gray-100 bg-gray-50 shrink-0">
+                <span className="flex-1 text-base font-semibold text-gray-600">Ingredient</span>
+                <span className="w-28 text-base font-semibold text-gray-600 text-right">Qty</span>
+                <span className="w-32 text-base font-semibold text-gray-600 text-right">Expiry</span>
+              </div>
+              <div className="flex-1 overflow-y-auto flex flex-col" style={{ scrollbarGutter: 'stable' }}>
+                {expiryRows.length === 0
+                  ? <p className="text-xl text-gray-400 text-center py-8">No expired or expiring stock.</p>
+                  : expiryRows.map((r, idx) => (
+                    <div key={r.key} className={`flex items-center px-5 py-3 ${idx < expiryRows.length - 1 ? 'border-b border-gray-100' : ''}`}>
+                      <span className="flex-1 min-w-0">
+                        <span className="block text-xl text-gray-700 truncate">{r.name}</span>
+                        <span className="block text-base text-gray-400">{r.batchId}</span>
+                      </span>
+                      <span className="w-28 text-xl text-gray-700 text-right">{r.qty} {r.unit}</span>
+                      <span className={`w-32 text-xl font-bold text-right ${r.days < 0 ? 'text-[#DF0C0C]' : 'text-orange-600'}`}>
+                        {r.days < 0 ? `${-r.days}d ago` : r.days === 0 ? 'Today' : `in ${r.days}d`}
+                      </span>
+                    </div>
+                  ))}
+              </div>
+            </div>
+
             {/* Critical Stock */}
             <div className="flex-1 flex flex-col border border-gray-200 rounded-xl overflow-hidden min-h-0 shadow-md">
               <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 shrink-0">
@@ -582,6 +788,8 @@ export default function Dashboard({ role }) {
                 }
               </div>
             </div>
+
+            {role === 'admin' && <div className="flex flex-col min-h-0"><OnShiftCard /></div>}
 
           </div>
         </div>
@@ -773,6 +981,7 @@ export default function Dashboard({ role }) {
                         label === 'Status' 
                           ? value === 'Returned' ? 'text-[#D97B39] font-medium' :
                             value === 'Refunded' ? 'text-[#C0392B] font-medium' :
+                            value === 'Canceled' ? 'text-gray-500 font-medium' :
                             value === 'Ongoing' ? 'text-yellow-600 font-medium' :
                             'text-green-600 font-medium'
                           : ''
@@ -816,7 +1025,16 @@ export default function Dashboard({ role }) {
                   <span className="text-xl font-semibold text-gray-800">Total</span>
                   <span className="text-xl font-semibold text-gray-800">₱{viewingSale.totalAmount ?? '—'}</span>
                 </div>
-                <div className="flex justify-end shrink-0">
+                <div className="flex justify-end gap-3 shrink-0">
+                  {viewingSale.status === 'Ongoing' && (
+                    <button
+                      onClick={() => setCancelTarget(viewingSale)}
+                      className="flex items-center gap-2 bg-[#C0392B] hover:bg-[#a53125] text-white px-6 py-2.5 rounded-full text-xl transition-colors"
+                    >
+                      <Ban size={18} />
+                      Cancel Order
+                    </button>
+                  )}
                   <button
                     onClick={() => handlePrintReceipt(viewingSale)}
                     className="flex items-center gap-2 bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white px-6 py-2.5 rounded-full text-xl transition-colors"
@@ -827,6 +1045,77 @@ export default function Dashboard({ role }) {
                 </div>
               </div>
 
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Cancel Order Modal ── */}
+      {cancelTarget && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]">
+          <div className="bg-white rounded-2xl shadow-2xl w-[520px] p-8 flex flex-col gap-4">
+            <h3 className="text-2xl font-semibold text-gray-800">Cancel Order</h3>
+            <p className="text-xl text-gray-600">
+              Cancel <span className="font-semibold">{cancelTarget.transactionNumber || cancelTarget.id}</span>? Ingredients and materials used by this order will be returned to stock.
+            </p>
+            <div className="flex flex-col gap-2">
+              <span className="text-xl text-gray-600">Reason</span>
+              <select
+                value={cancelReason}
+                onChange={e => { setCancelReason(e.target.value); setCancelError(''); }}
+                className="border border-gray-300 rounded-lg px-4 py-2.5 text-xl text-gray-700 bg-white outline-none focus:border-[#3ca4c7]"
+              >
+                <option value="">Select a reason…</option>
+                {CANCEL_REASONS.map(r => <option key={r} value={r}>{r}</option>)}
+              </select>
+              {cancelReason === 'Other' && (
+                <input
+                  value={cancelNote}
+                  onChange={e => { setCancelNote(e.target.value); setCancelError(''); }}
+                  placeholder="Describe the reason"
+                  className="border border-gray-300 rounded-lg px-4 py-2.5 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]"
+                />
+              )}
+            </div>
+            {cancelError && <p className="text-lg text-red-500">{cancelError}</p>}
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                onClick={closeCancel}
+                disabled={canceling}
+                className="px-6 py-2.5 rounded-full text-xl border border-gray-300 text-gray-600 hover:bg-gray-50 transition-colors"
+              >
+                Keep Order
+              </button>
+              <button
+                onClick={handleCancelOrder}
+                disabled={canceling}
+                className="px-6 py-2.5 rounded-full text-xl bg-[#C0392B] hover:bg-[#a53125] text-white transition-colors disabled:opacity-60"
+              >
+                {canceling ? 'Canceling…' : 'Cancel Order'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Cancel result ── */}
+      {cancelResult && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]">
+          <div className="bg-white rounded-2xl shadow-2xl w-[480px] p-8 flex flex-col gap-4">
+            <h3 className="text-2xl font-semibold text-gray-800">Order Canceled</h3>
+            <p className="text-xl text-gray-600">
+              {cancelResult.number} was canceled.{' '}
+              {cancelResult.stockRestored
+                ? `${cancelResult.restored.length} stock item(s) were returned to inventory.`
+                : 'No stock record was found for this order, so inventory was not changed.'}
+            </p>
+            <div className="flex justify-end">
+              <button
+                onClick={() => setCancelResult(null)}
+                className="px-6 py-2.5 rounded-full text-xl bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white transition-colors"
+              >
+                OK
+              </button>
             </div>
           </div>
         </div>

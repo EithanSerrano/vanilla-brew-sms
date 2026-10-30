@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { collection, getDocs, doc, addDoc, updateDoc, getDoc } from 'firebase/firestore';
 import { db, auth } from '../firebase';
 import { Search, Plus, X, RefreshCw, Filter, AlignJustify, Loader } from 'lucide-react';
+import { ID_PREFIX, nextId } from '../utils/idFormats';
 import AdminSidebar from '../layouts/AdminSidebar';
 
 function fmtDate(ts) {
@@ -224,12 +225,7 @@ export default function Promotions() {
       await logAudit('EDIT_PROMO', editingPromo.promoId, data.name, data);
     } else {
       const snap = await getDocs(collection(db, 'promotions'));
-      const nums = snap.docs
-        .map(d => d.data().promoId || '')
-        .filter(id => /^PROMO\d+$/.test(id))
-        .map(id => parseInt(id.slice(5)));
-      const base = nums.length ? Math.max(...nums) : 0;
-      const promoId = `PROMO${String(base + 1).padStart(3, '0')}`;
+      const promoId = nextId(ID_PREFIX.promotion, snap.docs.map(d => d.data().promoId), ['PROMO']);
       await addDoc(collection(db, 'promotions'), { ...data, promoId, createdAt: new Date() });
       await logAudit('ADD_PROMO', promoId, data.name, data);
     }

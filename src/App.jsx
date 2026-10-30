@@ -1,6 +1,9 @@
 import { useEffect } from "react";
 import { createBrowserRouter, RouterProvider, Navigate, Outlet } from "react-router-dom";
+import { onAuthStateChanged } from "firebase/auth";
+import { auth } from "./firebase";
 import { startSalesInventoryListener } from "./utils/inventoryDeduction";
+import { syncMenuAvailability } from "./utils/menuAvailability";
 import ProtectedRoute from "./components/ProtectedRoute";
 import RoleRoute from "./components/RoleRoute";
 import { ACCESS } from "./constants/roles";
@@ -21,6 +24,8 @@ import MenuCategories from "./pages/MenuCategories";
 import Promotions from "./pages/Promotions";
 import AdminHelp from "./pages/AdminHelp";
 import Analytics from "./pages/Analytics";
+import Attendance from "./pages/Attendance";
+import Supply from "./pages/Supply";
 
 // Staff Pages
 import StaffHome from "./pages/StaffHome";
@@ -39,7 +44,16 @@ import BackupRecovery from "./pages/BackupRecovery";
 function RootLayout() {
   useEffect(() => {
     const unsubscribe = startSalesInventoryListener();
-    return () => unsubscribe();
+    // Keep the POS menu in step with stock: on sign-in, then every 15 minutes
+    // (batches can expire with no sale or restock to trigger a check).
+    let timer = null;
+    const stopAuth = onAuthStateChanged(auth, (user) => {
+      clearInterval(timer);
+      if (!user) return;
+      syncMenuAvailability();
+      timer = setInterval(syncMenuAvailability, 15 * 60 * 1000);
+    });
+    return () => { unsubscribe(); stopAuth(); clearInterval(timer); };
   }, []);
 
   return (
@@ -70,6 +84,8 @@ const router = createBrowserRouter([
               { path: "/admin",             element: <AdminHome /> },
               { path: "/admin-dashboard",   element: <Dashboard role="admin" /> },
               { path: "/analytics",         element: <Analytics /> },
+              { path: "/attendance",        element: <Attendance /> },
+              { path: "/supply",            element: <Supply /> },
               { path: "/inventory",         element: <Inventory /> },
               { path: "/menu-items",        element: <MenuItems /> },
               { path: "/menu-categories",   element: <MenuCategories /> },

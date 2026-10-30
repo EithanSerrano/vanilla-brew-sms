@@ -2,6 +2,9 @@ import { useState, useEffect } from 'react';
 import { collection, getDocs, doc, addDoc, updateDoc, getDoc } from 'firebase/firestore';
 import { db, auth } from '../firebase';
 import { Search, Filter, X, RefreshCw, MoreVertical, AlertTriangle } from 'lucide-react';
+import { formatBatchId } from '../utils/idFormats';
+import { logRestock, addDaysISO } from '../utils/supply';
+import { syncMenuAvailability } from '../utils/menuAvailability';
 import StaffSidebar from '../layouts/StaffSidebar';
 
 const STATUS_STYLES = {
@@ -51,10 +54,7 @@ function fmtDate(ts) {
   return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('en-US');
 }
 
-function genBatchId(dateStr, count) {
-  const d = new Date(dateStr);
-  return `B${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}${String(d.getFullYear()).slice(-2)}${String(count+1).padStart(2,'0')}`;
-}
+const genBatchId = formatBatchId;
 
 function DiscardDialog({ onCancel, onConfirm }) {
   return (
@@ -100,6 +100,7 @@ export default function StaffInventory() {
   const [resupIngRow,      setResupIngRow]      = useState(null);
   const [resupIngExpDate,  setResupIngExpDate]  = useState('');
   const [resupIngQty,      setResupIngQty]      = useState('');
+  const [resupSupplier,    setResupSupplier]    = useState('');
   const [showResupIngForm, setShowResupIngForm] = useState(false);
   const [showResupIngConf, setShowResupIngConf] = useState(false);
   const [showResupIngOk,   setShowResupIngOk]   = useState(false);
@@ -126,8 +127,11 @@ export default function StaffInventory() {
         getDocs(collection(db, 'materials')),
         getDocs(collection(db, 'ingredients')),
       ]);
-      setMaterials(ms.docs.map(d => ({ id: d.id, ...d.data() })));
-      setIngredients(is.docs.map(d => ({ id: d.id, ...d.data() })));
+      const mats = ms.docs.map(d => ({ id: d.id, ...d.data() }));
+      const ings = is.docs.map(d => ({ id: d.id, ...d.data() }));
+      setMaterials(mats);
+      setIngredients(ings);
+      syncMenuAvailability({ materials: mats, ingredients: ings });
     } catch (e) { console.error('StaffInventory load error:', e); }
   };
   useEffect(() => { loadData(); }, []);
@@ -194,7 +198,7 @@ export default function StaffInventory() {
     .filter(r => !filterStatus || r.status === filterStatus);
 
   // ── Resupply Material ──
-  const handleResupMat = row => { setResupMatRow(row); setResupMatAmount(''); setShowResupMatForm(true); };
+  const handleResupMat = row => { setResupMatRow(row); setResupMatAmount(''); setResupSupplier(''); setShowResupMatForm(true); };
   const closeResupMat  = () => { resupMatAmount !== '' ? setShowResupMatDisc(true) : (setShowResupMatForm(false), setResupMatRow(null)); };
   const handleConfirmResupMat = async () => {
     try {
@@ -204,21 +208,30 @@ export default function StaffInventory() {
       const newStock      = previousStock + amountAdded;
       await updateDoc(doc(db, 'materials', resupMatRow._docId), { stock: newStock, lastUpdated: new Date() });
       await logAudit('RESUPPLY', 'material', resupMatRow.displayId, resupMatRow.displayName, { previousStock, amountAdded, newStock });
+      await logRestock({
+        itemType: 'material', refId: resupMatRow._docId, displayId: resupMatRow.displayId, name: resupMatRow.displayName,
+        unit: 'units', quantity: amountAdded, supplier: resupSupplier,
+      });
     } catch (e) { console.error('ResupMat error:', e); setResupMatError('Failed to save. Please try again.'); return; }
     await loadData(); setShowResupMatConf(false); setShowResupMatOk(true);
   };
 
   // ── Resupply Ingredient ──
-  const handleResupIng = row => { setResupIngRow(row); setResupIngExpDate(''); setResupIngQty(''); setShowResupIngForm(true); };
+  const handleResupIng = row => { setResupIngRow(row); setResupIngExpDate(row.raw.shelfLifeDays > 0 ? addDaysISO(row.raw.shelfLifeDays) : ''); setResupIngQty(''); setResupSupplier(''); setShowResupIngForm(true); };
   const closeResupIng  = () => { (resupIngExpDate !== '' || resupIngQty !== '') ? setShowResupIngDisc(true) : (setShowResupIngForm(false), setResupIngRow(null)); };
   const handleConfirmResupIng = async () => {
     try {
       setResupIngError('');
       const existing = resupIngRow.raw.batches || [];
       const batchId  = genBatchId(resupIngExpDate, existing.length);
-      const newBatch = { batchId, expirationDate: new Date(resupIngExpDate), quantity: parseInt(resupIngQty) || 0, createdAt: new Date() };
+      const receivedAt = new Date();
+      const newBatch = { batchId, expirationDate: new Date(resupIngExpDate), quantity: parseInt(resupIngQty) || 0, createdAt: receivedAt, supplier: resupSupplier.trim(), receivedAt };
       await updateDoc(doc(db, 'ingredients', resupIngRow._docId), { batches: [...existing, newBatch], lastUpdated: new Date() });
       await logAudit('RESUPPLY', 'ingredient', resupIngRow.displayId, resupIngRow.displayName, { batchId, expirationDate: resupIngExpDate, quantity: parseInt(resupIngQty) || 0 });
+      await logRestock({
+        itemType: 'ingredient', refId: resupIngRow._docId, displayId: resupIngRow.displayId, name: resupIngRow.displayName,
+        unit: resupIngRow.raw.unit, batchId, expirationDate: newBatch.expirationDate, quantity: newBatch.quantity, supplier: resupSupplier,
+      });
     } catch (e) { console.error('ResupIng error:', e); setResupIngError('Failed to save. Please try again.'); return; }
     await loadData(); setShowResupIngConf(false); setShowResupIngOk(true);
   };
@@ -472,6 +485,11 @@ export default function StaffInventory() {
               <input type="number" min="0" value={resupMatAmount} onChange={e => setResupMatAmount(e.target.value)}
                 className="flex-1 border border-gray-300 rounded-lg px-4 py-3 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]" />
             </div>
+            <div className="flex items-center gap-4">
+              <label className="text-xl text-gray-600 w-44 shrink-0">Supplier</label>
+              <input value={resupSupplier} onChange={e => setResupSupplier(e.target.value)} placeholder="Optional"
+                className="flex-1 border border-gray-300 rounded-lg px-4 py-3 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]" />
+            </div>
             {resupMatRow.raw.maxLimit > 0 && (resupMatRow.raw.stock || 0) + (parseInt(resupMatAmount) || 0) > resupMatRow.raw.maxLimit && (
               <div className="flex items-center gap-2 text-red-500">
                 <AlertTriangle size={16} />
@@ -543,6 +561,11 @@ export default function StaffInventory() {
                 <div className="flex items-center gap-4">
                   <label className="text-xl text-gray-600 w-44 shrink-0">Expiration Date</label>
                   <input type="date" value={resupIngExpDate} onChange={e => setResupIngExpDate(e.target.value)}
+                    className="flex-1 border border-gray-300 rounded-lg px-4 py-3 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]" />
+                </div>
+                <div className="flex items-center gap-4">
+                  <label className="text-xl text-gray-600 w-44 shrink-0">Supplier</label>
+                  <input value={resupSupplier} onChange={e => setResupSupplier(e.target.value)} placeholder="Optional"
                     className="flex-1 border border-gray-300 rounded-lg px-4 py-3 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]" />
                 </div>
                 <div className="flex gap-3 justify-end mt-2">

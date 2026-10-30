@@ -2,6 +2,9 @@ import { useState, useEffect, useRef } from 'react';
 import { collection, getDocs, doc, addDoc, updateDoc, getDoc } from 'firebase/firestore';
 import { db, auth } from '../firebase';
 import { Search, Filter, Plus, Lock, X, RefreshCw, ChevronLeft, ChevronRight, AlertTriangle, MoreVertical, AlignJustify } from 'lucide-react';
+import { ID_PREFIX, nextId, formatBatchId } from '../utils/idFormats';
+import { syncMenuAvailability } from '../utils/menuAvailability';
+import { logRestock, addDaysISO, isExpiredBatch, daysUntilExpiry, usableStock, batchExpiry } from '../utils/supply';
 import AdminSidebar from '../layouts/AdminSidebar';
 
 const STATUS_STYLES = {
@@ -9,6 +12,7 @@ const STATUS_STYLES = {
   low:             { label: 'Low Supply',               className: 'text-[#DF0C0C]'  },
   expiring_low:    { label: 'Low Supply / Expiring',    className: 'text-orange-600' },
   expiring_normal: { label: 'Normal Supply / Expiring', className: 'text-yellow-600' },
+  expired:         { label: 'Has Expired Stock',        className: 'text-[#DF0C0C]'  },
 };
 
 const MAT_SIZES   = ['Small', 'Medium', 'Large'];
@@ -27,21 +31,23 @@ function computeMaterialStatus(mat) {
 }
 
 function computeIngredientStatus(ing) {
-  const now    = new Date();
-  const cutoff = new Date(now.getTime() + EXPIRING_DAYS * 86400000);
-  const bats   = ing.batches || [];
-  const max    = ing.maxLimit || 0;
-  const total  = bats.reduce((s, b) => s + (b.quantity || 0), 0);
-  const isLow  = max > 0 && total < max * 0.1;
-  const first  = bats[0];
-  const isExp  = first && (first.quantity || 0) > 0 && (() => {
-    const e = first.expirationDate?.toDate?.() || (first.expirationDate ? new Date(first.expirationDate) : null);
-    return e && e <= cutoff;
-  })();
+  const bats  = (ing.batches || []).filter(b => (b.quantity || 0) > 0);
+  const max   = ing.maxLimit || 0;
+  const isLow = max > 0 && usableStock(ing) < max * 0.1;
+  const isExp = bats.some(b => { const d = daysUntilExpiry(b); return d !== null && d >= 0 && d <= EXPIRING_DAYS; });
+  if (bats.some(isExpiredBatch)) return 'expired';
   if (isLow && isExp) return 'expiring_low';
   if (isLow)          return 'low';
   if (isExp)          return 'expiring_normal';
   return 'normal';
+}
+
+// Earliest expiry among batches that still hold stock, or null.
+function nextExpiry(ing) {
+  const live = (ing.batches || []).filter(b => (b.quantity || 0) > 0 && batchExpiry(b));
+  if (!live.length) return null;
+  const first = live.reduce((a, b) => (batchExpiry(a) <= batchExpiry(b) ? a : b));
+  return { date: batchExpiry(first), days: daysUntilExpiry(first) };
 }
 
 function computeIngStock(ing) {
@@ -49,10 +55,7 @@ function computeIngStock(ing) {
   return ing.batches.reduce((s, b) => s + (b.quantity || 0), 0);
 }
 
-function genBatchId(dateStr, count) {
-  const d = new Date(dateStr);
-  return `B${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}${String(d.getFullYear()).slice(-2)}${String(count+1).padStart(2,'0')}`;
-}
+const genBatchId = formatBatchId;
 
 function fmtDate(ts) {
   if (!ts) return '—';
@@ -113,6 +116,12 @@ export default function Inventory() {
   const [ingMaxLimit,  setIngMaxLimit]  = useState('');
   const [ingExpDate,   setIngExpDate]   = useState('');
   const [ingBatchQty,  setIngBatchQty]  = useState('');
+  const [ingShelfLife, setIngShelfLife] = useState('');
+  const [ingSupplier,  setIngSupplier]  = useState('');
+  const [ingUnitCost,  setIngUnitCost]  = useState('');
+  const ingExpAuto = useRef(false);
+  const [suppliers,    setSuppliers]    = useState([]);
+  const [saveError,    setSaveError]    = useState('');
   const [pendingIng,   setPendingIng]   = useState(null);
   const [showIngConf,  setShowIngConf]  = useState(false);
   const [showIngOk,    setShowIngOk]    = useState(false);
@@ -142,6 +151,8 @@ export default function Inventory() {
   // ── Resupply Material ──
   const [resupMatRow,      setResupMatRow]      = useState(null);
   const [resupMatAmount,   setResupMatAmount]   = useState('');
+  const [resupMatSupplier, setResupMatSupplier] = useState('');
+  const [resupMatUnitCost, setResupMatUnitCost] = useState('');
   const [showResupMatForm, setShowResupMatForm] = useState(false);
   const [showResupMatConf, setShowResupMatConf] = useState(false);
   const [showResupMatOk,   setShowResupMatOk]   = useState(false);
@@ -151,6 +162,8 @@ export default function Inventory() {
   const [resupIngRow,      setResupIngRow]      = useState(null);
   const [resupIngExpDate,  setResupIngExpDate]  = useState('');
   const [resupIngQty,      setResupIngQty]      = useState('');
+  const [resupSupplier,    setResupSupplier]    = useState('');
+  const [resupUnitCost,    setResupUnitCost]    = useState('');
   const [showResupIngForm, setShowResupIngForm] = useState(false);
   const [showResupIngConf, setShowResupIngConf] = useState(false);
   const [showResupIngOk,   setShowResupIngOk]   = useState(false);
@@ -187,6 +200,7 @@ export default function Inventory() {
   const [editIngUnit,     setEditIngUnit]     = useState('grams');
   const [editIngIsAddOn,   setEditIngIsAddOn]   = useState(false);
   const [editIngHasLevels, setEditIngHasLevels] = useState(false);
+  const [editIngShelfLife, setEditIngShelfLife] = useState('');
   const [showEditForm,    setShowEditForm]    = useState(false);
   const [showEditConf,    setShowEditConf]    = useState(false);
   const [showEditOk,      setShowEditOk]      = useState(false);
@@ -199,9 +213,16 @@ export default function Inventory() {
         getDocs(collection(db, 'materials')),
         getDocs(collection(db, 'ingredients')),
       ]);
-      setMaterials(ms.docs.map(d => ({ id: d.id, ...d.data() })));
-      setIngredients(is.docs.map(d => ({ id: d.id, ...d.data() })));
+      const mats = ms.docs.map(d => ({ id: d.id, ...d.data() }));
+      const ings = is.docs.map(d => ({ id: d.id, ...d.data() }));
+      setMaterials(mats);
+      setIngredients(ings);
+      syncMenuAvailability({ materials: mats, ingredients: ings });
     } catch (e) { console.error('Inventory load error:', e); }
+    try {
+      const rs = await getDocs(collection(db, 'restocklog'));
+      setSuppliers([...new Set(rs.docs.map(d => (d.data().supplier || '').trim()).filter(Boolean))].sort());
+    } catch (e) { console.error('Supplier list error:', e); }
   };
   useEffect(() => { loadData(); }, []);
   useEffect(() => {
@@ -254,6 +275,7 @@ export default function Inventory() {
       displayStock: String(computeIngStock(ing)),
       displayUnit:        ing.unit || 'units',
       displayLastUpdated: fmtDate(ing.lastUpdated),
+      expiry: nextExpiry(ing),
       status:  computeIngredientStatus(ing),
       active:  ing.isActive !== false && ing.archived !== true,
       hiddenAt: ing.hiddenAt, raw: ing,
@@ -302,19 +324,27 @@ export default function Inventory() {
   const handleSaveMat = async () => {
     if (!matName.trim()) return;
     const snap = await getDocs(collection(db, 'materials'));
-    const nums = snap.docs.map(d => d.data().materialId || '').filter(id => /^MAT\d+$/.test(id)).map(id => parseInt(id.slice(3)));
-    const base = nums.length ? Math.max(...nums) : 0;
+    const newMatId = nextId(ID_PREFIX.material, snap.docs.map(d => d.data().materialId));
     setPendingMat({
       name: matName.trim(), maxLimit: parseInt(matMaxLimit) || 0,
-      entries: [{ qty: parseInt(matStartQty) || 0, matId: `MAT${String(base+1).padStart(3,'0')}` }],
+      entries: [{ qty: parseInt(matStartQty) || 0, matId: newMatId }],
     });
     setShowMatConf(true);
+  };
+
+
+  const saveFailure = (err, what) => {
+    console.error(`Save ${what} error:`, err);
+    setSaveError(err?.code === 'permission-denied'
+      ? `Your role is not allowed to add a ${what}. Ask an admin, or update the Firestore rules for this collection.`
+      : `Could not save the ${what}. ${err?.message || 'Please try again.'}`);
   };
 
   const handleConfirmMat = async () => {
     if (!pendingMat || matSavingRef.current) return;
     matSavingRef.current = true;
     setMatSaving(true);
+    setSaveError('');
     try {
       const now = new Date();
       for (const e of pendingMat.entries) {
@@ -328,6 +358,8 @@ export default function Inventory() {
         });
       }
       await loadData(); setShowMatConf(false); setShowMatOk(true);
+    } catch (err) {
+      saveFailure(err, 'material');
     } finally {
       matSavingRef.current = false;
       setMatSaving(false);
@@ -338,20 +370,19 @@ export default function Inventory() {
   // NEW INGREDIENT
   // ════════════════════════════════════
   const ingHasData = () => ingName.trim() !== '' || ingExpDate !== '' || ingBatchQty !== '' || ingMaxLimit !== '';
-  const resetIng = () => { setIngName(''); setIngType('Dry'); setIngUnit('grams'); setIngIsAddOn(false); setIngHasLevels(false); setIngMaxLimit(''); setIngExpDate(''); setIngBatchQty(''); setPendingIng(null); };
+  const resetIng = () => { setIngName(''); setIngType('Dry'); setIngUnit('grams'); setIngIsAddOn(false); setIngHasLevels(false); setIngMaxLimit(''); setIngExpDate(''); setIngBatchQty(''); setIngShelfLife(''); setIngSupplier(''); setIngUnitCost(''); ingExpAuto.current = false; setPendingIng(null); };
   const closeIng = () => { ingHasData() ? setShowIngDisc(true) : (setShowNewIng(false), resetIng()); };
 
   const handleSaveIng = async () => {
     if (!ingName.trim() || !ingExpDate || !ingBatchQty) return;
     const snap = await getDocs(collection(db, 'ingredients'));
-    const nums = snap.docs.map(d => d.data().ingredientId || '').filter(id => /^ING\d+$/.test(id)).map(id => parseInt(id.slice(3)));
-    const base = nums.length ? Math.max(...nums) : 0;
-    const newId = `ING${String(base+1).padStart(3,'0')}`;
+    const newId = nextId(ID_PREFIX.ingredient, snap.docs.map(d => d.data().ingredientId));
     setPendingIng({
       ingredientId: newId, name: ingName.trim(), type: ingType, unit: ingUnit,
       isAddOn: ingIsAddOn, hasLevels: ingHasLevels, maxLimit: parseInt(ingMaxLimit) || 0,
       batchId: genBatchId(ingExpDate, 0), expirationDate: new Date(ingExpDate),
       quantity: parseInt(ingBatchQty) || 0,
+      shelfLifeDays: parseInt(ingShelfLife) || null, supplier: ingSupplier.trim(), unitCost: ingUnitCost === '' ? null : Number(ingUnitCost),
     });
     setShowIngConf(true);
   };
@@ -360,20 +391,32 @@ export default function Inventory() {
     if (!pendingIng || ingSavingRef.current) return;
     ingSavingRef.current = true;
     setIsSaving(true);
+    setSaveError('');
     try {
       const now = new Date();
-      await addDoc(collection(db, 'ingredients'), {
+      const created = await addDoc(collection(db, 'ingredients'), {
         ingredientId: pendingIng.ingredientId, name: pendingIng.name, type: pendingIng.type,
         unit: pendingIng.unit, isAddOn: pendingIng.isAddOn, hasLevels: pendingIng.hasLevels, maxLimit: pendingIng.maxLimit,
         isActive: true,
-        batches: [{ batchId: pendingIng.batchId, expirationDate: pendingIng.expirationDate, quantity: pendingIng.quantity, createdAt: now }],
+        shelfLifeDays: pendingIng.shelfLifeDays,
+        batches: [{
+          batchId: pendingIng.batchId, expirationDate: pendingIng.expirationDate, quantity: pendingIng.quantity, createdAt: now,
+          supplier: pendingIng.supplier, unitCost: pendingIng.unitCost, receivedAt: now,
+        }],
         createdAt: now,
+      });
+      await logRestock({
+        itemType: 'ingredient', refId: created.id, displayId: pendingIng.ingredientId, name: pendingIng.name,
+        unit: pendingIng.unit, batchId: pendingIng.batchId, expirationDate: pendingIng.expirationDate,
+        quantity: pendingIng.quantity, supplier: pendingIng.supplier, unitCost: pendingIng.unitCost,
       });
       await logAudit('ADD_INGREDIENT', 'ingredient', pendingIng.ingredientId, pendingIng.name, {
         type: pendingIng.type, unit: pendingIng.unit, maxLimit: pendingIng.maxLimit,
         batchId: pendingIng.batchId, quantity: pendingIng.quantity,
       });
       await loadData(); setShowIngConf(false); setShowIngOk(true);
+    } catch (err) {
+      saveFailure(err, 'ingredient');
     } finally {
       ingSavingRef.current = false;
       setIsSaving(false);
@@ -442,7 +485,7 @@ export default function Inventory() {
       setRetMatQtys(Object.fromEntries(sibs.map(m => [m.size || 'N/A', ''])));
       setShowRetMatForm(true);
     } else {
-      setRetIngRow(row); setRetIngExpDate(''); setRetIngQty(''); setShowRetIngForm(true);
+      setRetIngRow(row); setRetIngExpDate(row.raw.shelfLifeDays > 0 ? addDaysISO(row.raw.shelfLifeDays) : ''); setRetIngQty(''); setShowRetIngForm(true);
     }
   };
 
@@ -470,6 +513,10 @@ export default function Inventory() {
     await logAudit('RETRIEVE', 'ingredient', retIngRow.displayId, retIngRow.displayName, {
       batchId, expirationDate: retIngExpDate, quantity: parseInt(retIngQty) || 0,
     });
+    await logRestock({
+      itemType: 'ingredient', refId: retIngRow._docId, displayId: retIngRow.displayId, name: retIngRow.displayName,
+      unit: retIngRow.raw.unit, batchId, expirationDate: new Date(retIngExpDate), quantity: parseInt(retIngQty) || 0,
+    });
     await loadData(); setShowRetIngConf(false); setShowRetIngForm(false); setRetIngRow(null);
   };
 
@@ -480,7 +527,7 @@ export default function Inventory() {
   // ════════════════════════════════════
   // RESUPPLY MATERIAL
   // ════════════════════════════════════
-  const handleResupMat = row => { setResupMatRow(row); setResupMatAmount(''); setShowResupMatForm(true); };
+  const handleResupMat = row => { setResupMatRow(row); setResupMatAmount(''); setResupMatSupplier(''); setResupMatUnitCost(''); setShowResupMatForm(true); };
   const closeResupMat  = () => { resupMatAmount !== '' ? setShowResupMatDisc(true) : (setShowResupMatForm(false), setResupMatRow(null)); };
   const handleConfirmResupMat = async () => {
     const previousStock = resupMatRow.raw.stock || 0;
@@ -490,21 +537,34 @@ export default function Inventory() {
     await logAudit('RESUPPLY', 'material', resupMatRow.displayId, resupMatRow.displayName, {
       previousStock, amountAdded, newStock,
     });
+    await logRestock({
+      itemType: 'material', refId: resupMatRow._docId, displayId: resupMatRow.displayId, name: resupMatRow.displayName,
+      unit: 'units', quantity: amountAdded, supplier: resupMatSupplier, unitCost: resupMatUnitCost,
+    });
     await loadData(); setShowResupMatConf(false); setShowResupMatOk(true);
   };
 
   // ════════════════════════════════════
   // RESUPPLY INGREDIENT
   // ════════════════════════════════════
-  const handleResupIng = row => { setResupIngRow(row); setResupIngExpDate(''); setResupIngQty(''); setShowResupIngForm(true); };
+  const handleResupIng = row => { setResupIngRow(row); setResupIngExpDate(row.raw.shelfLifeDays > 0 ? addDaysISO(row.raw.shelfLifeDays) : ''); setResupIngQty(''); setResupSupplier(''); setResupUnitCost(''); setShowResupIngForm(true); };
   const closeResupIng  = () => { (resupIngExpDate !== '' || resupIngQty !== '') ? setShowResupIngDisc(true) : (setShowResupIngForm(false), setResupIngRow(null)); };
   const handleConfirmResupIng = async () => {
     const existing = resupIngRow.raw.batches || [];
     const batchId  = genBatchId(resupIngExpDate, existing.length);
-    const newBatch = { batchId, expirationDate: new Date(resupIngExpDate), quantity: parseInt(resupIngQty) || 0, createdAt: new Date() };
+    const receivedAt = new Date();
+    const newBatch = {
+      batchId, expirationDate: new Date(resupIngExpDate), quantity: parseInt(resupIngQty) || 0, createdAt: receivedAt,
+      supplier: resupSupplier.trim(), unitCost: resupUnitCost === '' ? null : Number(resupUnitCost), receivedAt,
+    };
     await updateDoc(doc(db, 'ingredients', resupIngRow._docId), { batches: [...existing, newBatch], lastUpdated: new Date() });
     await logAudit('RESUPPLY', 'ingredient', resupIngRow.displayId, resupIngRow.displayName, {
       batchId, expirationDate: resupIngExpDate, quantity: parseInt(resupIngQty) || 0,
+    });
+    await logRestock({
+      itemType: 'ingredient', refId: resupIngRow._docId, displayId: resupIngRow.displayId, name: resupIngRow.displayName,
+      unit: resupIngRow.raw.unit, batchId, expirationDate: newBatch.expirationDate, quantity: newBatch.quantity,
+      supplier: resupSupplier, unitCost: resupUnitCost,
     });
     await loadData(); setShowResupIngConf(false); setShowResupIngOk(true);
   };
@@ -564,6 +624,7 @@ export default function Inventory() {
       setEditIngUnit(row.raw.unit || 'grams');
       setEditIngIsAddOn(row.raw.isAddOn || false);
       setEditIngHasLevels(row.raw.hasLevels || false);
+      setEditIngShelfLife(row.raw.shelfLifeDays ? String(row.raw.shelfLifeDays) : '');
     }
     setShowEditForm(true);
   };
@@ -571,7 +632,7 @@ export default function Inventory() {
     if (!editRow) return false;
     const base = editName !== (editRow.raw.name || '') || editMaxLimit !== String(editRow.raw.maxLimit || '');
     if (editRow._type === 'material') return base;
-    return base || editIngType !== (editRow.raw.type || 'Dry') || editIngUnit !== (editRow.raw.unit || 'grams') || editIngIsAddOn !== (editRow.raw.isAddOn || false) || editIngHasLevels !== (editRow.raw.hasLevels || false);
+    return base || editIngType !== (editRow.raw.type || 'Dry') || editIngUnit !== (editRow.raw.unit || 'grams') || editIngIsAddOn !== (editRow.raw.isAddOn || false) || editIngHasLevels !== (editRow.raw.hasLevels || false) || editIngShelfLife !== (editRow.raw.shelfLifeDays ? String(editRow.raw.shelfLifeDays) : '');
   };
   const closeEdit = () => { editHasChanges() ? setShowEditDisc(true) : (setShowEditForm(false), setEditRow(null)); };
   const handleConfirmEdit = async () => {
@@ -589,6 +650,7 @@ export default function Inventory() {
       await updateDoc(doc(db, 'ingredients', editRow._docId), {
         name: editName.trim(), type: editIngType, unit: editIngUnit,
         isAddOn: editIngIsAddOn, hasLevels: editIngHasLevels, maxLimit: parseInt(editMaxLimit) || 0,
+        shelfLifeDays: parseInt(editIngShelfLife) || null,
       });
       await logAudit('EDIT', 'ingredient', editRow.displayId, editRow.displayName, {
         previousName: editRow.raw.name, newName: editName.trim(),
@@ -607,6 +669,7 @@ export default function Inventory() {
   return (
     <div className="flex w-full h-full">
       <AdminSidebar />
+      <datalist id="supplier-list">{suppliers.map(n => <option key={n} value={n} />)}</datalist>
 
       <main className="flex-1 bg-white overflow-hidden flex flex-col p-8">
 
@@ -621,7 +684,7 @@ export default function Inventory() {
               >
                 <span className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-all ${showInactive ? 'left-6' : 'left-1'}`} />
               </button>
-              <span className="text-xl text-gray-600 shrink-0">{showInactive ? 'Showing Inactive List' : 'Showing Active List'}</span>
+              <span className="text-xl text-gray-600 shrink-0">{showInactive ? 'Showing Archived List' : 'Showing Active List'}</span>
             </div>
             <div className="flex items-center gap-3">
               <div className="relative shrink-0">
@@ -706,8 +769,6 @@ export default function Inventory() {
                     {[
                       { field: 'displayId',   labelAsc: 'ID (A → Z)',              labelDesc: 'ID (Z → A)' },
                       { field: 'displayName', labelAsc: 'Name (A → Z)',             labelDesc: 'Name (Z → A)' },
-                      { field: 'displayCat',  labelAsc: 'Category (A → Z)',         labelDesc: 'Category (Z → A)' },
-                      { field: 'lastUpdated', labelAsc: 'Last Updated (Oldest)',    labelDesc: 'Last Updated (Newest)' },
                     ].map(({ field, labelAsc, labelDesc }) => (
                       <div key={field}>
                         {[{ dir: 'asc', label: labelAsc }, { dir: 'desc', label: labelDesc }].map(({ dir, label }) => (
@@ -771,19 +832,18 @@ export default function Inventory() {
         <div className="flex-1 rounded-xl border border-gray-200 overflow-hidden flex flex-col min-h-0">
           {/* Column headers */}
           <div className="flex items-center pl-9 pr-5 py-3 bg-white border-b border-gray-200 shrink-0">
-            <span className="w-[9%] text-xl font-semibold text-gray-800 text-center">ID</span>
-            <span className="w-[14%] text-xl font-semibold text-gray-800 text-center">Name</span>
-            <span className="w-[12%] text-xl font-semibold text-gray-800 text-center">Category</span>
+            <span className="w-[11%] text-xl font-semibold text-gray-800 text-center">ID</span>
+            <span className="w-[20%] text-xl font-semibold text-gray-800 text-center">Name</span>
             {showInactive ? (
               <>
-                <span className="w-[16%] text-xl font-semibold text-gray-800 text-center">Date Hidden</span>
-                <span className="w-[24%] text-xl font-semibold text-gray-800 text-center">Actions</span>
+                <span className="w-[22%] text-xl font-semibold text-gray-800 text-center">Date Archived</span>
+                <span className="flex-1 text-xl font-semibold text-gray-800 text-center">Actions</span>
               </>
             ) : (
               <>
-                <span className="w-[16%] text-xl font-semibold text-gray-800 text-center">Stock</span>
-                <span className="w-[18%] text-xl font-semibold text-gray-800 text-center">Status</span>
-                <span className="w-[10%] text-xl font-semibold text-gray-800 text-center">Last Updated</span>
+                <span className="w-[15%] text-xl font-semibold text-gray-800 text-center">Stock</span>
+                <span className="w-[20%] text-xl font-semibold text-gray-800 text-center">Status</span>
+                <span className="w-[14%] text-xl font-semibold text-gray-800 text-center">Expiry</span>
                 <span className="flex-1 text-xl font-semibold text-gray-800 text-center">Actions</span>
               </>
             )}
@@ -800,21 +860,31 @@ export default function Inventory() {
                   key={`${row._type}-${row._docId}`}
                   className="flex items-center bg-white rounded-xl border border-gray-200 shadow-sm px-5 py-3.5"
                 >
-                  <span className="w-[9%] text-xl text-gray-700 text-center">{row.displayId}</span>
-                  <span className="w-[14%] text-xl text-gray-700 text-center truncate" title={row.displayName}>{row.displayName}</span>
-                  <span className="w-[12%] text-xl text-gray-700 text-center">{row.displayCat}</span>
+                  <span className="w-[11%] text-xl text-gray-700 text-center">{row.displayId}</span>
+                  <span className="w-[20%] text-xl text-gray-700 text-center truncate" title={row.displayName}>{row.displayName}</span>
                   {showInactive ? (
                     <>
-                      <span className="w-[16%] text-xl text-gray-700 text-center">{fmtDate(row.hiddenAt)}</span>
-                      <div className="w-[24%] flex items-center justify-center">
-                        <button onClick={() => handleClickRetrieve(row)} className="bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white px-4 py-1.5 rounded-full text-xl transition-colors">Retrieve</button>
+                      <span className="w-[22%] text-xl text-gray-700 text-center">{fmtDate(row.hiddenAt)}</span>
+                      <div className="flex-1 flex items-center justify-center">
+                        <button onClick={() => handleClickRetrieve(row)} className="bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white px-4 py-1.5 rounded-full text-xl transition-colors">Restore</button>
                       </div>
                     </>
                   ) : (
                     <>
-                      <span className="w-[17%] text-xl text-gray-700 text-center">{row.displayStock} {row.displayUnit}</span>
-                      <span className={`w-[17%] text-xl font-medium text-center ${s.className}`}>{s.label}</span>
-                      <span className="w-[12%] text-xl text-gray-500 text-center">{row.displayLastUpdated}</span>
+                      <span className="w-[15%] text-xl text-gray-700 text-center">{row.displayStock} {row.displayUnit}</span>
+                      <span className={`w-[20%] text-xl font-medium text-center ${s.className}`}>{s.label}</span>
+                      <div className="w-[14%] text-center">
+                        {row.expiry ? (
+                          <>
+                            <p className={`text-xl ${row.expiry.days < 0 ? 'text-[#DF0C0C] font-medium' : row.expiry.days <= EXPIRING_DAYS ? 'text-orange-600 font-medium' : 'text-gray-700'}`}>
+                              {row.expiry.date.toLocaleDateString('en-US')}
+                            </p>
+                            <p className={`text-base ${row.expiry.days < 0 ? 'text-[#DF0C0C]' : row.expiry.days <= EXPIRING_DAYS ? 'text-orange-600' : 'text-gray-400'}`}>
+                              {row.expiry.days < 0 ? `Expired ${-row.expiry.days}d ago` : row.expiry.days === 0 ? 'Expires today' : `${row.expiry.days}d left`}
+                            </p>
+                          </>
+                        ) : <span className="text-xl text-gray-400">—</span>}
+                      </div>
                       <div className="flex-1 flex items-center justify-center gap-2">
                         <button onClick={() => handleAdjClick(row)} className="bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white px-3 py-1.5 rounded-full text-xl transition-colors">Adjust</button>
                         <button onClick={() => row._type === 'material' ? handleResupMat(row) : handleResupIng(row)} className="bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white px-3 py-1.5 rounded-full text-xl transition-colors">Resupply</button>
@@ -834,7 +904,7 @@ export default function Inventory() {
                                 <button onClick={() => { setOpenDropdownId(null); setViewBatchRow(row); }} className="w-full px-4 py-2.5 text-left text-xl text-gray-700 hover:bg-gray-50 rounded-t-xl">View Batches</button>
                               )}
                               <button onClick={() => { setOpenDropdownId(null); handleEditClick(row); }} className="w-full px-4 py-2.5 text-left text-xl text-gray-700 hover:bg-gray-50">Edit</button>
-                              <button onClick={() => { setOpenDropdownId(null); handleClickHide(row); }} className="w-full px-4 py-2.5 text-left text-xl text-red-500 hover:bg-gray-50 rounded-b-xl">Hide</button>
+                              <button onClick={() => { setOpenDropdownId(null); handleClickHide(row); }} className="w-full px-4 py-2.5 text-left text-xl text-red-500 hover:bg-gray-50 rounded-b-xl">Archive</button>
                             </div>
                           )}
                         </div>
@@ -930,6 +1000,16 @@ export default function Inventory() {
                     </div>
                   </div>
                   <div className="flex items-center gap-5">
+                    <label className="text-xl text-gray-600 w-48 shrink-0">Shelf life (days)</label>
+                    <input type="number" min="0" placeholder="Optional. Used to auto-fill expiry dates" value={ingShelfLife}
+                      onChange={e => {
+                        const v = e.target.value;
+                        setIngShelfLife(v);
+                        if (parseInt(v) > 0 && (ingExpDate === '' || ingExpAuto.current)) { setIngExpDate(addDaysISO(parseInt(v))); ingExpAuto.current = true; }
+                      }}
+                      className="flex-1 border border-gray-300 rounded-lg px-4 py-3 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]" />
+                  </div>
+                  <div className="flex items-center gap-5">
                     <label className="text-xl text-gray-600 w-48 shrink-0">Maximum Limit</label>
                     <input type="number" min="0" value={ingMaxLimit} onChange={e => setIngMaxLimit(e.target.value)}
                       className="flex-1 border border-gray-300 rounded-lg px-4 py-3 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]" />
@@ -965,7 +1045,17 @@ export default function Inventory() {
                 <div className="flex flex-col gap-5">
                   <div className="flex items-center gap-5">
                     <label className="text-xl text-gray-600 w-48 shrink-0">Expiration Date for current batch:</label>
-                    <input type="date" value={ingExpDate} onChange={e => setIngExpDate(e.target.value)}
+                    <input type="date" value={ingExpDate} onChange={e => { ingExpAuto.current = false; setIngExpDate(e.target.value); }}
+                      className="flex-1 border border-gray-300 rounded-lg px-4 py-3 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]" />
+                  </div>
+                  <div className="flex items-center gap-5">
+                    <label className="text-xl text-gray-600 w-48 shrink-0">Supplier:</label>
+                    <input list="supplier-list" value={ingSupplier} onChange={e => setIngSupplier(e.target.value)} placeholder="Optional"
+                      className="flex-1 border border-gray-300 rounded-lg px-4 py-3 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]" />
+                  </div>
+                  <div className="flex items-center gap-5">
+                    <label className="text-xl text-gray-600 w-48 shrink-0">Cost per {ingUnit}:</label>
+                    <input type="number" min="0" step="0.01" value={ingUnitCost} onChange={e => setIngUnitCost(e.target.value)} placeholder="Optional"
                       className="flex-1 border border-gray-300 rounded-lg px-4 py-3 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]" />
                   </div>
                   <div className="flex items-center gap-5">
@@ -1002,8 +1092,9 @@ export default function Inventory() {
             <div className="border border-gray-100 rounded-lg p-3 bg-gray-50 flex flex-col gap-1">
               {pendingMat.entries.map(e => <p key={e.matId} className="text-xl text-gray-700">{e.matId} — Starting Qty: {e.qty}</p>)}
             </div>
+            {saveError && <p className="text-lg text-red-500">{saveError}</p>}
             <div className="flex gap-3 justify-end mt-1">
-              <button onClick={() => setShowMatConf(false)} disabled={matSaving} className="px-6 py-2 rounded-full border border-gray-300 text-xl text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50">Cancel</button>
+              <button onClick={() => { setShowMatConf(false); setSaveError(''); }} disabled={matSaving} className="px-6 py-2 rounded-full border border-gray-300 text-xl text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50">Cancel</button>
               <button onClick={handleConfirmMat} disabled={matSaving} className={`px-6 py-2 rounded-full text-xl transition-colors ${matSaving ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white'}`}>{matSaving ? 'Saving...' : 'Confirm'}</button>
             </div>
           </div>
@@ -1037,8 +1128,9 @@ export default function Inventory() {
               <p className="text-xl text-gray-700 flex gap-1">Name: <span className="font-semibold truncate" title={pendingIng.name}>{pendingIng.name}</span></p>
               <p className="text-xl text-gray-700">Batch: {pendingIng.batchId} — Qty: {pendingIng.quantity} {pendingIng.unit}</p>
             </div>
+            {saveError && <p className="text-lg text-red-500">{saveError}</p>}
             <div className="flex gap-3 justify-end mt-1">
-              <button onClick={() => setShowIngConf(false)} disabled={ingSaving} className="px-6 py-2 rounded-full border border-gray-300 text-xl text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50">Cancel</button>
+              <button onClick={() => { setShowIngConf(false); setSaveError(''); }} disabled={ingSaving} className="px-6 py-2 rounded-full border border-gray-300 text-xl text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50">Cancel</button>
               <button onClick={handleConfirmIng} disabled={ingSaving} className={`px-6 py-2 rounded-full text-xl transition-colors ${ingSaving ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white'}`}>{ingSaving ? 'Saving...' : 'Confirm'}</button>
             </div>
           </div>
@@ -1067,7 +1159,7 @@ export default function Inventory() {
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[60]">
           <div className="bg-white rounded-2xl shadow-2xl w-[95vw] max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between px-10 py-6 border-b border-gray-200">
-              <h3 className="text-2xl font-semibold text-gray-800">Hide {hideRow.displayName}?</h3>
+              <h3 className="text-2xl font-semibold text-gray-800">Archive {hideRow.displayName}?</h3>
               <button onClick={() => { setShowHideConf(false); setHideRow(null); setConnectedItems([]); setConflictActions({}); setShowConflictList(false); }} className="text-gray-400 hover:text-gray-600 transition-colors"><X size={22} /></button>
             </div>
             <div className="px-10 py-8 flex flex-col gap-6">
@@ -1146,7 +1238,7 @@ export default function Inventory() {
                       disabled={!allChosen}
                       className={`px-8 py-2 rounded-full text-xl transition-colors ${allChosen ? 'bg-[#3ca4c7] hover:bg-[#2b8aa8] text-white' : 'bg-gray-200 text-gray-400 cursor-not-allowed'}`}
                     >
-                      Confirm and Hide
+                      Confirm and Archive
                     </button>
                   </div>
                 );
@@ -1206,7 +1298,7 @@ export default function Inventory() {
       {showRetMatConf && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[60]">
           <div className="bg-white rounded-2xl shadow-2xl w-[500px] px-8 py-6 flex flex-col gap-4">
-            <h3 className="text-2xl font-semibold text-gray-800">Retrieve Material?</h3>
+            <h3 className="text-2xl font-semibold text-gray-800">Restore Material?</h3>
             <p className="text-xl text-gray-600">The following sizes will be reactivated with new stock:</p>
             <div className="border border-gray-100 rounded-lg p-3 bg-gray-50 flex flex-col gap-1">
               {retMatSibs.map(sib => (
@@ -1278,7 +1370,7 @@ export default function Inventory() {
       {showRetIngConf && retIngRow && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[60]">
           <div className="bg-white rounded-2xl shadow-2xl w-[500px] px-8 py-6 flex flex-col gap-4">
-            <h3 className="text-2xl font-semibold text-gray-800">Retrieve Ingredient?</h3>
+            <h3 className="text-2xl font-semibold text-gray-800">Restore Ingredient?</h3>
             <p className="text-xl text-gray-600"><span className="font-semibold">{retIngRow.displayName}</span> will be reactivated with a new batch:</p>
             <div className="border border-gray-100 rounded-lg p-3 bg-gray-50 flex flex-col gap-1">
               <p className="text-xl text-gray-700">Batch ID: {retIngExpDate ? genBatchId(retIngExpDate, 0) : '—'}</p>
@@ -1318,6 +1410,16 @@ export default function Inventory() {
                   <input type="number" min="0" value={resupMatAmount} onChange={e => setResupMatAmount(e.target.value)}
                     className="flex-1 border border-gray-300 rounded-lg px-4 py-3 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]" />
                   <span className="text-xl text-gray-500 shrink-0">units</span>
+                </div>
+                <div className="flex items-center gap-5 mt-4">
+                  <label className="text-xl text-gray-600 w-32 shrink-0">Supplier</label>
+                  <input list="supplier-list" value={resupMatSupplier} onChange={e => setResupMatSupplier(e.target.value)} placeholder="Optional"
+                    className="flex-1 border border-gray-300 rounded-lg px-4 py-3 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]" />
+                </div>
+                <div className="flex items-center gap-5 mt-4">
+                  <label className="text-xl text-gray-600 w-32 shrink-0">Cost per unit</label>
+                  <input type="number" min="0" step="0.01" value={resupMatUnitCost} onChange={e => setResupMatUnitCost(e.target.value)} placeholder="Optional"
+                    className="flex-1 border border-gray-300 rounded-lg px-4 py-3 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]" />
                 </div>
                 {resupMatRow.raw.maxLimit > 0 && (resupMatRow.raw.stock || 0) + (parseInt(resupMatAmount) || 0) > resupMatRow.raw.maxLimit && (
                   <div className="flex items-center gap-3 bg-orange-50 border border-orange-200 rounded-xl px-4 py-3 mt-2">
@@ -1412,6 +1514,21 @@ export default function Inventory() {
                       </div>
                     </div>
                   </div>
+                  <div className="flex items-center gap-8">
+                    <div className="flex items-center gap-4 flex-1">
+                      <label className="text-xl text-gray-600 shrink-0">Supplier:</label>
+                      <input list="supplier-list" value={resupSupplier} onChange={e => setResupSupplier(e.target.value)} placeholder="Optional"
+                        className="flex-1 border border-gray-300 rounded-lg px-4 py-3 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]" />
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <label className="text-xl text-gray-600 shrink-0">Cost per {resupIngRow.raw.unit || 'unit'}:</label>
+                      <input type="number" min="0" step="0.01" value={resupUnitCost} onChange={e => setResupUnitCost(e.target.value)} placeholder="Optional"
+                        className="w-40 border border-gray-300 rounded-lg px-4 py-3 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]" />
+                    </div>
+                  </div>
+                  {resupIngRow.raw.shelfLifeDays > 0 && (
+                    <p className="text-xl text-gray-400 -mt-4">Expiry pre-filled from the {resupIngRow.raw.shelfLifeDays}-day shelf life. Change it if the delivery says otherwise.</p>
+                  )}
                   <div className="text-center px-4">
                     <p className="text-xl font-semibold text-gray-700 mb-2">Reminder</p>
                     <p className="text-xl text-gray-500">
@@ -1438,6 +1555,7 @@ export default function Inventory() {
               <p className="text-xl text-gray-700">Batch ID: <span className="font-semibold">{resupIngExpDate ? genBatchId(resupIngExpDate, (resupIngRow.raw.batches || []).length) : '—'}</span></p>
               <p className="text-xl text-gray-700">Expiry: <span className="font-semibold">{resupIngExpDate || '—'}</span></p>
               <p className="text-xl text-gray-700">Quantity: <span className="font-semibold">{resupIngQty || 0} {resupIngRow.raw.unit || 'units'}</span></p>
+              {resupSupplier.trim() && <p className="text-xl text-gray-700">Supplier: <span className="font-semibold">{resupSupplier.trim()}</span></p>}
             </div>
             <div className="flex gap-3 justify-end mt-1">
               <button onClick={() => setShowResupIngConf(false)} className="px-6 py-2 rounded-full border border-gray-300 text-xl text-gray-600 hover:bg-gray-50 transition-colors">Cancel</button>
@@ -1674,6 +1792,11 @@ export default function Inventory() {
                           </select>
                           <span className="absolute right-4 top-3.5 text-gray-400 pointer-events-none text-xl">▾</span>
                         </div>
+                      </div>
+                      <div className="flex items-center gap-5">
+                        <label className="text-xl text-gray-600 w-52 shrink-0">Shelf life (days)</label>
+                        <input type="number" min="0" placeholder="Optional" value={editIngShelfLife} onChange={e => setEditIngShelfLife(e.target.value)}
+                          className="flex-1 border border-gray-300 rounded-lg px-4 py-3 text-xl text-gray-700 outline-none focus:border-[#3ca4c7]" />
                       </div>
                       <div className="flex items-center gap-5">
                         <span className="text-xl text-gray-600 flex-1">Consider Ingredient as an Add-On?</span>

@@ -8,6 +8,8 @@ import {
   ChevronDown, ChevronUp
 } from 'lucide-react';
 
+import ShiftClock from '../components/ShiftClock';
+
 function NavItem({ to, icon, label, end = false }) {
   return (
     <NavLink
@@ -103,7 +105,7 @@ export default function StaffSidebar() {
       </div>
 
       {/* Nav items */}
-      <nav className="flex-1 px-3 flex flex-col gap-0.5 overflow-y-auto pb-2">
+      <nav className="flex-1 min-h-0 px-3 flex flex-col gap-0.5 overflow-y-auto pb-2 [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.35)_transparent]">
         <NavItem to="/staff-dashboard" icon={<LayoutGrid size={17} />} label="Dashboard" />
         <NavItem to="/staff-inventory" icon={<Package size={17} />} label="Inventory" />
 
@@ -140,6 +142,8 @@ export default function StaffSidebar() {
         <NavItem to="/staff-account" icon={<UserCircle size={17} />} label="Account" />
         <NavItem to="/staff-about" icon={<Info size={17} />} label="About" />
         <NavItem to="/staff-help" icon={<HelpCircle size={17} />} label="Help" />
+
+        <ShiftClock />
 
         <button
           onClick={() => setShowLogoutConfirm(true)}

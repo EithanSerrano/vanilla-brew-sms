@@ -7,9 +7,10 @@ import {
   LayoutGrid, Package, FolderCog, Coffee, Users, Tag,
   FileText, ScrollText, Settings, Info,
   HelpCircle, LogOut, ChevronDown, ChevronUp,
-  QrCode, UserCircle, Percent, Database, BarChart3,
+  QrCode, UserCircle, Percent, Database, BarChart3, CalendarClock, Truck,
 } from 'lucide-react';
 import { can, getSessionRole } from '../constants/roles';
+import ShiftClock from '../components/ShiftClock';
 
 function NavItem({ to, icon, label, end = false }) {
   return (
@@ -125,10 +126,11 @@ export default function AdminSidebar() {
       </div>
 
       {/* Nav items */}
-      <nav className="flex-1 px-3 flex flex-col gap-0.5 overflow-y-auto pb-2">
+      <nav className="flex-1 min-h-0 px-3 flex flex-col gap-0.5 overflow-y-auto pb-2 [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.35)_transparent]">
         <NavItem to="/admin-dashboard" icon={<LayoutGrid size={17} />} label="Dashboard" />
         {can(role, 'analytics') && <NavItem to="/analytics" icon={<BarChart3 size={17} />} label="Analytics" />}
         <NavItem to="/inventory" icon={<Package size={17} />} label="Inventory" />
+        <NavItem to="/supply" icon={<Truck size={17} />} label="Supply" />
 
         {/* Administrative accordion */}
         <button
@@ -146,6 +148,7 @@ export default function AdminSidebar() {
             <SubNavItem to="/menu-items" icon={<Coffee size={15} />} label="Menu Items" />
             <SubNavItem to="/menu-categories" icon={<Tag size={15} />} label="Menu Categories" />
             <SubNavItem to="/promotions" icon={<Percent size={15} />} label="Promotions" />
+            <SubNavItem to="/attendance" icon={<CalendarClock size={15} />} label="Attendance" />
             {can(role, 'accounts') && <SubNavItem to="/registration" icon={<Users size={15} />} label="Manage Accounts" />}
           </div>
         )}
@@ -203,6 +206,8 @@ export default function AdminSidebar() {
         <NavItem to="/admin-account" icon={<UserCircle size={17} />} label="Account" />
         <NavItem to="/admin-about" icon={<Info size={17} />} label="About" />
         <NavItem to="/admin-help" icon={<HelpCircle size={17} />} label="Help" />
+
+        <ShiftClock />
 
         <button
           onClick={() => setShowLogoutConfirm(true)}
